@@ -1,0 +1,8 @@
+# Nosh's own settings file. It holds the API key and the whole food log,
+# neither of which belongs in a public repository.
+data.json
+
+# Local scratch
+*.bak
+node_modules/
+.DS_Store

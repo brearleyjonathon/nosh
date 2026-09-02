@@ -1,0 +1,9 @@
+{
+  "id": "dash-tracker",
+  "name": "Nosh",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Pick meal notes and watch their YAML nutrition add up as progress bars against DASH diet targets.",
+  "author": "Jonathon Brearley",
+  "isDesktopOnly": false
+}
