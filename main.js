@@ -3524,7 +3524,10 @@ class NoshSettingTab extends PluginSettingTab {
         if (this.plugin.settings.aiAuth === 'key') {
             new Setting(containerEl)
                 .setName('API key')
-                .setDesc('Stored in the vault. Prefer the ant profile on a machine that has it.')
+                .setDesc('Kept in plain text in this plugin’s data.json, inside your '
+                         + 'vault. Anything that reads the vault can read it — other '
+                         + 'plugins, whatever you sync with, any repository you commit the '
+                         + 'vault to. Prefer the ant profile on a machine that has one.')
                 .addText((t) => {
                     t.inputEl.type = 'password';
                     t.setPlaceholder('sk-ant-\u2026')
