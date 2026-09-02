@@ -1763,10 +1763,22 @@ module.exports = class NoshPlugin extends Plugin {
         // Moved notes leave dangling log entries; the cache has to be up first.
         this.app.workspace.onLayoutReady(() => this.repairLog());
 
-        // Keep the list in step with the vault.
-        this.registerEvent(this.app.metadataCache.on('changed', () => this.refreshViews()));
-        this.registerEvent(this.app.vault.on('delete', () => this.refreshViews()));
-        this.registerEvent(this.app.vault.on('rename', () => this.refreshViews()));
+        /* Keep the list in step with the vault, without redrawing it because
+         * somebody typed a word in a note Nosh has never heard of. */
+        this.registerEvent(this.app.metadataCache.on('changed', (file) => {
+            if (this.touches(file)) this.scheduleRefresh();
+        }));
+
+        /* A delete or a rename can strand a log entry, so both ask for the
+         * repair pass: it puts an entry back on the note's new path where it
+         * can, and where it cannot the day says so rather than going quiet. */
+        this.registerEvent(this.app.vault.on('delete', (file) => {
+            if (this.touches(file)) this.scheduleRefresh(true);
+        }));
+        this.registerEvent(this.app.vault.on('rename', (file, was) => {
+            const knew = this.knownPaths && this.knownPaths.has(was);
+            if (knew || this.touches(file)) this.scheduleRefresh(true);
+        }));
     }
 
     async loadSettings() {
@@ -1814,6 +1826,45 @@ module.exports = class NoshPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+    }
+
+    /* Most of what happens in a vault has nothing to do with Nosh, and a
+     * redraw walks every markdown file in it. A note matters if it is already
+     * one of ours, or if it has just become one - the cheapest pair of
+     * questions that cannot miss a change. */
+    touches(file) {
+        if (!file || typeof file.path !== 'string') return false;
+        if (!file.path.toLowerCase().endsWith('.md')) return false;
+        if (this.knownPaths && this.knownPaths.has(file.path)) return true;
+        if (underFolder(file.path, noshFolder(this.settings, ''))) return true;
+
+        const cache = this.app.metadataCache.getFileCache(file);
+        if (!cache) return false;
+        return !!noteKind(getAllTags(cache) || [], this.settings.tag);
+    }
+
+    /* Typing in a note fires `changed` over and over. Collapse a burst into
+     * one redraw; `repair` asks for the dangling-entry pass first, which is
+     * what a rename or a delete may have created work for. */
+    scheduleRefresh(repair) {
+        if (repair) this.pendingRepair = true;
+        if (this.refreshTimer) clearTimeout(this.refreshTimer);
+
+        this.refreshTimer = setTimeout(async () => {
+            this.refreshTimer = null;
+            const mend = this.pendingRepair;
+            this.pendingRepair = false;
+            try {
+                if (mend) await this.repairLog();
+                this.refreshViews();
+            } catch (e) {
+                new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+            }
+        }, 250);
+    }
+
+    onunload() {
+        if (this.refreshTimer) clearTimeout(this.refreshTimer);
     }
 
     refreshViews() {
@@ -1959,6 +2010,13 @@ module.exports = class NoshPlugin extends Plugin {
         };
         out.meal.sort((a, b) => a.name.localeCompare(b.name));
         out.ingredient.sort(byOrder(GROUP_ORDER));
+
+        /* What this walk found, so the next vault event can be answered
+         * without walking again. */
+        this.knownPaths = new Set();
+        for (const list of [out.meal, out.ingredient]) {
+            for (const r of list) this.knownPaths.add(r.path);
+        }
 
         return out;
     }
