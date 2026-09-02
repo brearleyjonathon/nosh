@@ -21,6 +21,38 @@
     letter-spacing: 0.01em;
 }
 
+/* A log entry whose note has gone. Stated plainly, because a total that is
+ * short for this reason looks exactly like a day somebody ate less. */
+.dash-tracker .dash-missing {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 6px 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.5;
+    background: var(--background-modifier-border);
+    border-radius: var(--radius-s);
+}
+
+.dash-tracker .dash-missing button {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding: 1px 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    background: transparent;
+    border: 1px solid var(--background-modifier-border-hover);
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.dash-tracker .dash-missing button:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+}
+
 .dash-tracker .dash-summary {
     padding-bottom: 10px;
     color: var(--text-muted);

@@ -2183,6 +2183,36 @@ class NoshView extends ItemView {
         return out;
     }
 
+    /* Entries whose note has gone. entriesFor() cannot return them - there is
+     * no recipe to return - so left alone they sit in the log counting for
+     * nothing, and the day's totals are quietly short by however much they
+     * were worth. repairLog() rescues the ones that were merely moved; these
+     * are the ones where the name went too. */
+    missingFor(days) {
+        const out = [];
+        for (const iso of days) {
+            for (const row of logRows(this.plugin.settings.log, iso)) {
+                if (this.byPath[row.path]) continue;
+                out.push({
+                    iso: iso,
+                    occasion: row.occasion,
+                    path: row.path,
+                    name: row.path.split('/').pop().replace(/\.md$/i, ''),
+                });
+            }
+        }
+        return out;
+    }
+
+    async forgetMissing(days) {
+        const log = this.plugin.settings.log;
+        for (const gone of this.missingFor(days)) {
+            logSet(log, gone.iso, gone.occasion, gone.path, 0);
+        }
+        await this.plugin.saveSettings();
+        this.refresh();
+    }
+
     totalsFor(days) {
         const totals = {};
         for (const n of NUTRIENTS) totals[n.key] = 0;
@@ -2521,6 +2551,22 @@ class NoshView extends ItemView {
                       fmt(totals.calories) + ' kcal' +
                       (week ? ' · ' + fmt(totals.calories / 7) + ' kcal/day avg' : ''),
             });
+        }
+
+        /* Said out loud rather than swallowed: a total that is short because
+         * a note was deleted looks exactly like a day somebody ate less. */
+        const gone = this.missingFor(days);
+        if (gone.length) {
+            const warn = this.summaryEl.createDiv({ cls: 'dash-missing' });
+            const names = gone.map((g) => g.name);
+            warn.createSpan({
+                text: gone.length + (gone.length === 1 ? ' entry points' : ' entries point') +
+                      ' at notes that are gone: ' + names.slice(0, 3).join(', ') +
+                      (names.length > 3 ? ' and ' + (names.length - 3) + ' more' : ''),
+            });
+            const drop = warn.createEl('button', { text: 'Forget' });
+            drop.setAttr('aria-label', 'Take these entries out of the log');
+            drop.addEventListener('click', () => this.forgetMissing(days));
         }
 
         const split = this.totalsByOccasion(days);
@@ -3177,7 +3223,7 @@ class NoshView extends ItemView {
         /* Nothing is written at all when the note is already there and good.
          * The day just gains a serving of what the vault already knows. */
         if (choice === 'existing') {
-            if (log) await this.setServings(clash.path, 1);
+            if (log) await this.setServings(clash.path, 1, this.occasion);
             new Notice(log ? 'Logged ' + name : name + ' is already in the vault');
             return;
         }
@@ -3195,7 +3241,7 @@ class NoshView extends ItemView {
          * wait for the index before ticking the day. */
         await awaitCache(this.app, file, 2000);
         this.plugin.refreshViews();
-        if (log) await this.setServings(file.path, 1);
+        if (log) await this.setServings(file.path, 1, this.occasion);
 
         new Notice((choice === 'replace' ? 'Updated ' : 'Added ') + file.basename);
     }
@@ -3251,7 +3297,11 @@ class NoshView extends ItemView {
             label: humanDay(iso),
             entries: this.entriesFor(iso).map((e) => ({
                 name: e.recipe.name,
-                meal: e.recipe.meal || 'Other',
+                /* Where it was actually eaten. The note's own meal_type only
+                 * ever said where it was eaten the first time, and a report
+                 * that used it filed a banana under Breakfast whatever the
+                 * sidebar showed. */
+                meal: occasionLabel(e.occasion),
                 amount: e.recipe.amount,
                 servings: e.servings,
                 calories: e.recipe.values.calories * e.servings,
