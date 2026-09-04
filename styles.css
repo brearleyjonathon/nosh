@@ -965,6 +965,16 @@
     height: 15px;
 }
 
+/* A reload off disk is usually over before the eye catches it, so the turn is
+ * the only proof it happened. */
+.dash-tracker .dash-gear-spin .svg-icon {
+    animation: dash-tumble 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dash-tracker .dash-gear-spin .svg-icon { animation: none; }
+}
+
 /* Asking about a recipe ---------------------------------------------- *
  *
  * A conversation rather than a form, so it reads as one: the question above,

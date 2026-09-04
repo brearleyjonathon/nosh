@@ -2206,6 +2206,19 @@ module.exports = class NoshPlugin extends Plugin {
         });
 
         this.addCommand({
+            id: 'reload-nosh-data',
+            name: 'Reload data from disk',
+            callback: async () => {
+                try {
+                    await this.reloadSettings();
+                    new Notice('Nosh: reloaded from data.json.');
+                } catch (e) {
+                    new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+                }
+            },
+        });
+
+        this.addCommand({
             id: 'clear-dash-selection',
             name: 'Clear today',
             callback: async () => {
@@ -2307,6 +2320,16 @@ module.exports = class NoshPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+    }
+
+    /* data.json is read once, at load. A vault that syncs from a phone while
+     * Obsidian sits open on a desk leaves what is on screen a version behind,
+     * and nothing in memory is unsaved, so re-reading the file is the whole of
+     * the fix: settings, targets and the log all come back off disk. */
+    async reloadSettings() {
+        await this.loadSettings();
+        await this.repairLog();
+        this.refreshViews();
     }
 
     /* Most of what happens in a vault has nothing to do with Nosh, and a
@@ -2620,6 +2643,25 @@ class NoshView extends ItemView {
         header.createEl('div', { cls: 'dash-title', text: 'Nosh' });
 
         const actions = header.createDiv({ cls: 'dash-actions' });
+
+        /* The log lives in data.json, which is read once at load. Somewhere to
+         * press when the vault has been synced from elsewhere since. */
+        const again = actions.createEl('button', { cls: 'dash-gear' });
+        again.setAttr('aria-label', 'Reload the log from data.json');
+        setIcon(again, 'refresh-cw');
+        again.addEventListener('click', async () => {
+            if (again.disabled) return;
+            again.disabled = true;
+            again.addClass('dash-gear-spin');
+            try {
+                await this.plugin.reloadSettings();
+                new Notice('Nosh: reloaded from data.json.');
+            } catch (e) {
+                new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+            }
+            again.removeClass('dash-gear-spin');
+            again.disabled = false;
+        });
 
         const out = actions.createEl('button', { cls: 'dash-gear' });
         out.setAttr('aria-label', 'Export a report for what is on screen');
