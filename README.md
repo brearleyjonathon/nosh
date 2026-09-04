@@ -82,14 +82,24 @@ bars, and the day-by-day detail behind them.
 
 ## Nosh AI (optional)
 
-Off unless you give it credentials. Three things use it:
+Off unless you give it credentials. Four things use it:
 
 - **Drafting** — describe something in plain words and get a note with the
   numbers estimated and the portion stated.
 - **What's for…** — takes what the day still has room for and suggests a meal
   that fits, with a method. Ask it before it runs: how many you are cooking for,
   how much of a production it should be, what needs using up.
+- **Ask about this recipe** — open a recipe and interrogate it: what the sodium
+  rides on, what would make it go further, what to serve alongside. Command
+  palette, or right-click the note.
 - **Readings** — an optional paragraph on an exported report.
+
+Asking works on any note that reads as a recipe, not only the ones Nosh wrote:
+an ingredients list, a method, or the frontmatter numbers is enough. The note
+goes over as written and its own figures are used rather than re-estimated;
+anything Claude has to supply itself is marked as an estimate. It is a
+conversation, so you can keep pushing, and **Save to note** appends the
+exchange to the bottom of the note if it was worth keeping.
 
 Two models can be set separately. Estimating a meal runs once a mouthful and
 wants something cheap; inventing one runs once a day and is the harder job.

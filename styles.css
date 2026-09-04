@@ -964,3 +964,84 @@
     width: 15px;
     height: 15px;
 }
+
+/* Asking about a recipe ---------------------------------------------- *
+ *
+ * A conversation rather than a form, so it reads as one: the question above,
+ * the answer below it, and the box to ask the next one still in reach. */
+.dash-probe .dash-probe-source {
+    padding: 0 0 10px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+/* Bounded, so a long answer scrolls inside the modal rather than pushing the
+ * box you type into off the bottom of it. */
+.dash-probe .dash-probe-log {
+    max-height: 46vh;
+    overflow-y: auto;
+}
+
+.dash-probe .dash-probe-log:not(:empty) {
+    margin-bottom: 12px;
+}
+
+.dash-probe .dash-probe-turn {
+    padding-bottom: 12px;
+}
+
+.dash-probe .dash-probe-who {
+    padding-bottom: 2px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.dash-probe .dash-probe-said {
+    font-size: var(--font-ui-smaller);
+    line-height: 1.6;
+}
+
+/* Rendered markdown arrives with its own margins, which would otherwise open
+ * a gap between the label and the first line of the answer. */
+.dash-probe .dash-probe-said > :first-child { margin-top: 0; }
+.dash-probe .dash-probe-said > :last-child { margin-bottom: 0; }
+
+.dash-probe .dash-probe-said ul,
+.dash-probe .dash-probe-said ol {
+    margin: 6px 0;
+    padding-left: 1.3em;
+}
+
+.dash-probe .dash-probe-you .dash-probe-said {
+    color: var(--text-muted);
+}
+
+.dash-probe .dash-probe-failed {
+    color: var(--text-error);
+}
+
+/* Openers, offered until there is a conversation to read instead. */
+.dash-probe .dash-probe-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-bottom: 10px;
+}
+
+.dash-probe .dash-probe-chip {
+    padding: 3px 10px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    background: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-l);
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.dash-probe .dash-probe-chip:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+}

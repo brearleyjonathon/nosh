@@ -1,7 +1,7 @@
 'use strict';
 
 const { Plugin, ItemView, PluginSettingTab, Setting, Modal, Menu, Notice,
-        requestUrl, setIcon, getAllTags } = require('obsidian');
+        requestUrl, setIcon, getAllTags, MarkdownRenderer, Component } = require('obsidian');
 
 const VIEW_TYPE_DASH = 'dash-tracker-view';
 
@@ -1700,6 +1700,463 @@ function readingMarkdown(reading, model) {
     return lines.join('\n');
 }
 
+/* --- asking about a recipe already in the vault ---------------------- *
+ *
+ * Everything above writes notes; this reads one back. A recipe in the vault
+ * is a question waiting to be asked - what the sodium rides on, what would
+ * make it go further, what it leaves the day short of - and none of that is
+ * answered by a form. So this one stays a conversation: the note is handed
+ * over as written, once, and the asking carries on from there.
+ *
+ * It works on any note that reads as a recipe, not only the ones Nosh wrote.
+ * A recipe typed in years ago says what it is made of and how it is cooked,
+ * which is the whole of what a question about it needs.
+ */
+
+const RECIPE_PARTS_HEAD = /ingredient|you.{0,3}ll need|shopping|components|parts/i;
+const RECIPE_METHOD_HEAD = /method|instruction|direction|step|preparation|how to|assembl/i;
+
+/* Long enough for any recipe and the notes around it; short of the point
+ * where a pasted book chapter is being reasoned about a paragraph at a time. */
+const RECIPE_MAX = 12000;
+
+function stripFrontMatter(text) {
+    const s = String(text || '');
+    const block = s.match(/^---\r?\n(?:[\s\S]*?\r?\n)?(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/);
+    return block ? s.slice(block[0].length) : s;
+}
+
+/* Headings say which list is which, and where a note has none - a recipe
+ * pasted in as a couple of lists and nothing else - the shape of the list
+ * answers instead: things are bulleted, steps are numbered. */
+function recipeLists(body) {
+    const named = { parts: [], steps: [] };
+    const loose = { parts: [], steps: [] };
+    let head = '';
+    let title = '';
+
+    for (const raw of String(body).split(/\r?\n/)) {
+        const line = raw.trim();
+
+        const heading = line.match(/^(#{1,6})\s+(.*)$/);
+        if (heading) {
+            head = heading[2].trim();
+            if (heading[1].length === 1 && !title) title = head;
+            continue;
+        }
+
+        const item = line.match(/^(?:[-*+]|\d+[.)])\s+(.*)$/);
+        if (!item) continue;
+
+        /* A tick box is how a recipe gets cooked from, not part of what it
+         * says, and neither is the wikilink syntax around an ingredient. */
+        const text = item[1]
+            .replace(/^\[[ xX]\]\s*/, '')
+            .replace(/\[\[([^\]|]+)(\|[^\]]*)?\]\]/g, '$1')
+            .trim();
+        if (!text) continue;
+
+        const ordered = /^\d/.test(line);
+        if (RECIPE_PARTS_HEAD.test(head)) named.parts.push(text);
+        else if (RECIPE_METHOD_HEAD.test(head)) named.steps.push(text);
+        else if (ordered) loose.steps.push(text);
+        else loose.parts.push(text);
+    }
+
+    return {
+        title,
+        parts: named.parts.length ? named.parts : loose.parts,
+        steps: named.steps.length ? named.steps : loose.steps,
+    };
+}
+
+/* One of Nosh's composed meals keeps its parts in the frontmatter, where a
+ * body list may only echo them. Read them from there when the body has none. */
+function componentParts(app, file, fm) {
+    if (Array.isArray(fm.ingredients)) {
+        return fm.ingredients.map((i) => String(i).trim()).filter(Boolean);
+    }
+
+    const out = [];
+    for (const c of parseComponents(fm.components)) {
+        const dest = app.metadataCache.getFirstLinkpathDest(c.link, file.path);
+        const name = dest ? dest.basename : c.link;
+        out.push(name + (c.servings === 1 ? '' : ', ' + servingsPhrase(c.servings)));
+    }
+    return out;
+}
+
+function readRecipe(app, file, text) {
+    const cache = app.metadataCache.getFileCache(file) || {};
+    const fm = cache.frontmatter || {};
+    const body = stripFrontMatter(text).trim();
+    const found = recipeLists(body);
+
+    const values = {};
+    let hasNumbers = false;
+    for (const n of NUTRIENTS) {
+        if (fm[n.key] === undefined) continue;
+        values[n.key] = parseNum(fm[n.key]);
+        hasNumbers = true;
+    }
+    for (const g of FOOD_GROUPS) {
+        if (fm[g.key] === undefined) continue;
+        values[g.key] = parseNum(fm[g.key]);
+        hasNumbers = true;
+    }
+
+    return {
+        path: file.path,
+        name: found.title || file.basename,
+        /* Sent as written, so nothing the note settled has to be guessed at
+         * again. A note past the cap loses its tail rather than its head, the
+         * recipe being at the top of one and the reminiscing at the bottom. */
+        body: body.length > RECIPE_MAX
+            ? body.slice(0, RECIPE_MAX) + '\n\n[the rest of the note is not shown]'
+            : body,
+        parts: found.parts.length ? found.parts : componentParts(app, file, fm),
+        steps: found.steps,
+        amount: typeof fm.amount === 'string' ? fm.amount.trim() : '',
+        serves: Math.max(1, parseNum(fm.serves || fm.servings) || 1),
+        meal: mealTypeOf(fm, getAllTags(cache) || []),
+        values,
+        hasNumbers,
+    };
+}
+
+/* What the menu is willing to offer on, answered from the cache alone so it
+ * can be answered while the menu is being built. The palette is less fussy:
+ * a command you went looking for should run and then tell you if the note was
+ * never a recipe, rather than quietly not being there. */
+function looksLikeRecipe(app, file, settings) {
+    if (!file || typeof file.path !== 'string') return false;
+    if (!file.path.toLowerCase().endsWith('.md')) return false;
+
+    const cache = app.metadataCache.getFileCache(file);
+    if (!cache) return false;
+    const fm = cache.frontmatter || {};
+    if (Array.isArray(fm.ingredients) || Array.isArray(fm.components)) return true;
+
+    for (const h of cache.headings || []) {
+        const said = String((h && h.heading) || '');
+        if (RECIPE_PARTS_HEAD.test(said) || RECIPE_METHOD_HEAD.test(said)) return true;
+    }
+
+    /* One of ours counts on its numbers alone: an ingredient note is a recipe
+     * with one line in it, and "how much sodium is that really" is a fair
+     * question to ask of it. */
+    if (noteKind(getAllTags(cache) || [], settings.tag)) {
+        return NUTRIENTS.some((n) => fm[n.key] !== undefined) ||
+               FOOD_GROUPS.some((g) => fm[g.key] !== undefined);
+    }
+    return false;
+}
+
+const AI_PROBE_SYSTEM = [
+    'You answer questions about one recipe out of the reader\'s own notes. The',
+    'note is given to you as it is written; treat it as the truth about the',
+    'dish, and answer the question actually asked.',
+    '',
+    '- A figure the note already carries was arrived at when the note was',
+    '  written. Use it rather than working out your own. Where an answer needs',
+    '  a number the note does not hold, estimate from standard reference data',
+    '  and say plainly that you have estimated it.',
+    '- Answer in a few sentences, or a short list where the answer really is a',
+    '  list. No preamble, and no reciting the recipe back.',
+    '- Where you propose a change, say what it costs as well as what it buys:',
+    '  which numbers move and roughly how far, and what it does to the taste or',
+    '  the texture. A swap that ruins the dish is not an improvement.',
+    '- Do not rewrite the whole recipe unless rewriting it is what was asked.',
+    '- The targets below are this vault\'s, not the reference pattern\'s. A limit',
+    '  is a ceiling rather than something to hit: landing well under one is a',
+    '  good outcome.',
+    '- Where the note does not say enough to answer, say so and say what is',
+    '  missing, rather than inventing the missing half.',
+].concat(AI_PORTIONS).join('\n');
+
+/* The recipe, its numbers and the targets they are read against, all of it on
+ * the first question only: after that the conversation is carrying it. */
+function probePrompt(recipe, settings) {
+    const lines = ['The note: ' + recipe.path];
+    if (recipe.serves > 1) lines.push('Its method serves ' + recipe.serves + '.');
+    if (recipe.amount) lines.push('One serving is ' + recipe.amount + '.');
+    if (recipe.meal) lines.push('It is usually eaten at: ' + recipe.meal + '.');
+
+    if (recipe.hasNumbers) {
+        lines.push('');
+        lines.push('What the note records for one serving, against this vault\'s targets:');
+        for (const n of NUTRIENTS) {
+            if (recipe.values[n.key] === undefined) continue;
+            const value = parseNum(recipe.values[n.key]);
+            const target = parseNum((settings.targets || {})[n.key]);
+            const against = target
+                ? ' (' + Math.round((value / target) * 100) + '% of the ' +
+                  fmt(target) + ' ' + n.unit + ' ' +
+                  (n.dir === 'limit' ? 'limit' : 'target') + ')'
+                : '';
+            lines.push('- ' + n.label + ': ' + fmt(value) + ' ' + n.unit + against);
+        }
+
+        const groups = FOOD_GROUPS
+            .filter((g) => parseNum(recipe.values[g.key]) > 0)
+            .map((g) => g.label + ', ' + servingsPhrase(parseNum(recipe.values[g.key])));
+        if (groups.length) {
+            lines.push('');
+            lines.push('DASH servings in one serving of it: ' + groups.join('; ') + '.');
+        }
+    } else {
+        lines.push('');
+        lines.push('The note carries no nutrition figures, so anything numeric in ' +
+                   'your answer is yours to estimate and to mark as an estimate.');
+    }
+
+    /* Ahead of the question rather than after it, because it is the subject
+     * and not a qualification of one. */
+    lines.push('');
+    lines.push('The note, as written:');
+    lines.push('');
+    lines.push(recipe.body);
+    lines.push('');
+    lines.push('The question:');
+
+    return lines.join('\n');
+}
+
+/* Prose, where the rest of Nosh asks for a filled form. A question about a
+ * recipe has no shape to fill in ahead of hearing it, and an answer squeezed
+ * into fields would be the wrong answer neatly. */
+async function aiAsk(plugin, system, messages) {
+    const headers = await aiHeaders(plugin.settings);
+
+    const res = await requestUrl({
+        url: AI_ENDPOINT,
+        method: 'POST',
+        headers,
+        throw: false,
+        body: JSON.stringify({
+            /* The harder of the two models, for the same reason a suggestion
+             * gets it: this is asked once over a cup of tea, not once a
+             * mouthful, and the answer is worth thinking about. */
+            model: aiModelId(plugin.settings, 'aiSuggestModel'),
+            max_tokens: 2048,
+            thinking: { type: 'adaptive' },
+            output_config: { effort: plugin.settings.aiEffort || 'medium' },
+            system,
+            messages,
+        }),
+    });
+
+    let body = null;
+    try { body = JSON.parse(res.text); } catch (e) { /* handled below */ }
+
+    if (res.status !== 200) {
+        if (res.status === 401) forgetAntToken();
+        const said = body && body.error && body.error.message;
+        throw new Error(said || ('The API answered ' + res.status + '.'));
+    }
+
+    const text = ((body && body.content) || [])
+        .filter((b) => b.type === 'text')
+        .map((b) => String(b.text || ''))
+        .join('\n')
+        .trim();
+    if (!text) throw new Error('Claude answered with nothing to read.');
+    return text;
+}
+
+/* Obsidian has rendered markdown for years, under two names. Take whichever
+ * this version has, and fall back on the text itself rather than on nothing. */
+async function renderMarkdownInto(app, markdown, el, path, owner) {
+    el.empty();
+    try {
+        if (MarkdownRenderer && typeof MarkdownRenderer.render === 'function') {
+            await MarkdownRenderer.render(app, markdown, el, path, owner);
+            return;
+        }
+        if (MarkdownRenderer && typeof MarkdownRenderer.renderMarkdown === 'function') {
+            await MarkdownRenderer.renderMarkdown(markdown, el, path, owner);
+            return;
+        }
+    } catch (e) { /* the plain text below is still readable */ }
+    el.setText(markdown);
+}
+
+/* Openers, not a menu of features: each one is a whole question, and typing
+ * over them is the point. */
+const RECIPE_ASKS = [
+    'How does this sit against DASH?',
+    'Cut the sodium',
+    'Make it go further',
+    'What should I serve with it?',
+];
+
+function probeMarkdown(turns, model) {
+    const lines = ['', '', '## Asked about this recipe', ''];
+    for (const t of turns) {
+        lines.push('**' + String(t.question).replace(/\s+/g, ' ').trim() + '**');
+        lines.push('');
+        lines.push(String(t.answer).trim());
+        lines.push('');
+    }
+    /* Whose answer this is, so a note read months later is not mistaken for
+     * something the vault measured. */
+    lines.push('*Answered by ' + model + ' on ' + humanDay(todayIso()) +
+               ', from this note. What the note already recorded is the vault\'s; ' +
+               'the rest is an estimate.*');
+    lines.push('');
+    return lines.join('\n');
+}
+
+class NoshProbeModal extends Modal {
+    constructor(app, plugin, file, recipe) {
+        super(app);
+        this.plugin = plugin;
+        this.file = file;
+        this.recipe = recipe;
+        this.messages = [];   // the conversation, as the API sees it
+        this.turns = [];      // the same thing as it would read in the note
+        this.busy = false;
+        /* A Modal is not a Component, and rendered markdown wants one to hang
+         * its own lifetime on - an embed, a callout, anything that registers
+         * cleanup. This is that owner, and it goes when the modal does. */
+        this.owner = new Component();
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        this.owner.load();
+        contentEl.addClass('dash-draft');
+        contentEl.addClass('dash-probe');
+        this.setTitle('Ask about ' + this.recipe.name);
+
+        contentEl.createDiv({ cls: 'dash-probe-source', text: this.found() });
+
+        this.logEl = contentEl.createDiv({ cls: 'dash-probe-log' });
+
+        /* Gone the moment there is a conversation to read instead. */
+        this.chipsEl = contentEl.createDiv({ cls: 'dash-probe-chips' });
+        for (const ask of RECIPE_ASKS) {
+            const chip = this.chipsEl.createEl('button',
+                { cls: 'dash-probe-chip', text: ask });
+            chip.addEventListener('click', () => {
+                this.askEl.value = ask;
+                this.ask();
+            });
+        }
+
+        this.askEl = contentEl.createEl('textarea', { cls: 'dash-draft-extra' });
+        this.askEl.rows = 2;
+        this.askEl.placeholder = 'Ask about this recipe…';
+        this.askEl.addEventListener('keydown', (e) => {
+            /* Enter sends, because this is a conversation and not a form.
+             * Shift keeps the newline for a question worth two lines. */
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.ask();
+            }
+        });
+
+        const actions = contentEl.createDiv({ cls: 'dash-draft-actions' });
+
+        this.saveEl = actions.createEl('button', { text: 'Save to note' });
+        this.saveEl.disabled = true;
+        this.saveEl.addEventListener('click', () => this.save());
+
+        this.goEl = actions.createEl('button', { cls: 'mod-cta', text: 'Ask' });
+        this.goEl.addEventListener('click', () => this.ask());
+
+        this.askEl.focus();
+    }
+
+    /* What was found in the note, said plainly, because it is also what will
+     * be sent: a recipe read as nothing but a title is worth knowing about
+     * before the first answer rests on it. */
+    found() {
+        const count = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+        const bits = [];
+        const parts = this.recipe.parts.length;
+        const steps = this.recipe.steps.length;
+        if (parts) bits.push(count(parts, 'ingredient'));
+        if (steps) bits.push(count(steps, 'step'));
+        if (this.recipe.hasNumbers) bits.push('its numbers');
+        return (bits.length ? bits.join(', ') : 'the text of the note') +
+               ', from ' + this.recipe.path;
+    }
+
+    turn(who, text) {
+        const el = this.logEl.createDiv({ cls: 'dash-probe-turn dash-probe-' + who });
+        el.createDiv({ cls: 'dash-probe-who', text: who === 'you' ? 'You' : 'Claude' });
+        const said = el.createDiv({ cls: 'dash-probe-said', text: text });
+        this.logEl.scrollTop = this.logEl.scrollHeight;
+        return said;
+    }
+
+    async ask() {
+        if (this.busy) return;
+        const question = String(this.askEl.value || '').trim();
+        if (!question) return;
+
+        this.busy = true;
+        this.goEl.disabled = true;
+        this.askEl.value = '';
+        if (this.chipsEl) {
+            this.chipsEl.remove();
+            this.chipsEl = null;
+        }
+
+        this.turn('you', question);
+        const answerEl = this.turn('claude', 'Thinking…');
+
+        this.messages.push({
+            role: 'user',
+            content: this.messages.length
+                ? question
+                : probePrompt(this.recipe, this.plugin.settings) + '\n\n' + question,
+        });
+
+        try {
+            const said = await aiAsk(this.plugin, AI_PROBE_SYSTEM, this.messages);
+            this.messages.push({ role: 'assistant', content: said });
+            this.turns.push({ question, answer: said });
+            await renderMarkdownInto(this.app, said, answerEl, this.file.path, this.owner);
+            this.logEl.scrollTop = this.logEl.scrollHeight;
+            this.saveEl.disabled = false;
+        } catch (e) {
+            /* A question that never reached an answer leaves the conversation
+             * as it was, so asking again does not ask it twice. */
+            this.messages.pop();
+            answerEl.addClass('dash-probe-failed');
+            answerEl.setText(e && e.message ? e.message : String(e));
+        } finally {
+            this.busy = false;
+            this.goEl.disabled = false;
+            this.askEl.focus();
+        }
+    }
+
+    /* Only ever appended, and only when asked for. The note is the reader's;
+     * an answer joins it at the bottom or not at all. */
+    async save() {
+        if (!this.turns.length) return;
+        this.saveEl.disabled = true;
+        try {
+            await this.app.vault.append(this.file, probeMarkdown(
+                this.turns, aiModelId(this.plugin.settings, 'aiSuggestModel')));
+            /* Saved once. Anything asked after this saves on its own. */
+            this.turns = [];
+            new Notice('Added to ' + this.file.basename + '.');
+        } catch (e) {
+            this.saveEl.disabled = false;
+            new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+        }
+    }
+
+    onClose() {
+        this.owner.unload();
+        this.contentEl.empty();
+    }
+}
+
 module.exports = class NoshPlugin extends Plugin {
     async onload() {
         await this.loadSettings();
@@ -1758,6 +2215,19 @@ module.exports = class NoshPlugin extends Plugin {
             },
         });
 
+        /* A recipe already in the vault is a question waiting to be asked, and
+         * the note it sits in is the whole of the context the asking needs. */
+        this.addCommand({
+            id: 'ask-about-recipe',
+            name: 'Ask about this recipe',
+            checkCallback: (checking) => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file || !file.path.toLowerCase().endsWith('.md')) return false;
+                if (!checking) this.probeRecipe(file);
+                return true;
+            },
+        });
+
         this.addSettingTab(new NoshSettingTab(this.app, this));
 
         // Moved notes leave dangling log entries; the cache has to be up first.
@@ -1772,6 +2242,17 @@ module.exports = class NoshPlugin extends Plugin {
         /* A delete or a rename can strand a log entry, so both ask for the
          * repair pass: it puts an entry back on the note's new path where it
          * can, and where it cannot the day says so rather than going quiet. */
+        /* Offered in the menu only where the note reads as a recipe, since a
+         * menu is a list you scan; the command is offered on any note at all,
+         * a palette being somewhere you go on purpose. */
+        this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
+            if (!looksLikeRecipe(this.app, file, this.settings)) return;
+            menu.addItem((item) => item
+                .setTitle('Ask about this recipe')
+                .setIcon('message-circle')
+                .onClick(() => this.probeRecipe(file)));
+        }));
+
         this.registerEvent(this.app.vault.on('delete', (file) => {
             if (this.touches(file)) this.scheduleRefresh(true);
         }));
@@ -1884,6 +2365,24 @@ module.exports = class NoshPlugin extends Plugin {
         if (!leaf) return;
         await leaf.setViewState({ type: VIEW_TYPE_DASH, active: true });
         workspace.revealLeaf(leaf);
+    }
+
+    /* The note is read from disk rather than from the picker's list, because
+     * this asks about recipes the picker has never heard of: a note wants
+     * ingredients, a method or numbers to be worth a question, and nothing
+     * else. */
+    async probeRecipe(file) {
+        try {
+            const recipe = readRecipe(this.app, file, await this.app.vault.cachedRead(file));
+            if (!recipe.parts.length && !recipe.steps.length && !recipe.hasNumbers) {
+                new Notice('Nothing in ' + file.basename + ' reads as a recipe: no ' +
+                           'ingredients, no method, no numbers.', 8000);
+                return;
+            }
+            new NoshProbeModal(this.app, this, file, recipe).open();
+        } catch (e) {
+            new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+        }
     }
 
     /* One pass over the vault, split by kind. Tags say which side of the
@@ -3557,10 +4056,11 @@ class NoshSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Model for suggestions')
-            .setDesc('Used by What\u2019s for\u2026 Inventing a meal worth cooking is a '
-                     + 'different job from costing one that has already been eaten, and it '
-                     + 'is the one where Opus earns its price. Runs once a day rather than '
-                     + 'once a mouthful.')
+            .setDesc('Used by What\u2019s for\u2026 and by Ask about this recipe. Inventing '
+                     + 'a meal worth cooking, or arguing about one already written down, is '
+                     + 'a different job from costing one that has already been eaten, and it '
+                     + 'is the one where Opus earns its price. Both run once a day rather '
+                     + 'than once a mouthful.')
             .addDropdown((d) => {
                 for (const m of AI_MODELS) d.addOption(m.id, m.label);
                 d.setValue(aiModelId(this.plugin.settings, 'aiSuggestModel'))
