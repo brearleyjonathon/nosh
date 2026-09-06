@@ -144,6 +144,10 @@ const DEFAULT_SETTINGS = {
      * far less often than it changes what it fancies, so this one is worth
      * remembering and the rest of the ask is not. */
     suggestServes: 1,
+    /* key -> 'floor' | 'range' | 'ceiling', and only where it differs from
+     * what FOOD_GROUPS says. An empty object is a vault that agrees with
+     * DASH about every bar. */
+    groupDirs: {},
     /* Obsidian reads main.js once, when the plugin loads. On, the view
      * header carries a button that unloads Nosh and loads it again, which
      * is only of use to somebody editing the plugin. */
@@ -1511,10 +1515,37 @@ function nutrientState(dir, pct) {
     return 'neutral';
 }
 
-function groupState(g, value, min, max) {
+/* Which way a bar is meant to be read. A floor is reached and passed, a
+ * ceiling is stayed under, a range is landed inside. FOOD_GROUPS carries
+ * what the DASH pattern intends; groupDirs carries what this vault decided
+ * instead, for the groups where it decided anything. */
+const GROUP_SHAPES = ['floor', 'range', 'ceiling'];
+
+function defaultShape(g) {
+    if (g.dir === 'limit') return 'ceiling';
+    return g.overOk ? 'floor' : 'range';
+}
+
+function groupShape(g, settings) {
+    const said = ((settings && settings.groupDirs) || {})[g.key];
+    return GROUP_SHAPES.includes(said) ? said : defaultShape(g);
+}
+
+/* What a shape means, in the words that sit under a group's name. */
+function shapeNote(shape) {
+    if (shape === 'ceiling') {
+        return 'A ceiling: aim to stay under the maximum. The minimum is not judged.';
+    }
+    if (shape === 'floor') {
+        return 'A floor: aim to reach the minimum. Over the maximum is fine.';
+    }
+    return 'A range: aim to land between the two.';
+}
+
+function groupState(shape, value, min, max) {
     const pct = max > 0 ? (value / max) * 100 : 0;
-    if (g.dir === 'limit') return value > max ? 'over' : pct >= 80 ? 'near' : 'under';
-    if (value > max) return g.overOk ? 'met' : 'over';
+    if (shape === 'ceiling') return value > max ? 'over' : pct >= 80 ? 'near' : 'under';
+    if (value > max) return shape === 'floor' ? 'met' : 'over';
     return value >= min ? 'met' : 'under';
 }
 
@@ -1565,7 +1596,7 @@ function reportMarkdown(r) {
     lines.push('| Group | Servings | Target | Over | |');
     lines.push('|---|---|---|---|---|');
     for (const g of r.groups) {
-        const target = g.dir === 'limit'
+        const target = g.shape === 'ceiling'
             ? '≤ ' + fmt(g.max)
             : (g.min === g.max ? fmt(g.max) : fmt(g.min) + '–' + fmt(g.max));
         lines.push('| ' + g.label +
@@ -2321,6 +2352,19 @@ module.exports = class NoshPlugin extends Plugin {
             };
         }
 
+        /* Only the three answers that mean anything, only for groups that
+         * still exist, and only where the answer is not the one the constant
+         * would have given anyway. A hand-edited data.json cannot leave a bar
+         * judged by a word nothing understands. */
+        const dirs = saved.groupDirs || {};
+        this.settings.groupDirs = {};
+        for (const g of FOOD_GROUPS) {
+            const said = dirs[g.key];
+            if (GROUP_SHAPES.includes(said) && said !== defaultShape(g)) {
+                this.settings.groupDirs[g.key] = said;
+            }
+        }
+
         /* Before day/week tracking the log was a single flat selection with no
          * date. Carry it onto today rather than dropping it. */
         const raw = Object.assign({}, saved.log);
@@ -2952,7 +2996,7 @@ class NoshView extends ItemView {
             const have = perWeek ? weekTotals[g.key] : totals[g.key];
             const per = perWeek ? ' this week' : ' today';
 
-            if (g.dir === 'limit') {
+            if (groupShape(g, settings) === 'ceiling') {
                 if (max > 0) {
                     room.push('- ' + g.label + ': ' + fmt(Math.max(0, max - have)) +
                               ' of ' + fmt(max) + ' servings left' + per);
@@ -3316,9 +3360,10 @@ class NoshView extends ItemView {
         const min = parseNum(t.min) * scale;
         const max = parseNum(t.max) * scale;
         const pct = max > 0 ? (value / max) * 100 : 0;
-        const state = groupState(g, value, min, max);
+        const shape = groupShape(g, this.plugin.settings);
+        const state = groupState(shape, value, min, max);
 
-        const targetText = g.dir === 'limit'
+        const targetText = shape === 'ceiling'
             ? '≤ ' + fmt(max)
             : (min === max ? fmt(max) : fmt(min) + '–' + fmt(max));
 
@@ -3326,7 +3371,7 @@ class NoshView extends ItemView {
             label: g.label,
             valueText: fmt(value) + ' / ' + targetText + ' servings',
             pct: pct, state: state, dir: g.dir,
-            minPct: g.dir === 'limit' || max <= 0 ? 0 : (min / max) * 100,
+            minPct: shape === 'ceiling' || max <= 0 ? 0 : (min / max) * 100,
             segments: (split || []).map((sp) => ({
                 value: sp.values[g.key],
                 label: (sp.occasion || 'Unsorted') + ' \u00b7 ' +
@@ -3966,10 +4011,12 @@ class NoshView extends ItemView {
             const min = parseNum(t.min) * s;
             const max = parseNum(t.max) * s;
             const value = perWeek ? weekTotals[g.key] : totals[g.key];
+            const shape = groupShape(g, settings);
             return {
-                key: g.key, label: g.label, period: g.period, dir: g.dir,
+                key: g.key, label: g.label, period: g.period,
+                shape: shape,
                 value: value, min: min, max: max,
-                state: groupState(g, value, min, max),
+                state: groupState(shape, value, min, max),
             };
         });
 
@@ -4299,10 +4346,33 @@ class NoshSettingTab extends PluginSettingTab {
             const hidden = (this.plugin.settings.hiddenGroups || []).includes(g.key);
             const t = this.plugin.settings.groupTargets[g.key];
             const per = g.period === 'week' ? 'per week' : 'per day';
+            /* Which of the two numbers is judged, and what going past it
+             * means. Without it a floor and a range look identical here -
+             * both are a pair of boxes - and the minimum on a ceiling looks
+             * like it does something. */
+            const shape = groupShape(g, this.plugin.settings);
+            const desc = (of) => shapeNote(of) + ' Reads the ' + g.key +
+                                 ' frontmatter field.';
 
-            new Setting(containerEl)
+            /* Held so the dropdown can rewrite the line under the name. */
+            const row = new Setting(containerEl)
                 .setName(g.label + ' (' + per + ')')
-                .setDesc('Reads the ' + g.key + ' frontmatter field.')
+                .setDesc(desc(shape))
+                .addDropdown((d) => d
+                    .addOption('floor', 'Floor')
+                    .addOption('range', 'Range')
+                    .addOption('ceiling', 'Ceiling')
+                    .setValue(shape)
+                    .onChange(async (v) => {
+                        /* Agreeing with DASH is not a decision worth storing:
+                         * the key goes, and the group follows the constant
+                         * again - including if a later version moves it. */
+                        if (v === defaultShape(g)) delete this.plugin.settings.groupDirs[g.key];
+                        else this.plugin.settings.groupDirs[g.key] = v;
+                        await this.plugin.saveSettings();
+                        this.plugin.refreshViews();
+                        row.setDesc(desc(groupShape(g, this.plugin.settings)));
+                    }))
                 .addText((c) => {
                     c.inputEl.type = 'number';
                     c.inputEl.style.width = '4em';
@@ -4343,6 +4413,7 @@ class NoshSettingTab extends PluginSettingTab {
                 .onClick(async () => {
                     this.plugin.settings.targets = Object.assign({}, DEFAULT_TARGETS);
                     this.plugin.settings.groupTargets = JSON.parse(JSON.stringify(DEFAULT_GROUP_TARGETS));
+                    this.plugin.settings.groupDirs = {};
                     await this.plugin.saveSettings();
                     this.plugin.refreshViews();
                     this.display();
