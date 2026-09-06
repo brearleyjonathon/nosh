@@ -4184,6 +4184,17 @@ class NoshSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    /* display() builds the pane again from nothing, which throws you back to
+     * the top of a long settings page. Anything that has to rebuild - a
+     * button that rewrites every box below it - goes through here. */
+    redraw() {
+        const scroller = this.containerEl.closest('.vertical-tab-content') ||
+                         this.containerEl;
+        const at = scroller.scrollTop;
+        this.display();
+        scroller.scrollTop = at;
+    }
+
     display() {
         const { containerEl } = this;
         containerEl.empty();
@@ -4264,7 +4275,9 @@ class NoshSettingTab extends PluginSettingTab {
                 .onChange(async (v) => {
                     this.plugin.settings.aiAuth = v;
                     await this.plugin.saveSettings();
-                    this.display();
+                    /* Rebuilds, because the API key box appears and goes
+                     * with the answer. */
+                    this.redraw();
                 }));
 
         if (this.plugin.settings.aiAuth === 'key') {
@@ -4436,7 +4449,7 @@ class NoshSettingTab extends PluginSettingTab {
                     settings.groupTargets = dietGroups(settings.dietCalories);
                     await this.plugin.saveSettings();
                     this.plugin.refreshViews();
-                    this.display();
+                    this.redraw();
                     new Notice('Nosh: targets filled in for ' +
                                fmt(settings.dietCalories) + ' kcal and ' +
                                fmt(settings.dietSodium) + ' mg sodium.');
@@ -4562,7 +4575,7 @@ class NoshSettingTab extends PluginSettingTab {
                     this.plugin.settings.dietSodium = SODIUM_STANDARD;
                     await this.plugin.saveSettings();
                     this.plugin.refreshViews();
-                    this.display();
+                    this.redraw();
                 }));
 
         new Setting(containerEl).setName('Developer').setHeading();
