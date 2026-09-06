@@ -35,7 +35,7 @@ Every number describes **one serving** of the thing the note is about.
 | `calories` `protein_g` `carbs_g` `fat_g` `sat_fat_g` | the four a recipe card prints, plus saturated fat |
 | `fiber_g` `sodium_mg` `potassium_mg` `calcium_mg` | the ones DASH actually judges you on |
 | `serv_grains` `serv_vegetables` `serv_fruit` `serv_dairy` | DASH food-group servings |
-| `serv_meat` `serv_fats` `serv_nuts` `serv_sweets` | …and the rest |
+| `serv_meat` `serv_fats` `serv_nuts` `serv_legumes` `serv_sweets` | …and the rest |
 | `amount` | the portion the numbers describe — "1 cup", "1 medium" |
 | `meal_type` | when it is usually eaten. A hint, not a filing system |
 | `group` | override the food group an ingredient files under |

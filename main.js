@@ -33,7 +33,8 @@ const FOOD_GROUPS = [
     { key: 'serv_dairy',      label: 'Low-fat dairy',period: 'day',  dir: 'range' },
     { key: 'serv_meat',       label: 'Lean meat/fish', period: 'day', dir: 'limit' },
     { key: 'serv_fats',       label: 'Fats & oils',  period: 'day',  dir: 'range' },
-    { key: 'serv_nuts',       label: 'Nuts, seeds, legumes', period: 'week', dir: 'range' },
+    { key: 'serv_nuts',       label: 'Nuts & seeds', period: 'week', dir: 'range', overOk: true },
+    { key: 'serv_legumes',    label: 'Legumes',      period: 'week', dir: 'range', overOk: true },
     { key: 'serv_sweets',     label: 'Sweets',       period: 'week', dir: 'limit' },
 ];
 
@@ -58,6 +59,7 @@ const DEFAULT_GROUP_TARGETS = {
     serv_meat:       { min: 0, max: 6 },
     serv_fats:       { min: 2, max: 3 },
     serv_nuts:       { min: 4, max: 5 },
+    serv_legumes:    { min: 4, max: 5 },
     serv_sweets:     { min: 0, max: 5 },
 };
 
@@ -526,6 +528,10 @@ const AI_PORTIONS = [
 const AI_DASH = [
     '- DASH servings follow the 2,000 kcal reference pattern. Most foods land',
     '  in one or two groups; leave the rest at 0. Fractions are expected.',
+    '- Nuts and seeds are counted apart from legumes, and nothing belongs to',
+    '  both: beans, lentils, dried peas, chickpeas, soy and tofu score',
+    '  `serv_legumes`, while peanuts and peanut butter go with the nuts they',
+    '  are eaten as.',
 ];
 
 /* meal_type is really the section heading in the picker, and three of its
