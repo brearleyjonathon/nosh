@@ -1123,8 +1123,8 @@ function composedMealNote(name, parts, occasion, iso, settings) {
     for (const n of NUTRIENTS) totals[n.key] = 0;
     for (const g of FOOD_GROUPS) totals[g.key] = 0;
     for (const p of parts) {
-        for (const n of NUTRIENTS) totals[n.key] += p.recipe.values[n.key] * p.servings;
-        for (const g of FOOD_GROUPS) totals[g.key] += p.recipe.values[g.key] * p.servings;
+        for (const n of NUTRIENTS) totals[n.key] += parseNum(p.recipe.values[n.key]) * p.servings;
+        for (const g of FOOD_GROUPS) totals[g.key] += parseNum(p.recipe.values[g.key]) * p.servings;
     }
     const round = (v) => Math.round(v * 100) / 100;
 
@@ -1798,6 +1798,10 @@ function readRecipe(app, file, text) {
     const body = stripFrontMatter(text).trim();
     const found = recipeLists(body);
 
+    /* Only what the note actually writes down goes in, so a field it never
+     * carried - one added to the plugin after the note - reads as absent
+     * rather than as a recorded zero. Totals put every value through
+     * parseNum for the same reason. */
     const values = {};
     let hasNumbers = false;
     for (const n of NUTRIENTS) {
@@ -2511,8 +2515,8 @@ module.exports = class NoshPlugin extends Plugin {
                 if (!part) { whole = false; break; }
 
                 const vals = resolve(part, seen);
-                for (const n of NUTRIENTS) sum[n.key] += vals[n.key] * c.servings;
-                for (const g of FOOD_GROUPS) sum[g.key] += vals[g.key] * c.servings;
+                for (const n of NUTRIENTS) sum[n.key] += parseNum(vals[n.key]) * c.servings;
+                for (const g of FOOD_GROUPS) sum[g.key] += parseNum(vals[g.key]) * c.servings;
             }
             delete seen[r.path];
 
@@ -2774,8 +2778,8 @@ class NoshView extends ItemView {
                     out.push(blank);
                 }
                 const into = out[at[e.occasion]].values;
-                for (const n of NUTRIENTS) into[n.key] += e.recipe.values[n.key] * e.servings;
-                for (const g of FOOD_GROUPS) into[g.key] += e.recipe.values[g.key] * e.servings;
+                for (const n of NUTRIENTS) into[n.key] += parseNum(e.recipe.values[n.key]) * e.servings;
+                for (const g of FOOD_GROUPS) into[g.key] += parseNum(e.recipe.values[g.key]) * e.servings;
             }
         }
 
@@ -2826,8 +2830,8 @@ class NoshView extends ItemView {
         for (const iso of days) {
             for (const e of this.entriesFor(iso)) {
                 meals++;
-                for (const n of NUTRIENTS) totals[n.key] += e.recipe.values[n.key] * e.servings;
-                for (const g of FOOD_GROUPS) totals[g.key] += e.recipe.values[g.key] * e.servings;
+                for (const n of NUTRIENTS) totals[n.key] += parseNum(e.recipe.values[n.key]) * e.servings;
+                for (const g of FOOD_GROUPS) totals[g.key] += parseNum(e.recipe.values[g.key]) * e.servings;
             }
         }
         return { totals, meals };
