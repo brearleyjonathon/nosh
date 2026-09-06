@@ -63,6 +63,71 @@ const DEFAULT_GROUP_TARGETS = {
     serv_sweets:     { min: 0, max: 5 },
 };
 
+/* Every DASH pattern is the same plan at a different size. What it asks for
+ * is a share of the energy - the 2,000 kcal reference is 18% protein, 55%
+ * carbohydrate, 27% fat, 6% saturated fat, which is exactly the grams above
+ * - so the grams follow the calories. Potassium and calcium are amounts to
+ * reach rather than shares of a meal, and stay put. Sodium is the question
+ * the plan asks separately - 2,300 mg usually, 1,500 mg where the point is
+ * to bring blood pressure down - and it is typed rather than chosen, because
+ * somebody working down from one to the other lives at 2,000 or 1,700 for a
+ * while and should be able to say so.
+ *
+ * The servings scale the same way, with one exception: DASH holds dairy at
+ * 2-3 a day from the smallest pattern to the largest, so it is held here
+ * too. This is a scale of the reference rather than the published table for
+ * each calorie level, and lands near it without being it. Every row stays
+ * editable afterwards, which is the point of filling them in rather than
+ * fixing them. */
+const DASH_REFERENCE = 2000;
+const SODIUM_STANDARD = 2300;
+const SODIUM_LOWER = 1500;
+const SCALED_NUTRIENTS = ['protein_g', 'carbs_g', 'fat_g', 'sat_fat_g', 'fiber_g'];
+const HELD_GROUPS = ['serv_dairy'];
+
+function dietScale(calories) {
+    const kcal = Math.max(1000, Math.min(4000, parseNum(calories) || DASH_REFERENCE));
+    return { kcal: Math.round(kcal), by: kcal / DASH_REFERENCE };
+}
+
+function dietSodium(mg) {
+    const n = parseNum(mg);
+    return n > 0 ? Math.round(Math.max(200, Math.min(6000, n))) : SODIUM_STANDARD;
+}
+
+function dietTargets(calories, sodium) {
+    const scale = dietScale(calories);
+    const out = Object.assign({}, DEFAULT_TARGETS);
+    out.calories = scale.kcal;
+    for (const key of SCALED_NUTRIENTS) {
+        out[key] = Math.round(DEFAULT_TARGETS[key] * scale.by);
+    }
+    out.sodium_mg = dietSodium(sodium);
+    return out;
+}
+
+/* Servings are counted off in halves at the table, so that is what a scaled
+ * one rounds to. A group the reference asks for at all keeps being asked
+ * for: half a serving of oil is a small target, none at all is a different
+ * plan. */
+function dietGroups(calories) {
+    const scale = dietScale(calories);
+    const half = (n) => Math.round(n * 2) / 2;
+    const out = {};
+    for (const g of FOOD_GROUPS) {
+        const base = DEFAULT_GROUP_TARGETS[g.key];
+        if (HELD_GROUPS.includes(g.key)) {
+            out[g.key] = { min: base.min, max: base.max };
+            continue;
+        }
+        out[g.key] = {
+            min: base.min > 0 ? Math.max(0.5, half(base.min * scale.by)) : 0,
+            max: base.max > 0 ? Math.max(0.5, half(base.max * scale.by)) : 0,
+        };
+    }
+    return out;
+}
+
 /* Nosh keeps one folder and makes these underneath it. A published plugin
  * cannot assume anything about how somebody else's vault is arranged, so the
  * default is a single folder at the root that they can move wherever. */
@@ -148,6 +213,10 @@ const DEFAULT_SETTINGS = {
      * what FOOD_GROUPS says. An empty object is a vault that agrees with
      * DASH about every bar. */
     groupDirs: {},
+    /* What the targets were last filled in from. Remembered so the pattern
+     * can be nudged and applied again without being typed out twice. */
+    dietCalories: DASH_REFERENCE,
+    dietSodium: SODIUM_STANDARD,   // mg a day, whatever you are working to
     /* Obsidian reads main.js once, when the plugin loads. On, the view
      * header carries a button that unloads Nosh and loads it again, which
      * is only of use to somebody editing the plugin. */
@@ -2352,6 +2421,13 @@ module.exports = class NoshPlugin extends Plugin {
             };
         }
 
+        this.settings.dietCalories = dietScale(saved.dietCalories).kcal;
+        /* A word where a number belongs - a hand edit, or a vault written by
+         * something that named the two levels - reads as what it names. */
+        this.settings.dietSodium = saved.dietSodium === 'lower' ? SODIUM_LOWER
+            : saved.dietSodium === 'standard' ? SODIUM_STANDARD
+            : dietSodium(saved.dietSodium);
+
         /* Only the three answers that mean anything, only for groups that
          * still exist, and only where the answer is not the one the constant
          * would have given anyway. A hand-edited data.json cannot leave a bar
@@ -4300,6 +4376,72 @@ class NoshSettingTab extends PluginSettingTab {
                     b.setDisabled(false).setButtonText('Test');
                 }));
 
+        new Setting(containerEl).setName('Diet pattern').setHeading();
+        containerEl.createDiv({
+            cls: 'setting-item-description',
+            text: 'Fills in every target below from one calorie figure, scaled ' +
+                  'from the DASH 2,000 kcal reference. It lands near the ' +
+                  'published pattern for a calorie level rather than on it, and ' +
+                  'nothing here stops you editing a row afterwards.',
+        });
+
+        new Setting(containerEl)
+            .setName('Calories a day')
+            .setDesc('Between 1,000 and 4,000. The grams follow it; potassium ' +
+                     'and calcium are amounts to reach and do not.')
+            .addText((c) => {
+                c.inputEl.type = 'number';
+                c.inputEl.style.width = '6em';
+                /* Kept as typed rather than clamped on every keystroke, which
+                 * would turn a half-typed 1,800 into 1,000 under the cursor.
+                 * Filling is where the range is enforced, and the box is
+                 * rewritten with what was actually used. */
+                c.setValue(String(this.plugin.settings.dietCalories))
+                    .onChange(async (v) => {
+                        this.plugin.settings.dietCalories = parseNum(v);
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName('Sodium (mg a day)')
+            .setDesc('Asked separately from the calories, and does not scale ' +
+                     'with them. DASH puts the standard limit at ' +
+                     fmt(SODIUM_STANDARD) + ' and its lower target at ' +
+                     fmt(SODIUM_LOWER) + '; anything in between - 2,000, 1,700 - ' +
+                     'is a step on the way down.')
+            .addText((c) => {
+                c.inputEl.type = 'number';
+                c.inputEl.style.width = '6em';
+                c.setValue(String(this.plugin.settings.dietSodium))
+                    .onChange(async (v) => {
+                        this.plugin.settings.dietSodium = parseNum(v);
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName('Fill the targets from this')
+            .setDesc('Overwrites every nutrient target and every food-group ' +
+                     'range. Which bars are shown, and whether each is a floor, ' +
+                     'a range or a ceiling, are left as you set them.')
+            .addButton((b) => b
+                .setButtonText('Fill')
+                .onClick(async () => {
+                    const settings = this.plugin.settings;
+                    settings.dietCalories = dietScale(settings.dietCalories).kcal;
+                    settings.dietSodium = dietSodium(settings.dietSodium);
+                    settings.targets = dietTargets(settings.dietCalories,
+                                                   settings.dietSodium);
+                    settings.groupTargets = dietGroups(settings.dietCalories);
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshViews();
+                    this.display();
+                    new Notice('Nosh: targets filled in for ' +
+                               fmt(settings.dietCalories) + ' kcal and ' +
+                               fmt(settings.dietSodium) + ' mg sodium.');
+                }));
+
         new Setting(containerEl).setName('Daily nutrient targets').setHeading();
         containerEl.createDiv({
             cls: 'setting-item-description',
@@ -4407,13 +4549,17 @@ class NoshSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Reset targets')
-            .setDesc('Back to the DASH 2,000 kcal reference pattern with the standard 2,300 mg sodium limit.')
+            .setDesc('Back to the DASH 2,000 kcal reference pattern with the ' +
+                     'standard 2,300 mg sodium limit, and the pattern above ' +
+                     'back to what it was shipped with.')
             .addButton((b) => b
                 .setButtonText('Reset')
                 .onClick(async () => {
                     this.plugin.settings.targets = Object.assign({}, DEFAULT_TARGETS);
                     this.plugin.settings.groupTargets = JSON.parse(JSON.stringify(DEFAULT_GROUP_TARGETS));
                     this.plugin.settings.groupDirs = {};
+                    this.plugin.settings.dietCalories = DASH_REFERENCE;
+                    this.plugin.settings.dietSodium = SODIUM_STANDARD;
                     await this.plugin.saveSettings();
                     this.plugin.refreshViews();
                     this.display();
