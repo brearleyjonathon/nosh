@@ -144,6 +144,10 @@ const DEFAULT_SETTINGS = {
      * far less often than it changes what it fancies, so this one is worth
      * remembering and the rest of the ask is not. */
     suggestServes: 1,
+    /* Obsidian reads main.js once, when the plugin loads. On, the view
+     * header carries a button that unloads Nosh and loads it again, which
+     * is only of use to somebody editing the plugin. */
+    devReload: false,
 };
 
 /* The occasions a day is made of, in the order it meets them. There used to
@@ -2652,7 +2656,46 @@ class NoshView extends ItemView {
         const header = root.createDiv({ cls: 'dash-header' });
         header.createEl('div', { cls: 'dash-title', text: 'Nosh' });
 
-        const actions = header.createDiv({ cls: 'dash-actions' });
+        this.actionsEl = header.createDiv({ cls: 'dash-actions' });
+        this.renderActions();
+
+        this.tabsEl = root.createDiv({ cls: 'dash-tabs' });
+        this.navEl = root.createDiv({ cls: 'dash-nav' });
+
+        /* Holds Today when it applies, and collapses to nothing when it
+         * does not. Clear lives on the tabs' context menu instead. */
+        this.dayActionsEl = root.createDiv({ cls: 'dash-day-actions' });
+
+        this.summaryEl = root.createDiv({ cls: 'dash-summary' });
+        this.totalsEl = root.createDiv({ cls: 'dash-totals' });
+        this.bodyEl = root.createDiv({ cls: 'dash-body' });
+
+        this.refresh();
+    }
+
+    async onClose() { this.contentEl.empty(); }
+
+    /* app.setting is not part of the documented API, so the gear says where to
+     * look rather than throwing if a future release moves it. */
+    openSettings() {
+        const setting = this.app.setting;
+        if (!setting || typeof setting.open !== 'function') {
+            new Notice('Open Settings → Community plugins → Nosh.');
+            return;
+        }
+        setting.open();
+        if (typeof setting.openTabById === 'function') {
+            setting.openTabById(this.plugin.manifest.id);
+        }
+    }
+
+    /* The row is rebuilt on every refresh rather than only when the view
+     * opens, because whether the reload button is there at all is a
+     * setting, and a setting should mean something the moment it changes. */
+    renderActions() {
+        const actions = this.actionsEl;
+        if (!actions) return;
+        actions.empty();
 
         /* The log lives in data.json, which is read once at load. Somewhere to
          * press when the vault has been synced from elsewhere since. */
@@ -2687,42 +2730,71 @@ class NoshView extends ItemView {
             out.disabled = false;
         });
 
+        /* Development only: main.js is read once, at load, so an edit to it
+         * needs the plugin taken down and brought back up. */
+        if (this.plugin.settings.devReload) {
+            const fresh = actions.createEl('button', { cls: 'dash-gear' });
+            fresh.setAttr('aria-label', 'Reload Nosh from disk');
+            setIcon(fresh, 'power');
+            fresh.addEventListener('click', async () => {
+                if (fresh.disabled) return;
+                fresh.disabled = true;
+                fresh.addClass('dash-gear-spin');
+                try {
+                    await this.reloadPlugin();
+                } catch (e) {
+                    new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+                    fresh.removeClass('dash-gear-spin');
+                    fresh.disabled = false;
+                }
+                /* Nothing is re-enabled on the way out: a reload that worked
+                 * took this button with it. */
+            });
+        }
+
         const gear = actions.createEl('button', { cls: 'dash-gear' });
         gear.setAttr('aria-label', 'Nosh settings');
         setIcon(gear, 'settings');
         gear.addEventListener('click', () => this.openSettings());
-
-        this.tabsEl = root.createDiv({ cls: 'dash-tabs' });
-        this.navEl = root.createDiv({ cls: 'dash-nav' });
-
-        /* Holds Today when it applies, and collapses to nothing when it
-         * does not. Clear lives on the tabs' context menu instead. */
-        this.dayActionsEl = root.createDiv({ cls: 'dash-day-actions' });
-
-        this.summaryEl = root.createDiv({ cls: 'dash-summary' });
-        this.totalsEl = root.createDiv({ cls: 'dash-totals' });
-        this.bodyEl = root.createDiv({ cls: 'dash-body' });
-
-        this.refresh();
     }
 
-    async onClose() { this.contentEl.empty(); }
-
-    /* app.setting is not part of the documented API, so the gear says where to
-     * look rather than throwing if a future release moves it. */
-    openSettings() {
-        const setting = this.app.setting;
-        if (!setting || typeof setting.open !== 'function') {
-            new Notice('Open Settings → Community plugins → Nosh.');
+    /* app.plugins is not part of the documented API, and this is the plugin
+     * pulling itself down mid-click: everything the reopening needs is taken
+     * before the disable, because `this` belongs to the copy being discarded.
+     * disablePlugin/enablePlugin do not touch the list of enabled plugins, so
+     * a reload that fails halfway leaves Nosh switched on. */
+    async reloadPlugin() {
+        const app = this.app;
+        const id = this.plugin.manifest.id;
+        const plugins = app.plugins;
+        if (!plugins || typeof plugins.disablePlugin !== 'function' ||
+            typeof plugins.enablePlugin !== 'function') {
+            new Notice('Nosh: this version of Obsidian will not reload a plugin ' +
+                       'from inside it. Toggle Nosh off and on under Settings → ' +
+                       'Community plugins.', 8000);
             return;
         }
-        setting.open();
-        if (typeof setting.openTabById === 'function') {
-            setting.openTabById(this.plugin.manifest.id);
+
+        await plugins.disablePlugin(id);
+        await plugins.enablePlugin(id);
+
+        /* The views on screen belonged to the copy just thrown away. Ask the
+         * workspace what survived rather than trusting the leaves held from
+         * before, and put a fresh view in each one; where nothing survived,
+         * the new copy opens a view of its own. */
+        const live = app.workspace.getLeavesOfType(VIEW_TYPE_DASH);
+        for (const leaf of live) {
+            await leaf.setViewState({ type: VIEW_TYPE_DASH, active: true });
         }
+        const now = plugins.plugins[id];
+        if (!live.length && now && typeof now.activateView === 'function') {
+            await now.activateView();
+        }
+        new Notice('Nosh: reloaded from disk.');
     }
 
     refresh() {
+        this.renderActions();
         const notes = this.plugin.collectNotes();
         this.lists = { meals: notes.meal, ingredients: notes.ingredient };
         /* Totals cover everything logged today, whichever tab is on screen. */
@@ -4274,6 +4346,22 @@ class NoshSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     this.plugin.refreshViews();
                     this.display();
+                }));
+
+        new Setting(containerEl).setName('Developer').setHeading();
+
+        new Setting(containerEl)
+            .setName('Reload button')
+            .setDesc('Puts a button in the view header that unloads Nosh and ' +
+                     'loads it again, so an edit to main.js shows without ' +
+                     'restarting Obsidian. Of no use unless you are working ' +
+                     'on the plugin itself.')
+            .addToggle((tg) => tg
+                .setValue(!!this.plugin.settings.devReload)
+                .onChange(async (on) => {
+                    this.plugin.settings.devReload = on;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshViews();
                 }));
     }
 }
