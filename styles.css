@@ -774,10 +774,24 @@
     background: var(--background-modifier-hover);
 }
 
+.dash-tracker .dash-ai-shot {
+    display: flex;
+    align-items: center;
+    padding: 2px 8px;
+}
+
+/* The icon carries the meaning here, so it is sized like the words beside
+ * it rather than like an icon somewhere on its own. */
+.dash-tracker .dash-ai-shot .svg-icon {
+    width: 15px;
+    height: 15px;
+}
+
 .dash-tracker .dash-ai-go:disabled {
     opacity: 0.6;
     cursor: default;
 }
+
 
 /* Draft confirmation ------------------------------------------------ */
 

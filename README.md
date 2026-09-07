@@ -85,7 +85,11 @@ bars, and the day-by-day detail behind them.
 Off unless you give it credentials. Four things use it:
 
 - **Drafting** — describe something in plain words and get a note with the
-  numbers estimated and the portion stated.
+  numbers estimated and the portion stated. Or photograph it: the camera
+  button beside **Draft** takes a nutrition label, which is read rather than
+  guessed at, or a plate of food, which is estimated and says what it assumed
+  about the portion. On a phone that is the camera or the photo roll. The
+  picture is shrunk and sent to the API with whatever you typed alongside it.
 - **What's for…** — takes what the day still has room for and suggests a meal
   that fits, with a method. Ask it before it runs: how many you are cooking for,
   how much of a production it should be, what needs using up.

@@ -654,6 +654,37 @@ const AI_MEAL_SYSTEM = [
     '  carries the fiber or potassium, what pushes the sodium. No preamble.',
 ]).join('\n');
 
+/* A photograph is two different jobs wearing the same coat, and which one it
+ * is can be seen rather than asked: a printed panel is to be read, a plate of
+ * food is to be estimated. Both end in the same form. */
+const AI_PHOTO = [
+    '',
+    'A photograph comes with this. Say in `note` what you were looking at.',
+    '',
+    'If it shows a nutrition panel, read it rather than estimating it:',
+    '- Take the per-serving column, not the per-100g one and not the whole',
+    '  container, and put the serving size the panel names in `amount`. How',
+    '  many of them were eaten is not your question; it is logged separately.',
+    '- A panel prints nutrients, never DASH servings. Those come from what the',
+    '  food is - the product name, the ingredients list - as they always do.',
+    '- Read what is legible and estimate only what is not, from standard',
+    '  reference data. Say in `note` which numbers you read and which you had',
+    '  to supply. Never present a figure you could not see as one you read.',
+    '',
+    'If it shows food rather than a panel, estimate what is in front of you:',
+    '- Name what you can identify, and leave out what you cannot. A sauce you',
+    '  cannot name is still fat and sodium; say so in `note` rather than',
+    '  itemising a guess.',
+    '- The portion is where you will be wrong, not the identification. Judge it',
+    '  against whatever gives you scale - the plate, a fork, a hand - say what',
+    '  you judged it against, and mark it assumed exactly as an unstated',
+    '  portion is marked.',
+    '',
+    'A photograph too dark, too far or too angled to read is worth saying so',
+    'about. Fill the form from what you can genuinely see and let `note` carry',
+    'the rest; do not quietly invent the difference.',
+].join('\n');
+
 /* Every field is required and additionalProperties is off, so a strict tool
  * call either validates whole or fails loudly. There is no half-filled note
  * to guess at afterwards. */
@@ -889,6 +920,101 @@ const AI_KINDS = {
     },
 };
 
+/* --- photographs ---------------------------------------------------- */
+
+/* What the API will take, and what a phone camera actually hands over. HEIC is
+ * neither: an iPhone converts on the way out of the picker, and where it does
+ * not, the canvas below turns whatever it decoded into a JPEG anyway. */
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+/* A photograph off a phone is three or four megabytes and several thousand
+ * pixels across, and none of it past this helps: a nutrition panel is legible
+ * at the long edge Claude reads at, and every pixel beyond it is paid for
+ * twice, in the upload and in the tokens. */
+const PHOTO_EDGE = 1568;
+const PHOTO_QUALITY = 0.85;
+
+function readAsDataUrl(blob) {
+    return new Promise((done, fail) => {
+        const reader = new FileReader();
+        reader.onload = () => done(String(reader.result || ''));
+        reader.onerror = () => fail(new Error('The picture could not be read.'));
+        reader.readAsDataURL(blob);
+    });
+}
+
+function splitDataUrl(url) {
+    const at = url.indexOf(',');
+    const head = at === -1 ? '' : url.slice(0, at);
+    const type = (head.match(/data:([^;]+)/) || [])[1] || '';
+    return { type: type, data: at === -1 ? '' : url.slice(at + 1) };
+}
+
+/* Drawn through a canvas rather than sent as it came, which shrinks it and
+ * settles the format in one pass. A browser that cannot decode the file at all
+ * - an untouched HEIC, most likely - falls back to sending the bytes when the
+ * API would accept them, and says so plainly when it would not. */
+async function readPhoto(file) {
+    const asIs = async () => {
+        const cut = splitDataUrl(await readAsDataUrl(file));
+        if (!PHOTO_TYPES.includes(cut.type)) {
+            throw new Error('That picture is a ' + (cut.type || 'kind') +
+                            ', which the API will not read. A JPEG or a PNG will.');
+        }
+        return cut;
+    };
+
+    let bitmap = null;
+    try {
+        bitmap = await createImageBitmap(file);
+    } catch (e) {
+        return asIs();
+    }
+
+    const long = Math.max(bitmap.width, bitmap.height);
+    const by = long > PHOTO_EDGE ? PHOTO_EDGE / long : 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * by));
+    canvas.height = Math.max(1, Math.round(bitmap.height * by));
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    const url = canvas.toDataURL('image/jpeg', PHOTO_QUALITY);
+    const cut = splitDataUrl(url);
+    return cut.data ? cut : asIs();
+}
+
+/* A cancelled picker fires nothing at all on a phone, and a taken photograph
+ * can take seconds to arrive - long enough that guessing at cancellation from
+ * a focus event would throw away the picture that was on its way. So there is
+ * one picker, waiting as long as it takes, and pressing the button again is
+ * what says the last press came to nothing. */
+let photoPick = null;   // { el, done }
+
+function pickPhoto() {
+    return new Promise((done) => {
+        if (photoPick) {
+            photoPick.el.remove();
+            photoPick.done(null);
+        }
+        const el = document.createElement('input');
+        el.type = 'file';
+        /* No capture attribute: on a phone this offers the camera and the
+         * library both, and the label you meant to photograph is as often
+         * already in the roll. */
+        el.accept = 'image/*';
+        el.style.display = 'none';
+        document.body.appendChild(el);
+        photoPick = { el: el, done: done };
+        el.addEventListener('change', () => {
+            const file = el.files && el.files[0];
+            photoPick = null;
+            el.remove();
+            done(file || null);
+        });
+        el.click();
+    });
+}
 /* --- auth ----------------------------------------------------------- */
 
 /* Two ways in. An API key is the portable one, and the only one a phone can
@@ -962,10 +1088,19 @@ async function aiHeaders(settings) {
 
 /* --- the call ------------------------------------------------------- */
 
-async function aiDraft(plugin, kind, description) {
+async function aiDraft(plugin, kind, description, photo) {
     const spec = AI_KINDS[kind] || AI_KINDS.ingredients;
     const tool = spec.tool();
     const headers = await aiHeaders(plugin.settings);
+
+    /* A string where there is no picture, because that is what every call
+     * before this one sent, and the picture goes first: it is the thing
+     * being asked about, and the words are what to do with it. */
+    const content = photo
+        ? [{ type: 'image',
+             source: { type: 'base64', media_type: photo.type, data: photo.data } },
+           { type: 'text', text: description }]
+        : description;
 
     const res = await requestUrl({
         url: AI_ENDPOINT,
@@ -977,11 +1112,11 @@ async function aiDraft(plugin, kind, description) {
             max_tokens: 4096,
             thinking: { type: 'adaptive' },
             output_config: { effort: plugin.settings.aiEffort || 'medium' },
-            system: spec.system,
+            system: photo ? spec.system + AI_PHOTO : spec.system,
             tools: [tool],
             /* One tool, and it must be called. The answer is the form, not prose. */
             tool_choice: { type: 'tool', name: tool.name },
-            messages: [{ role: 'user', content: description }],
+            messages: [{ role: 'user', content: content }],
         }),
     });
 
@@ -3981,17 +4116,27 @@ class NoshView extends ItemView {
         input.placeholder = 'Describe a ' + source.noun + '\u2026';
         const go = box.createEl('button', { cls: 'dash-ai-go', text: 'Draft' });
 
-        const run = async () => {
+        const shot = box.createEl('button', { cls: 'dash-ai-go dash-ai-shot' });
+        shot.setAttr('aria-label', 'Photograph a label, or a plate of food');
+        setIcon(shot, 'camera');
+
+        /* One path for both, because a picture and a description are the same
+         * ask with different evidence, and a picture is often worth a word
+         * anyway: how much of it was eaten, which of the two things on the
+         * plate is being logged. */
+        const run = async (photo) => {
             const text = input.value.trim();
-            if (!text) return;
+            if (!text && !photo) return;
 
             input.disabled = true;
             go.disabled = true;
+            shot.disabled = true;
             /* Something to watch while it thinks, rather than a dead button. */
             go.empty();
             go.createSpan({ cls: 'dash-ai-spin', text: '\ud83e\udd66' });
             try {
-                const draft = await aiDraft(this.plugin, source.key, text);
+                const draft = await aiDraft(this.plugin, source.key,
+                    text || 'This photograph is the ' + source.noun + '.', photo);
                 input.value = '';
                 new NoshDraftModal(this.app, this, source.key, draft).open();
             } catch (e) {
@@ -3999,12 +4144,31 @@ class NoshView extends ItemView {
             } finally {
                 input.disabled = false;
                 go.disabled = false;
+                shot.disabled = false;
                 go.setText('Draft');
             }
         };
 
-        go.addEventListener('click', run);
-        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+        go.addEventListener('click', () => run(null));
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(null); });
+
+        shot.addEventListener('click', async () => {
+            if (shot.disabled) return;
+            const file = await pickPhoto();
+            if (!file) return;
+            /* Shrinking a phone photograph takes long enough to look broken, so
+             * the button is held from the moment the picker closes. */
+            shot.disabled = true;
+            let photo = null;
+            try {
+                photo = await readPhoto(file);
+            } catch (e) {
+                new Notice('Nosh AI: ' + (e && e.message ? e.message : e), 8000);
+            } finally {
+                shot.disabled = false;
+            }
+            if (photo) run(photo);
+        });
     }
 
     async createFromDraft(kind, draft, log) {
@@ -4261,6 +4425,10 @@ class NoshSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl).setName('AI').setHeading();
+        containerEl.createDiv({
+            cls: 'setting-item-description',
+            text: 'What you type, the note you are asking about, and any photograph you take go to the Anthropic API. Nothing is sent until you ask for something.',
+        });
 
         new Setting(containerEl)
             .setName('Credentials')
