@@ -148,10 +148,47 @@
     margin-bottom: 10px;
 }
 
+.dash-tracker .dash-search-box {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .dash-tracker .dash-search {
     flex: 1 1 auto;
     min-width: 0;
     font-size: var(--font-ui-smaller);
+    /* Room for the cross, so a long filter does not run underneath it. */
+    padding-right: 26px;
+}
+
+.dash-tracker .dash-search-clear {
+    position: absolute;
+    right: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    color: var(--text-faint);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.dash-tracker .dash-search-clear:hover {
+    color: var(--text-normal);
+}
+
+.dash-tracker .dash-search-clear.is-hidden {
+    display: none;
+}
+
+.dash-tracker .dash-search-clear .svg-icon {
+    width: 14px;
+    height: 14px;
 }
 
 .dash-tracker .dash-fold {
@@ -171,7 +208,8 @@
 }
 
 /* Kept in the layout rather than removed, so the filter box does not resize
- * as you type into it. */
+ * as you type into it. A tab with no sections at all does not make the
+ * button in the first place. */
 .dash-tracker .dash-fold.is-hidden {
     visibility: hidden;
     pointer-events: none;

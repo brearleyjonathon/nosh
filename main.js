@@ -3704,16 +3704,57 @@ class NoshView extends ItemView {
         else this.renderCompose(el, source);
 
         const row = el.createDiv({ cls: 'dash-filter' });
-        const search = row.createEl('input', { cls: 'dash-search', type: 'text' });
+        /* The box holds the field and the cross together, so the cross can sit
+         * inside the field rather than beside it and take the width with it. */
+        const box = row.createDiv({ cls: 'dash-search-box' });
+        const search = box.createEl('input', { cls: 'dash-search', type: 'text' });
         search.placeholder = 'Filter ' + source.label.toLowerCase() + '\u2026';
         search.value = this.query;
+
+        const clear = box.createEl('button', { cls: 'dash-search-clear' });
+        clear.setAttr('aria-label', 'Clear the filter');
+        setIcon(clear, 'x');
+
+        /* Nothing to clear, nothing to press: an empty box has no cross in it. */
+        const showClear = () => clear.toggleClass('is-hidden', !search.value);
+        showClear();
+
+        const wipe = () => {
+            search.value = '';
+            this.query = '';
+            showClear();
+            this.renderList();
+            /* The list is what you were looking at, but the box is what you
+             * were typing in, and clearing a filter is usually the start of
+             * typing a different one. */
+            search.focus();
+        };
+
         search.addEventListener('input', () => {
             this.query = search.value.toLowerCase();
+            showClear();
             this.renderList();
         });
+        search.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && search.value) {
+                /* Escape belongs to the filter while there is a filter to leave
+                 * behind; the pane keeps it the rest of the time. */
+                e.stopPropagation();
+                wipe();
+            }
+        });
+        clear.addEventListener('click', wipe);
 
-        this.foldBtn = row.createEl('button', { cls: 'dash-fold' });
-        this.foldBtn.addEventListener('click', () => this.toggleAll());
+        /* Meals arrive in one alphabetical run with nothing to fold, so the
+         * button is not made at all there and the filter takes the whole row.
+         * Where sections do exist the button is made even when this particular
+         * list has only one of them, because that changes as you type and a box
+         * that resizes under the cursor is worse than a button that greys. */
+        this.foldBtn = null;
+        if (source.sectioned) {
+            this.foldBtn = row.createEl('button', { cls: 'dash-fold' });
+            this.foldBtn.addEventListener('click', () => this.toggleAll());
+        }
 
         this.listEl = el.createDiv({ cls: 'dash-list' });
         this.renderList();
