@@ -3884,8 +3884,12 @@ class NoshView extends ItemView {
         if (n) b.createSpan({ cls: 'dash-occasion-count', text: String(n) });
 
         b.addEventListener('click', () => {
+            if (name === this.occasion) return;
             this.occasion = name;
-            this.renderBody();
+            /* The same list in the same order: moving from breakfast to lunch
+             * changes which ticks are on, not what you were looking at, so it
+             * has no business throwing you back to the top of it. */
+            this.keepScroll(() => this.renderBody());
         });
     }
 
