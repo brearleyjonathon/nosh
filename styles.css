@@ -524,7 +524,7 @@
     color: var(--text-accent);
     font-size: var(--font-ui-smaller);
     background: transparent;
-    border: 1px dashed var(--background-modifier-border);
+    border: 1px dashed var(--text-accent);
     box-shadow: none;
     border-radius: var(--radius-s);
     cursor: pointer;
@@ -532,6 +532,7 @@
 
 .dash-tracker .dash-suggest-btn:hover:not(:disabled) {
     color: var(--text-accent-hover);
+    border-color: var(--text-accent-hover);
     background: var(--background-modifier-hover);
     border-style: solid;
 }
@@ -798,31 +799,35 @@
 .dash-tracker .dash-ai-go {
     flex: 0 0 auto;
     padding: 2px 10px;
-    color: var(--text-muted);
+    color: var(--text-accent);
     font-size: var(--font-ui-smaller);
     background: transparent;
-    border: 1px solid var(--background-modifier-border);
+    border: 1px solid var(--text-accent);
     box-shadow: none;
     border-radius: var(--radius-s);
     cursor: pointer;
 }
 
 .dash-tracker .dash-ai-go:hover:not(:disabled) {
-    color: var(--text-normal);
+    color: var(--text-accent-hover);
+    border-color: var(--text-accent-hover);
     background: var(--background-modifier-hover);
 }
 
 .dash-tracker .dash-ai-shot {
     display: flex;
     align-items: center;
-    padding: 2px 8px;
+    justify-content: center;
+    aspect-ratio: 1;
+    padding: 0;
 }
 
-/* The icon carries the meaning here, so it is sized like the words beside
- * it rather than like an icon somewhere on its own. */
+/* The icon is the whole button, so it is sized to be pressed rather than
+ * to match the words beside it - and on a phone that is the difference
+ * between a target and a decoration. */
 .dash-tracker .dash-ai-shot .svg-icon {
-    width: 15px;
-    height: 15px;
+    width: 18px;
+    height: 18px;
 }
 
 .dash-tracker .dash-ai-go:disabled {
