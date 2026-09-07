@@ -836,6 +836,87 @@
 }
 
 
+/* Cards with a keyboard in front of them ----------------------------
+ *
+ * A phone keyboard covers the window rather than resizing it, and the webview
+ * is not told: window.visualViewport reports the same height with the keys up
+ * as with them down, which is why two attempts at measuring this from the page
+ * came to nothing. Obsidian measures it natively and publishes it as
+ * --keyboard-height on the root - the same number its own app container is
+ * capped by - so that is what the card is moved by.
+ *
+ * The container is pinned top and bottom by Obsidian and centres the card in
+ * between. Lifting its bottom edge off the keyboard is the whole fix: the
+ * centring is left alone and starts telling the truth again. Nothing here is
+ * scoped to a phone, because --keyboard-height is 0px everywhere else. */
+
+.modal-container.dash-modal-fit-container {
+    bottom: var(--keyboard-height, 0px);
+    /* The status bar is not drawable, and a tall card would otherwise put its
+     * title under the clock. */
+    padding-top: var(--safe-area-inset-top, 0px);
+    box-sizing: border-box;
+}
+
+/* Obsidian caps a phone card at 100vh less the status bar, which does not know
+ * about the keyboard either. Written through the container so it wins on
+ * specificity rather than on load order. */
+.modal-container.dash-modal-fit-container .modal.dash-modal-fit {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - var(--keyboard-height, 0px) -
+                     var(--safe-area-inset-top, 0px));
+}
+
+/* min-height is what lets it actually shrink: a flex item will not go below
+ * its content otherwise, and the scroll never starts. */
+.modal-container.dash-modal-fit-container .modal.dash-modal-fit .modal-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* While the keys are up the card gives up its comfortable spacing: the room
+ * has halved, and what matters is seeing the field and the buttons at once. */
+.modal.dash-modal-fit.dash-keyed .dash-draft .dash-draft-row {
+    padding-bottom: 4px;
+}
+
+.modal.dash-modal-fit.dash-keyed .dash-draft .dash-draft-actions {
+    padding-top: 8px;
+}
+
+.modal.dash-modal-fit.dash-keyed .dash-draft-extra {
+    min-height: 3em;
+}
+
+/* Somewhere to put the keyboard away, opposite the close button, and only
+ * there when there is one to put away. */
+.dash-keyboard-down {
+    display: none;
+}
+
+.modal.dash-modal-fit.dash-keyed .dash-keyboard-down {
+    position: absolute;
+    top: var(--size-4-3, 12px);
+    inset-inline-start: var(--size-4-3, 12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.modal.dash-modal-fit.dash-keyed .dash-keyboard-down .svg-icon {
+    width: 20px;
+    height: 20px;
+}
 /* Draft confirmation ------------------------------------------------ */
 
 .dash-draft .dash-draft-row {

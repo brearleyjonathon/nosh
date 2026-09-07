@@ -1449,6 +1449,77 @@ function awaitCache(app, file, ms) {
  * already known; what is not is who is eating, how much of a production this
  * should be, and what is sitting in the fridge that ought to be used up. None
  * of that belongs in a settings page, because none of it is true twice. */
+/* --- modals with a keyboard in front of them ------------------------- */
+
+/* The webview is not resized when a phone keyboard comes up - it is covered -
+ * and window.visualViewport does not notice either, which is why Obsidian
+ * measures the keyboard natively and publishes it as --keyboard-height on the
+ * root. Everything below leans on that rather than on anything the page can
+ * work out for itself. The CSS does the moving; this hangs the classes the CSS
+ * needs, and gives the keyboard somewhere to be sent away.
+ *
+ * Returns the undo. */
+function fitModalToKeyboard(modal) {
+    const modalEl = modal.modalEl;
+    modalEl.addClass('dash-modal-fit');
+    modal.containerEl.addClass('dash-modal-fit-container');
+
+    /* Mirrors the close button on the other side of the card, and only while
+     * there is a keyboard to put away. */
+    const down = modalEl.createEl('button', { cls: 'dash-keyboard-down' });
+    down.setAttr('aria-label', 'Hide the keyboard');
+    setIcon(down, 'chevron-down');
+
+    const typing = () => {
+        const at = document.activeElement;
+        return at && modalEl.contains(at) &&
+               (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' ||
+                at.tagName === 'SELECT') ? at : null;
+    };
+    const hideKeys = () => { const at = typing(); if (at) at.blur(); };
+
+    down.addEventListener('click', hideKeys);
+
+    /* A tap on the card itself, rather than on something in it, means the same
+     * as pressing the chevron: a phone has nowhere else to put that gesture.
+     * Anything you could actually be aiming at is left alone. */
+    const tapAway = (e) => {
+        const on = e.target;
+        if (!on || typeof on.closest !== 'function') return;
+        if (on.closest('input, textarea, select, button, label, a, summary')) return;
+        hideKeys();
+    };
+    modalEl.addEventListener('pointerdown', tapAway);
+
+    /* Class rather than a measurement: what the card does about the keyboard is
+     * make itself smaller, and it only needs to know whether one is there. */
+    const opened = () => modalEl.addClass('dash-keyed');
+    const shut = () => {
+        /* A tick, because moving between two fields is a blur and a focus and
+         * the card should not flinch in between. */
+        window.setTimeout(() => { if (!typing()) modalEl.removeClass('dash-keyed'); }, 60);
+    };
+
+    const follow = (e) => {
+        opened();
+        const el = e.target;
+        if (el && typeof el.scrollIntoView === 'function') {
+            /* The wait is for the keyboard: the room the card has is not what
+             * it will be at the moment the field takes focus. */
+            window.setTimeout(() => el.scrollIntoView({ block: 'nearest' }), 150);
+        }
+    };
+    modalEl.addEventListener('focusin', follow);
+    modalEl.addEventListener('focusout', shut);
+
+    return () => {
+        modalEl.removeEventListener('focusin', follow);
+        modalEl.removeEventListener('focusout', shut);
+        modalEl.removeEventListener('pointerdown', tapAway);
+        down.remove();
+    };
+}
+
 class NoshSuggestModal extends Modal {
     constructor(app, view, onDone) {
         super(app);
@@ -1465,6 +1536,7 @@ class NoshSuggestModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
+        this.unfit = fitModalToKeyboard(this);
         contentEl.addClass('dash-draft');
         this.setTitle('What' + String.fromCharCode(8217) + 's for ' +
                       (OCCASION_ASK[this.view.occasion] ||
@@ -1537,6 +1609,7 @@ class NoshSuggestModal extends Modal {
     /* Dismissing leaves the answer null, which reads as "never mind" rather
      * than as an empty set of preferences. */
     onClose() {
+        if (this.unfit) { this.unfit(); this.unfit = null; }
         this.contentEl.empty();
         this.onDone(this.answer);
     }
@@ -1599,6 +1672,7 @@ class NoshDraftModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
+        this.unfit = fitModalToKeyboard(this);
         const spec = AI_KINDS[this.kind] || AI_KINDS.ingredients;
         contentEl.addClass('dash-draft');
         this.setTitle(spec.title);
@@ -1701,7 +1775,10 @@ class NoshDraftModal extends Modal {
         });
     }
 
-    onClose() { this.contentEl.empty(); }
+    onClose() {
+        if (this.unfit) { this.unfit(); this.unfit = null; }
+        this.contentEl.empty();
+    }
 }
 
 /* Reports -------------------------------------------------------------
@@ -2273,6 +2350,7 @@ class NoshProbeModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
+        this.unfit = fitModalToKeyboard(this);
         this.owner.load();
         contentEl.addClass('dash-draft');
         contentEl.addClass('dash-probe');
@@ -2401,6 +2479,7 @@ class NoshProbeModal extends Modal {
     }
 
     onClose() {
+        if (this.unfit) { this.unfit(); this.unfit = null; }
         this.owner.unload();
         this.contentEl.empty();
     }
