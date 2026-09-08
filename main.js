@@ -1830,6 +1830,110 @@ function groupState(shape, value, min, max) {
     return value >= min ? 'met' : 'under';
 }
 
+/* --- the score -------------------------------------------------------- */
+
+/* How one bar is doing, as credit from 0 to 1, or null for a bar with nothing
+ * to say. The shape is the bar's own. A floor pays in proportion to how much
+ * of the minimum is there; a ceiling pays in full up to the maximum and then
+ * loses it at the same rate, reaching nothing at double; a range does both.
+ * Continuous rather than stepped, because the difference between three
+ * servings and four is real and a step would throw it away. */
+function creditFor(shape, value, min, max) {
+    const past = (cap) => Math.max(0, 1 - (value - cap) / cap);
+    if (shape === 'ceiling') return max > 0 ? (value > max ? past(max) : 1) : null;
+    if (shape === 'floor') return min > 0 ? Math.min(1, value / min) : null;
+    if (min > 0 && value < min) return value / min;
+    if (max > 0 && value > max) return past(max);
+    return min > 0 || max > 0 ? 1 : null;
+}
+
+/* One bar's credit, and which way it went missing. `reach` is how much of what
+ * should be there is - null for a ceiling, which has nothing to reach - and
+ * `excess` how far past what should not be there it went, null for a floor,
+ * which cannot be overdone. A range answers both. The bar on screen is drawn
+ * from these two; the number is drawn from the credit. */
+function barCredit(key, label, kind, value, min, max) {
+    const credit = creditFor(kind, value, min, max);
+    if (credit === null) return null;
+    const short = kind !== 'ceiling' && min > 0 && value < min;
+    const over = kind !== 'floor' && max > 0 && value > max;
+    return {
+        key: key, label: label, credit: credit,
+        reach: kind === 'ceiling' ? null : (short ? credit : 1),
+        excess: kind === 'floor' ? null : (over ? 1 - credit : 0),
+    };
+}
+
+/* What a food group is judged against, or null for one that is hidden -
+ * hiding a bar being a way of saying you do not care. */
+function groupSpec(settings, g) {
+    if ((settings.hiddenGroups || []).includes(g.key)) return null;
+    const t = settings.groupTargets[g.key] || DEFAULT_GROUP_TARGETS[g.key];
+    return { shape: groupShape(g, settings), min: parseNum(t.min), max: parseNum(t.max) };
+}
+
+/* The bars one day is judged on. A nutrient's direction is its shape; a food
+ * group's shape is whatever the vault settled on. Hidden bars are out, and so
+ * is anything shown for reference. Calories has one rule of its own: under the
+ * target it says nothing at all - eating less is not something DASH rewards -
+ * and only going over costs anything. */
+function dayCredits(settings, totals) {
+    const out = [];
+    const hiddenN = settings.hiddenNutrients || [];
+    for (const n of NUTRIENTS) {
+        if (n.dir === 'info' || hiddenN.includes(n.key)) continue;
+        const target = parseNum(settings.targets[n.key]);
+        if (target <= 0) continue;
+        const value = totals[n.key];
+        let bar = null;
+        if (n.key === 'calories') {
+            if (value > target) bar = barCredit(n.key, n.label, 'ceiling', value, 0, target);
+        } else if (n.dir === 'limit') {
+            bar = barCredit(n.key, n.label, 'ceiling', value, 0, target);
+        } else {
+            bar = barCredit(n.key, n.label, 'floor', value, target, 0);
+        }
+        if (bar) out.push(bar);
+    }
+    for (const g of FOOD_GROUPS) {
+        if (g.period !== 'day') continue;
+        const spec = groupSpec(settings, g);
+        const bar = spec && barCredit(g.key, g.label, spec.shape, totals[g.key], spec.min, spec.max);
+        if (bar) out.push(bar);
+    }
+    return out;
+}
+
+/* Out of 100, the plain average over the bars in play. Equal weight, on
+ * purpose: every weighting is an argument nobody can settle, and the
+ * published DASH accordance scores do not try. If one bar should matter more,
+ * say so by which bars are showing.
+ *
+ * Alongside it, the two things the bar draws. `reach` is the average over the
+ * things to reach, because that is progress and progress averages. `excess`
+ * is the worst thing gone over, not the average, because an average would
+ * let two clean ceilings hide a third at double - and the point of red is
+ * not to be hidden. `worst` is the three bars costing most, since a number
+ * without them is a scold and with them is a list. */
+function scoreOf(bars) {
+    if (!bars.length) return null;
+    const mean = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+    const reaches = bars.map((b) => b.reach).filter((x) => x !== null);
+    const excesses = bars.map((b) => b.excess).filter((x) => x !== null);
+    const worst = bars.filter((b) => b.credit < 1)
+        .sort((a, b) => a.credit - b.credit).slice(0, 3);
+    return {
+        score: Math.round(mean(bars.map((b) => b.credit)) * 100),
+        reach: mean(reaches),
+        excess: excesses.length ? Math.max.apply(null, excesses) : null,
+        bars: bars.length,
+        worst: worst,
+    };
+}
+/* Coloured no more finely than a bar is. */
+function scoreState(score) {
+    return score >= 90 ? 'met' : score >= 70 ? 'near' : 'under';
+}
 /* A column of glyphs reads down the page faster than a column of adjectives,
  * and survives being pasted somewhere without the stylesheet. */
 const STATE_MARK = { met: '✓', under: '↓', near: '!', over: '✗', neutral: '·' };
@@ -1857,6 +1961,26 @@ function reportMarkdown(r) {
         ? r.meals + (r.meals === 1 ? ' entry · ' : ' entries · ') + fmt(r.totals.calories) +
           ' kcal' + (r.mode === 'week' ? ' · ' + fmt(r.totals.calories / 7) + ' kcal/day' : '')
         : 'Nothing logged.');
+
+    /* The same score the sidebar shows, from the same functions, so the
+     * report cannot hold a second opinion. */
+    const sc = r.score || {};
+    const said = [];
+    if (sc.day) said.push('day ' + sc.day.score);
+    if (sc.week) said.push('week ' + sc.week.score);
+    if (said.length) {
+        lines.push('');
+        lines.push('Score · ' + said.join(' · ') + ' out of 100');
+        const of = sc.day || sc.week;
+        const drawn = [];
+        if (of.reach !== null) drawn.push('reached ' + Math.round(of.reach * 100) + '% of what to reach');
+        if (of.excess) drawn.push('worst excess ' + Math.round(of.excess * 100) + '% over');
+        if (drawn.length) lines.push(drawn.join(' · ').replace(/^./, (c) => c.toUpperCase()));
+        if (of.worst.length) {
+            lines.push('Costing most: ' + of.worst.map((b) =>
+                b.label + ' ' + Math.round(b.credit * 100) + '%').join(', '));
+        }
+    }
 
     lines.push('');
     lines.push('## Nutrients');
@@ -3545,6 +3669,113 @@ class NoshView extends ItemView {
         }
     }
 
+    /* Today is judged on its own totals. A week is judged bar by bar: each
+     * per-day bar is averaged over the days that have anything logged - a
+     * day nobody logged is missing, not a zero - and the weekly bars are
+     * read against the week, exactly as the bars below the number are. */
+    dayScore(iso) {
+        return scoreOf(dayCredits(this.plugin.settings, this.totalsFor([iso]).totals));
+    }
+
+    weekScore(days) {
+        const settings = this.plugin.settings;
+        const sum = Object.create(null);
+        let logged = 0;
+        for (const iso of days) {
+            if (!this.entriesFor(iso).length) continue;
+            logged++;
+            for (const b of dayCredits(settings, this.totalsFor([iso]).totals)) {
+                const at = sum[b.key] || (sum[b.key] = {
+                    label: b.label, credit: 0, n: 0,
+                    reach: 0, reachN: 0, excess: 0, excessN: 0,
+                });
+                at.credit += b.credit;
+                at.n++;
+                if (b.reach !== null) { at.reach += b.reach; at.reachN++; }
+                if (b.excess !== null) { at.excess += b.excess; at.excessN++; }
+            }
+        }
+        const bars = Object.keys(sum).map((key) => {
+            const at = sum[key];
+            return {
+                key: key, label: at.label, credit: at.credit / at.n,
+                reach: at.reachN ? at.reach / at.reachN : null,
+                excess: at.excessN ? at.excess / at.excessN : null,
+            };
+        });
+        const totals = this.totalsFor(days).totals;
+        for (const g of FOOD_GROUPS) {
+            if (g.period !== 'week') continue;
+            const spec = groupSpec(settings, g);
+            const bar = spec && barCredit(g.key, g.label, spec.shape, totals[g.key], spec.min, spec.max);
+            if (bar) bars.push(bar);
+        }
+        /* No days, no score: the weekly floors would otherwise read an empty
+         * week as a week of nothing eaten, which is a different claim. */
+        if (!logged) return null;
+        const out = scoreOf(bars);
+        if (out) out.logged = logged;
+        return out;
+    }
+
+    /* One quiet line under the meal count. In Day view it is two numbers,
+     * because today and the week answer different questions - am I on track
+     * now, did the pattern hold - and the week already contains the day.
+     * Blended into one they would say nothing anyone could act on. */
+    renderScore(week) {
+        const weekOf = weekDays(this.cursor, this.plugin.settings.weekStart);
+        const today = week ? null : this.dayScore(this.cursor);
+        const whole = this.weekScore(weekOf);
+        if (!today && !whole) return;
+
+        const row = this.summaryEl.createDiv({ cls: 'dash-score' });
+        row.setAttr('title', 'From the middle: green goes right as the things to ' +
+                             'reach are reached, red goes left for the worst thing ' +
+                             'gone over. The number averages every bar you have ' +
+                             'showing, calories only when over. Tap for what is ' +
+                             'costing most.');
+        const put = (label, got) => {
+            if (!got) return;
+            const part = row.createDiv({ cls: 'dash-score-part' });
+            /* Label to the left, number over the middle - which is where the
+             * two fills meet, so the number sits on the thing it summarises. */
+            const top = part.createDiv({ cls: 'dash-score-top' });
+            top.createSpan({ cls: 'dash-score-label', text: label });
+            const num = top.createSpan({ cls: 'dash-score-num', text: String(got.score) });
+            num.setAttr('data-state', scoreState(got.score));
+
+            /* Both fills start at the middle. Green goes right as the things to
+             * reach are reached, all the way to the edge when they all are; red
+             * goes left for the worst thing gone over. Nothing either side of
+             * the middle is a day with nothing to show yet. */
+            const bar = part.createDiv({ cls: 'dash-score-bar' });
+            const excess = bar.createDiv({ cls: 'dash-score-excess' });
+            excess.style.width = ((got.excess || 0) * 50) + '%';
+            const reach = bar.createDiv({ cls: 'dash-score-reach' });
+            reach.style.width = ((got.reach === null ? 1 : got.reach) * 50) + '%';
+            bar.createDiv({ cls: 'dash-score-tick' });
+        };
+        put(this.cursor === todayIso() ? 'Today so far' : 'Day', today);
+        /* So far while the week is still going, whatever was skipped in it. */
+        put(weekOf[weekOf.length - 1] >= todayIso() ? 'Week so far' : 'Week', whole);
+
+        /* What pulled it down, on request. The day's list in Day view, the
+         * week's in Week view: the number you are looking at is the one that
+         * gets explained. */
+        if (this.scoreOpen) {
+            const of = today || whole;
+            const why = row.createDiv({ cls: 'dash-score-why' });
+            why.setText(of.worst.length
+                ? 'Costing most: ' + of.worst.map((b) =>
+                    b.label + ' ' + Math.round(b.credit * 100) + '%').join(' · ')
+                : 'Every bar met.');
+        }
+        row.addEventListener('click', () => {
+            this.scoreOpen = !this.scoreOpen;
+            this.keepScroll(() => this.renderTotals());
+        });
+    }
+
     renderTotals() {
         const el = this.totalsEl;
         el.empty();
@@ -3566,6 +3797,7 @@ class NoshView extends ItemView {
                       fmt(totals.calories) + ' kcal' +
                       (week ? ' · ' + fmt(totals.calories / 7) + ' kcal/day avg' : ''),
             });
+            this.renderScore(week);
         }
 
         /* Said out loud rather than swallowed: a total that is short because
@@ -4406,6 +4638,10 @@ class NoshView extends ItemView {
             span: week ? humanWeek(days) : humanDay(this.cursor),
             days: days, meals: totalled.meals, totals: totals,
             nutrients: nutrients, groups: groups, byDay: byDay,
+            score: {
+                day: week ? null : this.dayScore(this.cursor),
+                week: this.weekScore(weekDays(this.cursor, settings.weekStart)),
+            },
         };
     }
 

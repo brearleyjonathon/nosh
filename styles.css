@@ -59,6 +59,92 @@
     font-size: var(--font-ui-smaller);
 }
 
+/* The score sits under the meal count, a number and a bar for today and for
+ * the week. Both fills start at the bar's middle, under the number: green
+ * runs right as things are reached, red runs left for the worst thing gone
+ * over. Coloured no more finely than a bar is, and only the numbers speak
+ * up. */
+.dash-tracker .dash-score {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding-top: 6px;
+    cursor: pointer;
+}
+
+.dash-tracker .dash-score-part {
+    flex: 1 1 140px;
+    min-width: 0;
+}
+
+/* Three columns so the number lands over the middle of the bar beneath it
+ * whatever the label's width: the label takes the left third, the number
+ * the centre, and the right stays empty to balance it. */
+.dash-tracker .dash-score-top {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 3px;
+}
+
+.dash-tracker .dash-score-label {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-tracker .dash-score-num {
+    color: var(--text-normal);
+    font-weight: 600;
+}
+
+.dash-tracker .dash-score-num[data-state="met"]  { color: var(--color-green); }
+.dash-tracker .dash-score-num[data-state="near"] { color: var(--color-orange); }
+
+.dash-tracker .dash-score-bar {
+    position: relative;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--background-modifier-border);
+    overflow: hidden;
+}
+
+.dash-tracker .dash-score-reach,
+.dash-tracker .dash-score-excess {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+}
+
+.dash-tracker .dash-score-reach {
+    left: 50%;
+    max-width: 50%;
+    background: var(--color-green);
+}
+
+.dash-tracker .dash-score-excess {
+    right: 50%;
+    max-width: 50%;
+    background: var(--color-red);
+}
+
+/* Where the two fills meet, drawn over both so it shows when neither has
+ * anything to say yet. */
+.dash-tracker .dash-score-tick {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: calc(50% - 1px);
+    width: 2px;
+    background: var(--text-faint);
+}
+
+.dash-tracker .dash-score-why {
+    flex-basis: 100%;
+    color: var(--text-faint);
+}
 /* Progress bars ----------------------------------------------------- */
 
 .dash-tracker .dash-totals {

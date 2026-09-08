@@ -75,6 +75,77 @@ correcting one ingredient corrects every meal built on it — and every day thos
 meals were eaten. The totals are written into frontmatter as well, so the note
 still means something to Dataview, to a reader, and to anyone you share it with.
 
+## The score
+
+Under the meal count sit two scores out of 100, each with a bar: today, and
+the week. They are kept apart on purpose — *am I on track right now* and *did
+the pattern hold* are different questions, and one blended figure would answer
+neither.
+
+The number sits over the middle of its bar, and both fills start there. Green
+runs right as the things to reach are reached, all the way to the edge when
+they all are; red runs left for the worst thing gone over — the worst rather
+than the average, because an average would let two clean limits hide a third
+at double. Nothing either side of the middle is a day with nothing to show
+yet.
+
+Each is the plain average of how far every bar you have showing is from its
+target. A floor pays out in proportion to how much of the minimum is there; a
+ceiling pays in full up to the maximum and then loses it at the same rate,
+reaching nothing at double; a range does both. Every bar weighs the same, as
+the published DASH accordance scores have it — if one should matter more, say
+so by which bars you show. Carbs stay out, being for reference, and calories
+only count when over: eating less is not something DASH rewards. Hidden bars
+are out too.
+
+The week is judged bar by bar over the days that have anything logged, so a
+day you did not log is missing rather than a zero, with the weekly groups read
+against the week. Both say *so far* while they are still being written. Tap
+the line for the three bars costing most.
+
+### The arithmetic
+
+Every bar in play gets a **credit** between 0 and 1, from its value `v` and
+its own shape. Nutrients take their direction as a shape — a goal is a floor,
+a limit is a ceiling — and food groups take whatever shape the settings gave
+them.
+
+```
+floor    (minimum m)              credit = min(1, v / m)
+ceiling  (maximum M)              credit = 1                    while v ≤ M
+                                          = max(0, 1 − (v − M) / M)  past it
+range    (m … M)                  the floor rule below m, the ceiling rule
+                                  above M, 1 in between
+```
+
+So half the fibre is half a credit, sodium at 3,450 against 2,300 is half a
+credit, and anything at double its ceiling is none. The exceptions:
+
+- **Carbs** are never scored; they are shown for reference.
+- **Calories** are a ceiling that is absent while you are under it — it
+  joins the average only when `v > target`, and then loses credit like any
+  ceiling.
+- **Hidden bars** are out, and so is any bar whose target is 0.
+- Weekly groups are not in a day's score; they are judged in the week's.
+
+The **score** is the mean credit over the bars in play, times 100, rounded.
+Every bar weighs the same.
+
+The bar is drawn from two more figures. Each floor and range also reports
+**reach** — its credit while short, 1 once the minimum is met — and each
+ceiling and range reports **excess** — `1 − credit` while over, 0 otherwise.
+Green is the *mean* reach across the things to reach; red is the *maximum*
+excess across the things that can be overdone. Half the bar is 1.
+
+For the **week**, each per-day bar's credit, reach and excess are averaged
+across the days with anything logged, then the weekly groups are scored once
+against the week's totals and their targets, and the score, green and red
+are taken over that combined set exactly as for a day. A week with no logged
+days has no score.
+
+Colour follows the number and nothing finer: green at 90 and above, amber
+from 70, plain below.
+
 ## Reports
 
 Export what is on screen — a day or a week — as a markdown note: the totals, the
