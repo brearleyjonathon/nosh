@@ -480,13 +480,18 @@
     padding-top: 0;
 }
 
-/* The same heading as a button, so it can fold the bars under it. */
+/* The same heading as a button, so it can fold the bars under it. Obsidian
+ * centres what is in a button; the heading belongs at the left. */
 .dash-tracker button.dash-section-head {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 6px;
     width: 100%;
     height: auto;
+    /* A heading you press wants more room under it than one you read, so a
+     * thumb lands on the heading and not on the first thing beneath it. */
+    padding-bottom: 10px;
     text-align: left;
     background: transparent;
     border: none;
@@ -496,6 +501,17 @@
 
 .dash-tracker button.dash-section-head:hover {
     color: var(--text-muted);
+}
+
+/* The headings over the bars sit closer to them than Input does to the
+ * picker: a bar is a thin thing and does not need the room. The first of
+ * them takes a little from above instead, so the score's bars can breathe. */
+.dash-tracker .dash-totals button.dash-section-head {
+    padding-bottom: 6px;
+}
+
+.dash-tracker .dash-totals > button.dash-section-head:first-child {
+    padding-top: 8px;
 }
 
 /* A month ------------------------------------------------------------
