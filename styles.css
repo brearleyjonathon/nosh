@@ -480,6 +480,116 @@
     padding-top: 0;
 }
 
+/* The same heading as a button, so it can fold the bars under it. */
+.dash-tracker button.dash-section-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: auto;
+    text-align: left;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.dash-tracker button.dash-section-head:hover {
+    color: var(--text-muted);
+}
+
+/* A month ------------------------------------------------------------
+ *
+ * Seven columns, a row a week, a square a day. Inside each square the
+ * nutrient bars as lines a couple of pixels tall, too small to label and
+ * not meant to be: the picture is the colour, week by week. */
+.dash-tracker .dash-month {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+}
+
+/* Left, over the date in the square beneath, with the same inset. */
+.dash-tracker .dash-month-dow {
+    text-align: left;
+    padding: 0 0 2px 5px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+/* A button, so it can be pressed, which means undoing what Obsidian gives
+ * every button: centred content would shrink the lines inside to nothing,
+ * since an empty div is as wide as its contents. Stretched, they fill. */
+.dash-tracker .dash-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 3px;
+    aspect-ratio: 1;
+    height: auto;
+    min-width: 0;
+    padding: 4px;
+    background: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.dash-tracker .dash-cell:hover {
+    border-color: var(--text-faint);
+}
+
+.dash-tracker .dash-cell.is-today {
+    border-color: var(--interactive-accent);
+}
+
+.dash-tracker .dash-cell.is-outside {
+    opacity: 0.45;
+}
+
+.dash-tracker .dash-cell-date {
+    font-size: 10px;
+    line-height: 1;
+    text-align: left;
+    color: var(--text-faint);
+}
+
+.dash-tracker .dash-cell.is-empty .dash-cell-date {
+    color: var(--text-faint);
+    opacity: 0.6;
+}
+
+.dash-tracker .dash-cell-lines {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 1px;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.dash-tracker .dash-cell-line {
+    flex: 0 0 auto;
+    width: 100%;
+    height: 3px;
+    border-radius: 1px;
+    background: var(--background-modifier-border);
+    overflow: hidden;
+}
+
+.dash-tracker .dash-cell-fill {
+    height: 100%;
+    background: var(--interactive-accent);
+}
+
+.dash-tracker .dash-cell-line[data-state="met"] .dash-cell-fill  { background: var(--color-green); }
+.dash-tracker .dash-cell-line[data-state="near"] .dash-cell-fill { background: var(--color-orange); }
+.dash-tracker .dash-cell-line[data-state="over"] .dash-cell-fill { background: var(--color-red); }
+.dash-tracker .dash-cell-line[data-state="neutral"] .dash-cell-fill { background: var(--text-faint); }
+
 /* Bottom of a target band, e.g. the 4 in "4-5 servings". */
 .dash-tracker .dash-bar-min {
     position: absolute;

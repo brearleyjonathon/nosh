@@ -100,8 +100,8 @@ are out too.
 
 The week is judged bar by bar over the days that have anything logged, so a
 day you did not log is missing rather than a zero, with the weekly groups read
-against the week. Both say *so far* while they are still being written. Tap
-the line for the three bars costing most.
+against the week. Tap the line for the three bars costing most. The Month
+tab scores the month the same way, over its per-day bars alone.
 
 ### The arithmetic
 
@@ -145,6 +145,14 @@ days has no score.
 
 Colour follows the number and nothing finer: green at 90 and above, amber
 from 70, plain below.
+
+## The month
+
+The Month tab is a calendar: a row a week, a square a day. Each square holds
+the nutrient bars as lines a couple of pixels tall — too small to label, and
+not meant to be. The picture is the colour, week by week: which days went
+green, which went red, which have nothing on them at all. Any square opens
+its day.
 
 ## Reports
 

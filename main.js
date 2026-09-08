@@ -189,6 +189,9 @@ const DEFAULT_SETTINGS = {
     weekStart: 1,     // 0 = Sunday, 1 = Monday
     hiddenNutrients: [],
     hiddenGroups: [],
+    /* Sections of the totals folded away: 'macros', 'groupsDay', 'groupsWeek'.
+     * Remembered, because a fold is a preference and not a mood. */
+    foldedTotals: {},
     aiReading: false,
     aiModel: 'claude-sonnet-5',   // must be an id in AI_MODELS
     /* Inventing a meal and costing one are different jobs, and not jobs for
@@ -537,6 +540,34 @@ function weekDays(iso, weekStart) {
     const out = [];
     for (let i = 0; i < 7; i++) out.push(addDays(first, i));
     return out;
+}
+
+/* A month is its own days; the grid around it is filled out to whole weeks
+ * by the caller, which knows where the week starts. */
+function monthDays(iso) {
+    const d = dateOf(iso);
+    const out = [];
+    for (let x = new Date(d.getFullYear(), d.getMonth(), 1);
+         x.getMonth() === d.getMonth(); x.setDate(x.getDate() + 1)) {
+        out.push(isoOf(x));
+    }
+    return out;
+}
+
+/* Keeps the day of the month where the next month has it, and takes the last
+ * day where it does not, so the 31st does not overflow into the month after. */
+function addMonths(iso, n) {
+    const d = dateOf(iso);
+    const day = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + n);
+    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(day, last));
+    return isoOf(d);
+}
+
+function humanMonth(iso) {
+    return dateOf(iso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
 function humanDay(iso) {
@@ -2733,6 +2764,7 @@ module.exports = class NoshPlugin extends Plugin {
         this.settings.targets = Object.assign({}, DEFAULT_TARGETS, saved.targets);
         this.settings.hiddenNutrients = saved.hiddenNutrients || [];
         this.settings.hiddenGroups = saved.hiddenGroups || [];
+        this.settings.foldedTotals = Object.assign({}, saved.foldedTotals);
         this.settings.weekStart = saved.weekStart === 0 ? 0 : 1;
 
         /* Three folder settings collapsed into one. Where the old three
@@ -3274,6 +3306,7 @@ class NoshView extends ItemView {
     // --- data -------------------------------------------------------
 
     daysFor(mode) {
+        if (mode === 'month') return monthDays(this.cursor);
         return mode === 'week'
             ? weekDays(this.cursor, this.plugin.settings.weekStart)
             : [this.cursor];
@@ -3544,16 +3577,17 @@ class NoshView extends ItemView {
 
     renderTabs() {
         this.tabsEl.empty();
-        for (const m of ['day', 'week']) {
-            const b = this.tabsEl.createEl('button', {
-                cls: 'dash-tab', text: m === 'day' ? 'Day' : 'Week',
-            });
+        const names = { day: 'Day', week: 'Week', month: 'Month' };
+        for (const m of ['day', 'week', 'month']) {
+            const b = this.tabsEl.createEl('button', { cls: 'dash-tab', text: names[m] });
             if (this.mode === m) b.addClass('is-active');
             b.addEventListener('click', () => this.setMode(m));
 
             /* Clearing is the one destructive action here and there is no
              * undo, so it hides behind a right-click rather than sitting out
-             * in the open next to Export. */
+             * in the open next to Export. A month is too much to lose to a
+             * right-click, and is not offered. */
+            if (m === 'month') continue;
             b.setAttr('aria-label', 'Right-click to clear');
             b.addEventListener('contextmenu', (evt) => {
                 evt.preventDefault();
@@ -3582,34 +3616,40 @@ class NoshView extends ItemView {
 
     renderNav() {
         this.navEl.empty();
-        const week = this.mode === 'week';
-        const step = week ? 7 : 1;
+        const mode = this.mode;
+        const noun = mode === 'month' ? 'month' : mode === 'week' ? 'week' : 'day';
+        /* A month moves by months, which are not a number of days. */
+        const move = (n) => mode === 'month'
+            ? addMonths(this.cursor, n)
+            : addDays(this.cursor, n * (mode === 'week' ? 7 : 1));
 
         const prev = this.navEl.createEl('button', { cls: 'dash-nav-btn', text: '◀' });
-        prev.setAttr('aria-label', week ? 'Previous week' : 'Previous day');
+        prev.setAttr('aria-label', 'Previous ' + noun);
         prev.addEventListener('click', () => {
-            this.cursor = addDays(this.cursor, -step);
+            this.cursor = move(-1);
             this.refresh();
         });
 
         const days = this.daysInView();
-        const label = week ? humanWeek(days) : humanDay(this.cursor);
+        const label = mode === 'month' ? humanMonth(this.cursor)
+            : mode === 'week' ? humanWeek(days) : humanDay(this.cursor);
         this.navEl.createSpan({ cls: 'dash-nav-label', text: label });
 
         const next = this.navEl.createEl('button', { cls: 'dash-nav-btn', text: '▶' });
-        next.setAttr('aria-label', week ? 'Next week' : 'Next day');
+        next.setAttr('aria-label', 'Next ' + noun);
         next.addEventListener('click', () => {
-            this.cursor = addDays(this.cursor, step);
+            this.cursor = move(1);
             this.refresh();
         });
 
         this.dayActionsEl.empty();
 
         const today = todayIso();
-        const isCurrent = week ? days.includes(today) : this.cursor === today;
+        const isCurrent = mode === 'day' ? this.cursor === today : days.includes(today);
         if (!isCurrent) {
             const jump = this.dayActionsEl.createEl('button', {
-                cls: 'dash-today', text: week ? 'This week' : 'Today',
+                cls: 'dash-today',
+                text: mode === 'month' ? 'This month' : mode === 'week' ? 'This week' : 'Today',
             });
             jump.addEventListener('click', () => {
                 this.cursor = today;
@@ -3677,7 +3717,11 @@ class NoshView extends ItemView {
         return scoreOf(dayCredits(this.plugin.settings, this.totalsFor([iso]).totals));
     }
 
-    weekScore(days) {
+    weekScore(days) { return this.spanScore(days, true); }
+
+    /* A month has no weekly groups to read: their targets are weekly and a
+     * month's total is not a week's. Its bars are the per-day ones alone. */
+    spanScore(days, weekly) {
         const settings = this.plugin.settings;
         const sum = Object.create(null);
         let logged = 0;
@@ -3705,7 +3749,7 @@ class NoshView extends ItemView {
         });
         const totals = this.totalsFor(days).totals;
         for (const g of FOOD_GROUPS) {
-            if (g.period !== 'week') continue;
+            if (!weekly || g.period !== 'week') continue;
             const spec = groupSpec(settings, g);
             const bar = spec && barCredit(g.key, g.label, spec.shape, totals[g.key], spec.min, spec.max);
             if (bar) bars.push(bar);
@@ -3722,10 +3766,12 @@ class NoshView extends ItemView {
      * because today and the week answer different questions - am I on track
      * now, did the pattern hold - and the week already contains the day.
      * Blended into one they would say nothing anyone could act on. */
-    renderScore(week) {
+    renderScore(mode) {
         const weekOf = weekDays(this.cursor, this.plugin.settings.weekStart);
-        const today = week ? null : this.dayScore(this.cursor);
-        const whole = this.weekScore(weekOf);
+        const today = mode === 'day' ? this.dayScore(this.cursor) : null;
+        const whole = mode === 'month'
+            ? this.spanScore(monthDays(this.cursor), false)
+            : this.weekScore(weekOf);
         if (!today && !whole) return;
 
         const row = this.summaryEl.createDiv({ cls: 'dash-score' });
@@ -3755,9 +3801,8 @@ class NoshView extends ItemView {
             reach.style.width = ((got.reach === null ? 1 : got.reach) * 50) + '%';
             bar.createDiv({ cls: 'dash-score-tick' });
         };
-        put(this.cursor === todayIso() ? 'Today so far' : 'Day', today);
-        /* So far while the week is still going, whatever was skipped in it. */
-        put(weekOf[weekOf.length - 1] >= todayIso() ? 'Week so far' : 'Week', whole);
+        put(this.cursor === todayIso() ? 'Today' : 'Day', today);
+        put(mode === 'month' ? 'Month' : 'Week', whole);
 
         /* What pulled it down, on request. The day's list in Day view, the
          * week's in Week view: the number you are looking at is the one that
@@ -3785,20 +3830,31 @@ class NoshView extends ItemView {
         const scale = week ? 7 : 1;
         const { totals, meals } = this.totalsFor(days);
 
+        const month = this.mode === 'month';
+        const logged = month ? days.filter((d) => this.entriesFor(d).length).length : 0;
+
         this.summaryEl.empty();
         if (!meals) {
             this.summaryEl.createSpan({
-                text: week ? 'Nothing logged this week.'
+                text: month ? 'Nothing logged this month.'
+                    : week ? 'Nothing logged this week.'
                            : 'Nothing logged — tick a meal below.',
             });
         } else {
             this.summaryEl.createSpan({
-                text: meals + (meals === 1 ? ' meal · ' : ' meals · ') +
+                text: month
+                    ? logged + (logged === 1 ? ' day' : ' days') + ' logged · ' +
+                      fmt(totals.calories / logged) + ' kcal/day avg'
+                    : meals + (meals === 1 ? ' meal · ' : ' meals · ') +
                       fmt(totals.calories) + ' kcal' +
                       (week ? ' · ' + fmt(totals.calories / 7) + ' kcal/day avg' : ''),
             });
-            this.renderScore(week);
+            this.renderScore(this.mode);
         }
+
+        /* A month's bars are the grid below, one square a day. Totals for a
+         * month would be totals against no target. */
+        if (month) return;
 
         /* Said out loud rather than swallowed: a total that is short because
          * a note was deleted looks exactly like a day somebody ate less. */
@@ -3819,8 +3875,9 @@ class NoshView extends ItemView {
         const split = this.totalsByOccasion(days);
 
         const hiddenN = this.plugin.settings.hiddenNutrients || [];
+        const macros = this.renderSectionHead(el, 'macros', 'Macros');
         for (const n of NUTRIENTS) {
-            if (hiddenN.includes(n.key)) continue;
+            if (!macros || hiddenN.includes(n.key)) continue;
             const target = parseNum(this.plugin.settings.targets[n.key]) * scale;
             const value = totals[n.key];
             const pct = target > 0 ? (value / target) * 100 : 0;
@@ -3848,33 +3905,48 @@ class NoshView extends ItemView {
         const perWeek = visible.filter((g) => g.period === 'week');
 
         if (perDay.length) {
-            el.createDiv({
-                cls: 'dash-section',
-                text: week ? 'Food groups · week' : 'Food groups · day',
-            });
-            if (!(this.recipes || []).some((r) => r.hasGroups)) {
+            const open = this.renderSectionHead(el, 'groupsDay',
+                week ? 'Food groups · week' : 'Food groups · day');
+            if (open && !(this.recipes || []).some((r) => r.hasGroups)) {
                 el.createDiv({
                     cls: 'dash-empty',
                     text: 'No meal carries serving counts yet. Add fields such as ' +
                           'serv_vegetables: 2 to a note’s frontmatter.',
                 });
             }
-            for (const g of perDay) this.renderGroup(el, g, totals[g.key], scale, split);
+            if (open) for (const g of perDay) this.renderGroup(el, g, totals[g.key], scale, split);
         }
 
         /* Weekly allowances are always shown against the whole week. In Day
          * view that means the week-to-date total, so the day you are logging
          * is read in the context of the allowance it draws down. */
         if (perWeek.length) {
-            el.createDiv({
-                cls: 'dash-section',
-                text: week ? 'Food groups · per week' : 'Food groups · this week so far',
-            });
+            const open = this.renderSectionHead(el, 'groupsWeek',
+                week ? 'Food groups · per week' : 'Food groups · this week so far');
+            if (!open) return;
             const weekDaysOf = weekDays(this.cursor, this.plugin.settings.weekStart);
             const weekTotals = week ? totals : this.totalsFor(weekDaysOf).totals;
             const weekSplit = week ? split : this.totalsByOccasion(weekDaysOf);
             for (const g of perWeek) this.renderGroup(el, g, weekTotals[g.key], 1, weekSplit);
         }
+    }
+
+    /* A section heading that folds its bars away, with a caret like the
+     * picker's groups have. Returns whether the bars should follow it. */
+    renderSectionHead(el, key, text, redraw) {
+        const folded = !!(this.plugin.settings.foldedTotals || {})[key];
+        const head = el.createEl('button', { cls: 'dash-section dash-section-head' });
+        head.createSpan({ cls: 'dash-group-caret', text: folded ? '\u25b8' : '\u25be' });
+        head.createSpan({ text: text });
+        head.setAttr('aria-expanded', String(!folded));
+        head.addEventListener('click', async () => {
+            const at = this.plugin.settings.foldedTotals ||
+                       (this.plugin.settings.foldedTotals = {});
+            if (folded) delete at[key]; else at[key] = true;
+            await this.plugin.saveSettings();
+            this.keepScroll(redraw || (() => this.renderTotals()));
+        });
+        return !folded;
     }
 
     renderGroup(el, g, value, scale, split) {
@@ -3907,7 +3979,8 @@ class NoshView extends ItemView {
     renderBody() {
         this.bodyEl.empty();
         this.suggestEl = null;
-        if (this.mode === 'week') this.renderWeekStrip();
+        if (this.mode === 'month') this.renderMonthGrid();
+        else if (this.mode === 'week') this.renderWeekStrip();
         else this.renderPicker();
     }
 
@@ -3953,6 +4026,65 @@ class NoshView extends ItemView {
         }
     }
 
+    /* A month at a glance: a row a week, a square a day, and in each square
+     * the nutrient bars drawn as lines too thin to label - which is the
+     * point. You cannot read a number off it, but you can see which weeks
+     * went green and which went red, and which days there is nothing on at
+     * all. Any square opens its day. */
+    renderMonthGrid() {
+        const el = this.bodyEl;
+        const settings = this.plugin.settings;
+        const inMonth = monthDays(this.cursor);
+        const month = dateOf(this.cursor).getMonth();
+        const today = todayIso();
+        const hiddenN = settings.hiddenNutrients || [];
+        const lines = NUTRIENTS.filter((n) => !hiddenN.includes(n.key));
+
+        /* Whole weeks, so the columns mean the same all the way down. */
+        const first = weekDays(inMonth[0], settings.weekStart)[0];
+        const last = weekDays(inMonth[inMonth.length - 1], settings.weekStart)[6];
+        const days = [];
+        for (let iso = first; iso <= last; iso = addDays(iso, 1)) days.push(iso);
+
+        const grid = el.createDiv({ cls: 'dash-month' });
+        for (const iso of days.slice(0, 7)) {
+            grid.createDiv({
+                cls: 'dash-month-dow',
+                text: dateOf(iso).toLocaleDateString(undefined, { weekday: 'narrow' }),
+            });
+        }
+
+        for (const iso of days) {
+            const cell = grid.createEl('button', { cls: 'dash-cell' });
+            if (dateOf(iso).getMonth() !== month) cell.addClass('is-outside');
+            if (iso === today) cell.addClass('is-today');
+            cell.setAttr('aria-label', humanDay(iso));
+            cell.createDiv({ cls: 'dash-cell-date', text: String(dateOf(iso).getDate()) });
+
+            const entries = this.entriesFor(iso);
+            const box = cell.createDiv({ cls: 'dash-cell-lines' });
+            if (!entries.length) {
+                cell.addClass('is-empty');
+            } else {
+                const totals = this.totalsFor([iso]).totals;
+                for (const n of lines) {
+                    const target = parseNum(settings.targets[n.key]);
+                    const pct = target > 0 ? (totals[n.key] / target) * 100 : 0;
+                    const line = box.createDiv({ cls: 'dash-cell-line' });
+                    line.setAttr('data-state', nutrientState(n.dir, pct));
+                    line.createDiv({ cls: 'dash-cell-fill' }).style.width =
+                        Math.max(0, Math.min(100, pct)) + '%';
+                }
+            }
+
+            cell.addEventListener('click', () => {
+                this.cursor = iso;
+                this.mode = 'day';
+                this.refresh();
+            });
+        }
+    }
+
     /* Building draws on the ingredient list, so it answers as that tab for
      * everything the list rendering needs. */
     sourceDef() {
@@ -3970,6 +4102,11 @@ class NoshView extends ItemView {
         const el = this.bodyEl;
         const building = this.source === BUILD_KEY;
         const source = this.sourceDef();
+
+        /* The whole of the logging half folds away under one heading, for
+         * a day you only want to read. The fold redraws the body rather
+         * than the totals, which is what this heading sits at the top of. */
+        if (!this.renderSectionHead(el, 'input', 'Input', () => this.renderBody())) return;
 
         this.renderOccasions(el);
 
@@ -4649,6 +4786,9 @@ class NoshView extends ItemView {
      * on top. If the API is down you still get the report, and a notice
      * saying why it came without one. */
     async exportReport(withReading) {
+        if (this.mode === 'month') {
+            throw new Error('A report is a day or a week. Pick one and export that.');
+        }
         const settings = this.plugin.settings;
         const r = this.reportData();
         let body = reportMarkdown(r);
