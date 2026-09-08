@@ -159,6 +159,12 @@ its day.
 Export what is on screen — a day or a week — as a markdown note: the totals, the
 bars, and the day-by-day detail behind them.
 
+Between the two sits a **By food** table: a row for each food eaten, a column
+for each nutrient, the largest figure in every column in bold. Read the sodium
+column down and it lands on the thing that brought it. A food eaten twice is
+one row with its servings added up, since the question is about the food and
+not the sitting.
+
 ## Nosh AI (optional)
 
 Off unless you give it credentials. Four things use it:

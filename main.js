@@ -1969,6 +1969,27 @@ function scoreState(score) {
  * and survives being pasted somewhere without the stylesheet. */
 const STATE_MARK = { met: '✓', under: '↓', near: '!', over: '✗', neutral: '·' };
 
+/* The entries of every day folded into one row per food, most calories
+ * first. A meal note and an ingredient note are each a food here: the meal
+ * is what was ticked, and what it is made of is on its own note. */
+function foodRows(byDay) {
+    const rows = new Map();
+    for (const d of byDay) {
+        for (const e of d.entries) {
+            let row = rows.get(e.name);
+            if (!row) {
+                row = { name: e.name, servings: 0, values: {} };
+                for (const n of NUTRIENTS) row.values[n.key] = 0;
+                rows.set(e.name, row);
+            }
+            row.servings += e.servings;
+            for (const n of NUTRIENTS) row.values[n.key] += e.values[n.key];
+        }
+    }
+    return Array.from(rows.values())
+        .sort((a, b) => b.values.calories - a.values.calories);
+}
+
 function reportTitle(r) {
     return 'Nosh ' + r.days[0] +
            (r.mode === 'week' ? ' to ' + r.days[r.days.length - 1] : '');
@@ -2040,6 +2061,34 @@ function reportMarkdown(r) {
                    ' | ' + target +
                    ' | ' + (g.period === 'week' ? 'the week' : 'the day') +
                    ' | ' + STATE_MARK[g.state] + ' |');
+    }
+
+    /* Which foods carried each nutrient. A row a food, a column a nutrient,
+     * the biggest figure in each column in bold, so the sodium column reads
+     * straight down to the thing that brought it. The same food eaten twice
+     * is one row with its servings added up, since the question is about
+     * the food and not the sitting. */
+    const foods = foodRows(r.byDay);
+    if (foods.length) {
+        lines.push('');
+        lines.push('## By food');
+        lines.push('');
+        lines.push('| Food | Servings | ' +
+                   NUTRIENTS.map((n) => n.label + ' (' + n.unit + ')').join(' | ') + ' |');
+        lines.push('|---|---:|' + NUTRIENTS.map(() => '---:').join('|') + '|');
+        const top = {};
+        for (const n of NUTRIENTS) {
+            top[n.key] = Math.max.apply(null, foods.map((f) => f.values[n.key]));
+        }
+        for (const f of foods) {
+            lines.push('| ' + f.name + ' | ' + fmt(f.servings) + ' | ' + NUTRIENTS.map((n) => {
+                const v = f.values[n.key];
+                const lead = foods.length > 1 && v > 0 && v === top[n.key];
+                return lead ? '**' + fmt(v) + '**' : fmt(v);
+            }).join(' | ') + ' |');
+        }
+        lines.push('| *Total* | | ' + NUTRIENTS.map((n) =>
+            '*' + fmt(r.totals[n.key]) + '*').join(' | ') + ' |');
     }
 
     lines.push('');
@@ -4767,6 +4816,10 @@ class NoshView extends ItemView {
                 servings: e.servings,
                 calories: e.recipe.values.calories * e.servings,
                 sodium: e.recipe.values.sodium_mg * e.servings,
+                /* Every nutrient, scaled to what was eaten, for the table that
+                 * says which foods carried each one. */
+                values: Object.fromEntries(NUTRIENTS.map((n) =>
+                    [n.key, parseNum(e.recipe.values[n.key]) * e.servings])),
             })),
         }));
 
