@@ -3,7 +3,7 @@
 const { Plugin, ItemView, PluginSettingTab, Setting, Modal, Menu, Notice,
         requestUrl, setIcon, getAllTags, MarkdownRenderer, Component } = require('obsidian');
 
-const VIEW_TYPE_DASH = 'dash-tracker-view';
+const VIEW_TYPE_DASH = 'nosh-view';
 
 /*
  * dir describes how a bar should be read:
@@ -1638,12 +1638,12 @@ function awaitCache(app, file, ms) {
  * Returns the undo. */
 function fitModalToKeyboard(modal) {
     const modalEl = modal.modalEl;
-    modalEl.addClass('dash-modal-fit');
-    modal.containerEl.addClass('dash-modal-fit-container');
+    modalEl.addClass('nosh-modal-fit');
+    modal.containerEl.addClass('nosh-modal-fit-container');
 
     /* Mirrors the close button on the other side of the card, and only while
      * there is a keyboard to put away. */
-    const down = modalEl.createEl('button', { cls: 'dash-keyboard-down' });
+    const down = modalEl.createEl('button', { cls: 'nosh-keyboard-down' });
     down.setAttr('aria-label', 'Hide the keyboard');
     setIcon(down, 'chevron-down');
 
@@ -1670,11 +1670,11 @@ function fitModalToKeyboard(modal) {
 
     /* Class rather than a measurement: what the card does about the keyboard is
      * make itself smaller, and it only needs to know whether one is there. */
-    const opened = () => modalEl.addClass('dash-keyed');
+    const opened = () => modalEl.addClass('nosh-keyed');
     const shut = () => {
         /* A tick, because moving between two fields is a blur and a focus and
          * the card should not flinch in between. */
-        window.setTimeout(() => { if (!typing()) modalEl.removeClass('dash-keyed'); }, 60);
+        window.setTimeout(() => { if (!typing()) modalEl.removeClass('nosh-keyed'); }, 60);
     };
 
     const follow = (e) => {
@@ -1714,12 +1714,12 @@ class NoshSuggestModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         this.unfit = fitModalToKeyboard(this);
-        contentEl.addClass('dash-draft');
+        contentEl.addClass('nosh-draft');
         this.setTitle('What' + String.fromCharCode(8217) + 's for ' +
                       (OCCASION_ASK[this.view.occasion] ||
                        this.view.occasion.toLowerCase()) + '?');
 
-        const served = contentEl.createDiv({ cls: 'dash-draft-row' });
+        const served = contentEl.createDiv({ cls: 'nosh-draft-row' });
         served.createEl('label', { text: 'Cooking for' });
         const servesEl = served.createEl('input', { type: 'number' });
         servesEl.min = '1';
@@ -1730,7 +1730,7 @@ class NoshSuggestModal extends Modal {
             this.preview();
         });
 
-        const spanned = contentEl.createDiv({ cls: 'dash-draft-row' });
+        const spanned = contentEl.createDiv({ cls: 'nosh-draft-row' });
         spanned.createEl('label', { text: 'Effort' });
         const spanEl = spanned.createEl('select');
         for (const r of RECIPE_SPANS) {
@@ -1743,7 +1743,7 @@ class NoshSuggestModal extends Modal {
             this.preview();
         });
 
-        const used = contentEl.createDiv({ cls: 'dash-draft-row' });
+        const used = contentEl.createDiv({ cls: 'nosh-draft-row' });
         used.createEl('label', { text: 'Use up' });
         const useEl = used.createEl('input', { type: 'text' });
         useEl.placeholder = 'half a fennel, the last of the yoghurt';
@@ -1752,7 +1752,7 @@ class NoshSuggestModal extends Modal {
             this.preview();
         });
 
-        const extraEl = contentEl.createEl('textarea', { cls: 'dash-draft-extra' });
+        const extraEl = contentEl.createEl('textarea', { cls: 'nosh-draft-extra' });
         extraEl.placeholder = 'Anything else, in your own words\u2026';
         extraEl.rows = 2;
         extraEl.addEventListener('input', () => {
@@ -1763,12 +1763,12 @@ class NoshSuggestModal extends Modal {
         /* Read-only, and shown rather than hidden: the fields above are how it
          * gets changed, and a box that can be typed into as well would only
          * argue with them about which one won. */
-        const box = contentEl.createEl('details', { cls: 'dash-draft-preview' });
+        const box = contentEl.createEl('details', { cls: 'nosh-draft-preview' });
         box.createEl('summary', { text: 'What Claude will be told' });
         this.previewEl = box.createEl('pre');
         this.preview();
 
-        const actions = contentEl.createDiv({ cls: 'dash-draft-actions' });
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
         const cancel = actions.createEl('button', { text: 'Cancel' });
         cancel.addEventListener('click', () => this.close());
 
@@ -1805,16 +1805,16 @@ class NoshExistsModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
-        contentEl.addClass('dash-draft');
+        contentEl.addClass('nosh-draft');
         contentEl.createEl('h3', { text: this.name + ' already exists' });
         contentEl.createDiv({
-            cls: 'dash-draft-note',
+            cls: 'nosh-draft-note',
             text: 'A note by that name is already in the vault. Logging the one you ' +
                   'have keeps the day counting a single food rather than two that ' +
                   'happen to share a name.',
         });
 
-        const actions = contentEl.createDiv({ cls: 'dash-draft-actions' });
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
         const pick = (label, value, primary) => {
             const b = actions.createEl('button', { text: label });
             if (primary) b.addClass('mod-cta');
@@ -1849,15 +1849,15 @@ class NoshPhotoModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         this.unfit = fitModalToKeyboard(this);
-        contentEl.addClass('dash-draft');
+        contentEl.addClass('nosh-draft');
         this.setTitle('What is this, and how much of it?');
 
-        const shown = contentEl.createDiv({ cls: 'dash-draft-shot' });
+        const shown = contentEl.createDiv({ cls: 'nosh-draft-shot' });
         const img = shown.createEl('img');
         img.src = 'data:' + this.photo.type + ';base64,' + this.photo.data;
         img.alt = 'The photograph about to be sent';
 
-        const ask = contentEl.createDiv({ cls: 'dash-draft-ask' });
+        const ask = contentEl.createDiv({ cls: 'nosh-draft-ask' });
         const said = ask.createEl('input', { type: 'text' });
         said.value = this.seed;
         said.placeholder = 'Half of it. The one on the left. Two of these\u2026';
@@ -1866,12 +1866,12 @@ class NoshPhotoModal extends Modal {
         });
 
         contentEl.createDiv({
-            cls: 'dash-draft-note',
+            cls: 'nosh-draft-note',
             text: 'A label is read as the serving it prints, and a plate as what is ' +
                   'on it, unless you say otherwise here.',
         });
 
-        const actions = contentEl.createDiv({ cls: 'dash-draft-actions' });
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
         const cancel = actions.createEl('button', { text: 'Cancel' });
         cancel.addEventListener('click', () => this.close());
 
@@ -1939,10 +1939,10 @@ class NoshDraftModal extends Modal {
         const { contentEl } = this;
         this.unfit = fitModalToKeyboard(this);
         const spec = AI_KINDS[this.kind] || AI_KINDS.ingredients;
-        contentEl.addClass('dash-draft');
+        contentEl.addClass('nosh-draft');
         this.setTitle(spec.title);
 
-        const named = contentEl.createDiv({ cls: 'dash-draft-row' });
+        const named = contentEl.createDiv({ cls: 'nosh-draft-row' });
         named.createEl('label', { text: 'Name' });
         const nameEl = named.createEl('input', { type: 'text' });
         nameEl.value = this.draft.name || '';
@@ -1955,7 +1955,7 @@ class NoshDraftModal extends Modal {
          * better than a dropdown of occasions can. It stays in the
          * frontmatter, editable there like anything else. */
         if (this.kind !== 'ingredients') {
-            const mealed = contentEl.createDiv({ cls: 'dash-draft-row' });
+            const mealed = contentEl.createDiv({ cls: 'nosh-draft-row' });
             mealed.createEl('label', { text: 'Meal' });
             const mealEl = mealed.createEl('select');
             for (const m of MEAL_ORDER) {
@@ -1972,14 +1972,14 @@ class NoshDraftModal extends Modal {
          * with. A portion is the one thing on this card you know better than
          * Claude does - it was your plate - and it is where an estimate goes
          * wrong. Move it and everything below follows. */
-        const portions = contentEl.createDiv({ cls: 'dash-draft-portions' });
+        const portions = contentEl.createDiv({ cls: 'nosh-draft-portions' });
         for (const part of this.parts) {
-            const row = portions.createDiv({ cls: 'dash-draft-portion' });
+            const row = portions.createDiv({ cls: 'nosh-draft-portion' });
             row.createSpan({
-                cls: 'dash-draft-portion-name',
+                cls: 'nosh-draft-portion-name',
                 text: this.kind === 'ingredients' ? 'Amount' : part.name,
             });
-            const box = row.createEl('input', { cls: 'dash-draft-num', type: 'number' });
+            const box = row.createEl('input', { cls: 'nosh-draft-num', type: 'number' });
             box.min = '0';
             box.step = 'any';
             box.inputMode = 'decimal';
@@ -1988,7 +1988,7 @@ class NoshDraftModal extends Modal {
                 part.qty = Math.max(0, parseNum(box.value));
                 this.retotal();
             });
-            row.createSpan({ cls: 'dash-draft-unit', text: part.unit });
+            row.createSpan({ cls: 'nosh-draft-unit', text: part.unit });
         }
 
         /* A suggestion is being judged on whether it is worth cooking, so the
@@ -1997,13 +1997,13 @@ class NoshDraftModal extends Modal {
         const steps = Array.isArray(this.draft.method)
             ? this.draft.method.filter(Boolean) : [];
         if (steps.length) {
-            const how = contentEl.createEl('ol', { cls: 'dash-draft-method' });
+            const how = contentEl.createEl('ol', { cls: 'nosh-draft-method' });
             for (const step of steps) how.createEl('li', { text: String(step) });
 
             /* Built from the portions as they stand, so a halved ingredient
              * is halved in the chat too. */
             const chat = contentEl.createEl('a', {
-                cls: 'dash-draft-chat',
+                cls: 'nosh-draft-chat',
                 text: 'Cook this with Claude',
             });
             chat.setAttr('target', '_blank');
@@ -2015,7 +2015,7 @@ class NoshDraftModal extends Modal {
         /* Read, not typed. Every figure here is what the portions above come
          * to, and a number you could overwrite would only be a number that had
          * stopped describing the food. */
-        const table = contentEl.createEl('table', { cls: 'dash-draft-table' });
+        const table = contentEl.createEl('table', { cls: 'nosh-draft-table' });
         this.figures = {};
         for (const n of NUTRIENTS) {
             const tr = table.createEl('tr');
@@ -2023,20 +2023,20 @@ class NoshDraftModal extends Modal {
             this.figures[n.key] = tr.createEl('td');
         }
 
-        this.groupsEl = contentEl.createDiv({ cls: 'dash-draft-groups' });
+        this.groupsEl = contentEl.createDiv({ cls: 'nosh-draft-groups' });
         this.retotal();
 
         if (this.draft.note) {
-            contentEl.createDiv({ cls: 'dash-draft-note', text: this.draft.note });
+            contentEl.createDiv({ cls: 'nosh-draft-note', text: this.draft.note });
         }
 
-        const logged = contentEl.createDiv({ cls: 'dash-draft-log' });
+        const logged = contentEl.createDiv({ cls: 'nosh-draft-log' });
         const box = logged.createEl('input', { type: 'checkbox' });
         box.checked = this.shouldLog;
         box.addEventListener('change', () => { this.shouldLog = box.checked; });
         logged.createEl('label', { text: 'Log one serving for ' + humanDay(this.view.cursor) });
 
-        const actions = contentEl.createDiv({ cls: 'dash-draft-actions' });
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
         const cancel = actions.createEl('button', { text: 'Cancel' });
         cancel.addEventListener('click', () => this.close());
 
@@ -2803,26 +2803,26 @@ class NoshProbeModal extends Modal {
         const { contentEl } = this;
         this.unfit = fitModalToKeyboard(this);
         this.owner.load();
-        contentEl.addClass('dash-draft');
-        contentEl.addClass('dash-probe');
+        contentEl.addClass('nosh-draft');
+        contentEl.addClass('nosh-probe');
         this.setTitle('Ask about ' + this.recipe.name);
 
-        contentEl.createDiv({ cls: 'dash-probe-source', text: this.found() });
+        contentEl.createDiv({ cls: 'nosh-probe-source', text: this.found() });
 
-        this.logEl = contentEl.createDiv({ cls: 'dash-probe-log' });
+        this.logEl = contentEl.createDiv({ cls: 'nosh-probe-log' });
 
         /* Gone the moment there is a conversation to read instead. */
-        this.chipsEl = contentEl.createDiv({ cls: 'dash-probe-chips' });
+        this.chipsEl = contentEl.createDiv({ cls: 'nosh-probe-chips' });
         for (const ask of RECIPE_ASKS) {
             const chip = this.chipsEl.createEl('button',
-                { cls: 'dash-probe-chip', text: ask });
+                { cls: 'nosh-probe-chip', text: ask });
             chip.addEventListener('click', () => {
                 this.askEl.value = ask;
                 this.ask();
             });
         }
 
-        this.askEl = contentEl.createEl('textarea', { cls: 'dash-draft-extra' });
+        this.askEl = contentEl.createEl('textarea', { cls: 'nosh-draft-extra' });
         this.askEl.rows = 2;
         this.askEl.placeholder = 'Ask about this recipe…';
         this.askEl.addEventListener('keydown', (e) => {
@@ -2834,7 +2834,7 @@ class NoshProbeModal extends Modal {
             }
         });
 
-        const actions = contentEl.createDiv({ cls: 'dash-draft-actions' });
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
 
         this.saveEl = actions.createEl('button', { text: 'Save to note' });
         this.saveEl.disabled = true;
@@ -2862,9 +2862,9 @@ class NoshProbeModal extends Modal {
     }
 
     turn(who, text) {
-        const el = this.logEl.createDiv({ cls: 'dash-probe-turn dash-probe-' + who });
-        el.createDiv({ cls: 'dash-probe-who', text: who === 'you' ? 'You' : 'Claude' });
-        const said = el.createDiv({ cls: 'dash-probe-said', text: text });
+        const el = this.logEl.createDiv({ cls: 'nosh-probe-turn nosh-probe-' + who });
+        el.createDiv({ cls: 'nosh-probe-who', text: who === 'you' ? 'You' : 'Claude' });
+        const said = el.createDiv({ cls: 'nosh-probe-said', text: text });
         this.logEl.scrollTop = this.logEl.scrollHeight;
         return said;
     }
@@ -2903,7 +2903,7 @@ class NoshProbeModal extends Modal {
             /* A question that never reached an answer leaves the conversation
              * as it was, so asking again does not ask it twice. */
             this.messages.pop();
-            answerEl.addClass('dash-probe-failed');
+            answerEl.addClass('nosh-probe-failed');
             answerEl.setText(e && e.message ? e.message : String(e));
         } finally {
             this.busy = false;
@@ -2945,7 +2945,7 @@ module.exports = class NoshPlugin extends Plugin {
         this.addRibbonIcon('heart', 'Open Nosh', () => this.activateView());
 
         this.addCommand({
-            id: 'open-dash-tracker',
+            id: 'open-nosh',
             name: 'Open Nosh',
             callback: () => this.activateView(),
         });
@@ -2998,7 +2998,7 @@ module.exports = class NoshPlugin extends Plugin {
         });
 
         this.addCommand({
-            id: 'clear-dash-selection',
+            id: 'clear-today',
             name: 'Clear today',
             callback: async () => {
                 delete this.settings.log[todayIso()];
@@ -3437,24 +3437,24 @@ class NoshView extends ItemView {
     async onOpen() {
         const root = this.contentEl;
         root.empty();
-        root.addClass('dash-tracker');
+        root.addClass('nosh-tracker');
 
-        const header = root.createDiv({ cls: 'dash-header' });
-        header.createEl('div', { cls: 'dash-title', text: 'Nosh' });
+        const header = root.createDiv({ cls: 'nosh-header' });
+        header.createEl('div', { cls: 'nosh-title', text: 'Nosh' });
 
-        this.actionsEl = header.createDiv({ cls: 'dash-actions' });
+        this.actionsEl = header.createDiv({ cls: 'nosh-actions' });
         this.renderActions();
 
-        this.tabsEl = root.createDiv({ cls: 'dash-tabs' });
-        this.navEl = root.createDiv({ cls: 'dash-nav' });
+        this.tabsEl = root.createDiv({ cls: 'nosh-tabs' });
+        this.navEl = root.createDiv({ cls: 'nosh-nav' });
 
         /* Holds Today when it applies, and collapses to nothing when it
          * does not. Clear lives on the tabs' context menu instead. */
-        this.dayActionsEl = root.createDiv({ cls: 'dash-day-actions' });
+        this.dayActionsEl = root.createDiv({ cls: 'nosh-day-actions' });
 
-        this.summaryEl = root.createDiv({ cls: 'dash-summary' });
-        this.totalsEl = root.createDiv({ cls: 'dash-totals' });
-        this.bodyEl = root.createDiv({ cls: 'dash-body' });
+        this.summaryEl = root.createDiv({ cls: 'nosh-summary' });
+        this.totalsEl = root.createDiv({ cls: 'nosh-totals' });
+        this.bodyEl = root.createDiv({ cls: 'nosh-body' });
 
         this.refresh();
     }
@@ -3485,24 +3485,24 @@ class NoshView extends ItemView {
 
         /* The log lives in data.json, which is read once at load. Somewhere to
          * press when the vault has been synced from elsewhere since. */
-        const again = actions.createEl('button', { cls: 'dash-gear' });
+        const again = actions.createEl('button', { cls: 'nosh-gear' });
         again.setAttr('aria-label', 'Reload the log from data.json');
         setIcon(again, 'refresh-cw');
         again.addEventListener('click', async () => {
             if (again.disabled) return;
             again.disabled = true;
-            again.addClass('dash-gear-spin');
+            again.addClass('nosh-gear-spin');
             try {
                 await this.plugin.reloadSettings();
                 new Notice('Nosh: reloaded from data.json.');
             } catch (e) {
                 new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
             }
-            again.removeClass('dash-gear-spin');
+            again.removeClass('nosh-gear-spin');
             again.disabled = false;
         });
 
-        const out = actions.createEl('button', { cls: 'dash-gear' });
+        const out = actions.createEl('button', { cls: 'nosh-gear' });
         out.setAttr('aria-label', 'Export a report for what is on screen');
         setIcon(out, 'file-output');
         out.addEventListener('click', async () => {
@@ -3519,18 +3519,18 @@ class NoshView extends ItemView {
         /* Development only: main.js is read once, at load, so an edit to it
          * needs the plugin taken down and brought back up. */
         if (this.plugin.settings.devReload) {
-            const fresh = actions.createEl('button', { cls: 'dash-gear' });
+            const fresh = actions.createEl('button', { cls: 'nosh-gear' });
             fresh.setAttr('aria-label', 'Reload Nosh from disk');
             setIcon(fresh, 'power');
             fresh.addEventListener('click', async () => {
                 if (fresh.disabled) return;
                 fresh.disabled = true;
-                fresh.addClass('dash-gear-spin');
+                fresh.addClass('nosh-gear-spin');
                 try {
                     await this.reloadPlugin();
                 } catch (e) {
                     new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
-                    fresh.removeClass('dash-gear-spin');
+                    fresh.removeClass('nosh-gear-spin');
                     fresh.disabled = false;
                 }
                 /* Nothing is re-enabled on the way out: a reload that worked
@@ -3538,7 +3538,7 @@ class NoshView extends ItemView {
             });
         }
 
-        const gear = actions.createEl('button', { cls: 'dash-gear' });
+        const gear = actions.createEl('button', { cls: 'nosh-gear' });
         gear.setAttr('aria-label', 'Nosh settings');
         setIcon(gear, 'settings');
         gear.addEventListener('click', () => this.openSettings());
@@ -3828,7 +3828,7 @@ class NoshView extends ItemView {
         const brief = this.remainingBrief();
         const outstanding = brief.short.length + brief.groups.length;
 
-        const go = el.createEl('button', { cls: 'dash-suggest-btn' });
+        const go = el.createEl('button', { cls: 'nosh-suggest-btn' });
         if (!outstanding) {
             go.setText('Every target met');
             go.disabled = true;
@@ -3875,7 +3875,7 @@ class NoshView extends ItemView {
         this.tabsEl.empty();
         const names = { day: 'Day', week: 'Week', month: 'Month' };
         for (const m of ['day', 'week', 'month']) {
-            const b = this.tabsEl.createEl('button', { cls: 'dash-tab', text: names[m] });
+            const b = this.tabsEl.createEl('button', { cls: 'nosh-tab', text: names[m] });
             if (this.mode === m) b.addClass('is-active');
             b.addEventListener('click', () => this.setMode(m));
 
@@ -3919,7 +3919,7 @@ class NoshView extends ItemView {
             ? addMonths(this.cursor, n)
             : addDays(this.cursor, n * (mode === 'week' ? 7 : 1));
 
-        const prev = this.navEl.createEl('button', { cls: 'dash-nav-btn', text: '◀' });
+        const prev = this.navEl.createEl('button', { cls: 'nosh-nav-btn', text: '◀' });
         prev.setAttr('aria-label', 'Previous ' + noun);
         prev.addEventListener('click', () => {
             this.cursor = move(-1);
@@ -3929,9 +3929,9 @@ class NoshView extends ItemView {
         const days = this.daysInView();
         const label = mode === 'month' ? humanMonth(this.cursor)
             : mode === 'week' ? humanWeek(days) : humanDay(this.cursor);
-        this.navEl.createSpan({ cls: 'dash-nav-label', text: label });
+        this.navEl.createSpan({ cls: 'nosh-nav-label', text: label });
 
-        const next = this.navEl.createEl('button', { cls: 'dash-nav-btn', text: '▶' });
+        const next = this.navEl.createEl('button', { cls: 'nosh-nav-btn', text: '▶' });
         next.setAttr('aria-label', 'Next ' + noun);
         next.addEventListener('click', () => {
             this.cursor = move(1);
@@ -3944,7 +3944,7 @@ class NoshView extends ItemView {
         const isCurrent = mode === 'day' ? this.cursor === today : days.includes(today);
         if (!isCurrent) {
             const jump = this.dayActionsEl.createEl('button', {
-                cls: 'dash-today',
+                cls: 'nosh-today',
                 text: mode === 'month' ? 'This month' : mode === 'week' ? 'This week' : 'Today',
             });
             jump.addEventListener('click', () => {
@@ -3966,15 +3966,15 @@ class NoshView extends ItemView {
     // --- bars -------------------------------------------------------
 
     renderBar(parent, opts) {
-        const row = parent.createDiv({ cls: 'dash-metric' });
+        const row = parent.createDiv({ cls: 'nosh-metric' });
         row.setAttr('data-state', opts.state);
         row.setAttr('data-dir', opts.dir);
 
-        const top = row.createDiv({ cls: 'dash-metric-top' });
-        top.createSpan({ cls: 'dash-metric-name', text: opts.label });
-        top.createSpan({ cls: 'dash-metric-val', text: opts.valueText });
+        const top = row.createDiv({ cls: 'nosh-metric-top' });
+        top.createSpan({ cls: 'nosh-metric-name', text: opts.label });
+        top.createSpan({ cls: 'nosh-metric-val', text: opts.valueText });
 
-        const bar = row.createDiv({ cls: 'dash-bar' });
+        const bar = row.createDiv({ cls: 'nosh-bar' });
         const width = Math.max(0, Math.min(100, opts.pct));
         const segs = (opts.segments || []).filter((seg) => seg.value > 0);
 
@@ -3985,23 +3985,23 @@ class NoshView extends ItemView {
              * into a second thing it is saying. The breaks and the shading
              * separate the meals; the order says which is which. */
             const whole = segs.reduce((sum, seg) => sum + seg.value, 0);
-            const strip = bar.createDiv({ cls: 'dash-bar-split' });
+            const strip = bar.createDiv({ cls: 'nosh-bar-split' });
             strip.style.width = width + '%';
 
             segs.forEach((seg, i) => {
-                const part = strip.createDiv({ cls: 'dash-bar-part' });
+                const part = strip.createDiv({ cls: 'nosh-bar-part' });
                 part.style.flexGrow = String(seg.value / whole);
                 part.style.opacity = String(1 - Math.min(i, 4) * 0.15);
                 part.setAttr('aria-label', seg.label);
                 part.setAttr('title', seg.label);
             });
         } else {
-            const fill = bar.createDiv({ cls: 'dash-bar-fill' });
+            const fill = bar.createDiv({ cls: 'nosh-bar-fill' });
             fill.style.width = width + '%';
         }
 
         if (opts.minPct > 0 && opts.minPct < 100) {
-            bar.createDiv({ cls: 'dash-bar-min' }).style.left = opts.minPct + '%';
+            bar.createDiv({ cls: 'nosh-bar-min' }).style.left = opts.minPct + '%';
         }
     }
 
@@ -4070,7 +4070,7 @@ class NoshView extends ItemView {
         if (!got) return;
         if (!this.renderSectionHead(this.summaryEl, 'score', 'Composite score')) return;
 
-        const row = this.summaryEl.createDiv({ cls: 'dash-score' });
+        const row = this.summaryEl.createDiv({ cls: 'nosh-score' });
         row.setAttr('title', 'From the middle: green goes right as the things to ' +
                              'reach are reached, red goes left for the worst thing ' +
                              'gone over. The number averages every bar you have ' +
@@ -4078,31 +4078,31 @@ class NoshView extends ItemView {
                              'costing most.');
         const put = (label, got) => {
             if (!got) return;
-            const part = row.createDiv({ cls: 'dash-score-part' });
+            const part = row.createDiv({ cls: 'nosh-score-part' });
             /* Label to the left, number over the middle - which is where the
              * two fills meet, so the number sits on the thing it summarises. */
-            const top = part.createDiv({ cls: 'dash-score-top' });
-            top.createSpan({ cls: 'dash-score-label', text: label });
-            const num = top.createSpan({ cls: 'dash-score-num', text: String(got.score) });
+            const top = part.createDiv({ cls: 'nosh-score-top' });
+            top.createSpan({ cls: 'nosh-score-label', text: label });
+            const num = top.createSpan({ cls: 'nosh-score-num', text: String(got.score) });
             num.setAttr('data-state', scoreState(got.score));
 
             /* Both fills start at the middle. Green goes right as the things to
              * reach are reached, all the way to the edge when they all are; red
              * goes left for the worst thing gone over. Nothing either side of
              * the middle is a day with nothing to show yet. */
-            const bar = part.createDiv({ cls: 'dash-score-bar' });
-            const excess = bar.createDiv({ cls: 'dash-score-excess' });
+            const bar = part.createDiv({ cls: 'nosh-score-bar' });
+            const excess = bar.createDiv({ cls: 'nosh-score-excess' });
             excess.style.width = ((got.excess || 0) * 50) + '%';
-            const reach = bar.createDiv({ cls: 'dash-score-reach' });
+            const reach = bar.createDiv({ cls: 'nosh-score-reach' });
             reach.style.width = ((got.reach === null ? 1 : got.reach) * 50) + '%';
-            bar.createDiv({ cls: 'dash-score-tick' });
+            bar.createDiv({ cls: 'nosh-score-tick' });
         };
         put(mode === 'month' ? 'Month' : mode === 'week' ? 'Week'
             : this.cursor === todayIso() ? 'Today' : 'Day', got);
 
         /* What pulled it down, on request. */
         if (this.scoreOpen) {
-            const why = row.createDiv({ cls: 'dash-score-why' });
+            const why = row.createDiv({ cls: 'nosh-score-why' });
             why.setText(got.worst.length
                 ? 'Costing most: ' + got.worst.map((b) =>
                     b.label + ' ' + Math.round(b.credit * 100) + '%').join(' · ')
@@ -4153,7 +4153,7 @@ class NoshView extends ItemView {
          * a note was deleted looks exactly like a day somebody ate less. */
         const gone = this.missingFor(days);
         if (gone.length) {
-            const warn = this.summaryEl.createDiv({ cls: 'dash-missing' });
+            const warn = this.summaryEl.createDiv({ cls: 'nosh-missing' });
             const names = gone.map((g) => g.name);
             warn.createSpan({
                 text: gone.length + (gone.length === 1 ? ' entry points' : ' entries point') +
@@ -4202,7 +4202,7 @@ class NoshView extends ItemView {
                 week ? 'Food groups · week' : 'Food groups · day');
             if (open && !(this.recipes || []).some((r) => r.hasGroups)) {
                 el.createDiv({
-                    cls: 'dash-empty',
+                    cls: 'nosh-empty',
                     text: 'No meal carries serving counts yet. Add fields such as ' +
                           'serv_vegetables: 2 to a note’s frontmatter.',
                 });
@@ -4228,8 +4228,8 @@ class NoshView extends ItemView {
      * picker's groups have. Returns whether the bars should follow it. */
     renderSectionHead(el, key, text, redraw) {
         const folded = !!(this.plugin.settings.foldedTotals || {})[key];
-        const head = el.createEl('button', { cls: 'dash-section dash-section-head' });
-        head.createSpan({ cls: 'dash-group-caret', text: folded ? '\u25b8' : '\u25be' });
+        const head = el.createEl('button', { cls: 'nosh-section nosh-section-head' });
+        head.createSpan({ cls: 'nosh-group-caret', text: folded ? '\u25b8' : '\u25be' });
         head.createSpan({ text: text });
         head.setAttr('aria-expanded', String(!folded));
         head.addEventListener('click', async () => {
@@ -4283,32 +4283,32 @@ class NoshView extends ItemView {
         const target = parseNum(this.plugin.settings.targets.calories) || 1;
         const today = todayIso();
 
-        el.createDiv({ cls: 'dash-group', text: 'Days' });
+        el.createDiv({ cls: 'nosh-group', text: 'Days' });
 
         for (const iso of days) {
             const entries = this.entriesFor(iso);
             const kcal = entries.reduce(
                 (s, e) => s + e.recipe.values.calories * e.servings, 0);
 
-            const row = el.createDiv({ cls: 'dash-day' });
+            const row = el.createDiv({ cls: 'nosh-day' });
             if (iso === today) row.addClass('is-today');
             if (!entries.length) row.addClass('is-empty');
 
             row.createDiv({
-                cls: 'dash-day-name',
+                cls: 'nosh-day-name',
                 text: dateOf(iso).toLocaleDateString(undefined,
                     { weekday: 'short', day: 'numeric' }),
             });
 
-            const mid = row.createDiv({ cls: 'dash-day-mid' });
+            const mid = row.createDiv({ cls: 'nosh-day-mid' });
             mid.createDiv({
-                cls: 'dash-day-meta',
+                cls: 'nosh-day-meta',
                 text: entries.length
                     ? entries.length + (entries.length === 1 ? ' meal · ' : ' meals · ') + fmt(kcal) + ' kcal'
                     : '—',
             });
-            const bar = mid.createDiv({ cls: 'dash-bar' });
-            bar.createDiv({ cls: 'dash-bar-fill' }).style.width =
+            const bar = mid.createDiv({ cls: 'nosh-bar' });
+            bar.createDiv({ cls: 'nosh-bar-fill' }).style.width =
                 Math.max(0, Math.min(100, (kcal / target) * 100)) + '%';
 
             row.addEventListener('click', () => {
@@ -4339,23 +4339,23 @@ class NoshView extends ItemView {
         const days = [];
         for (let iso = first; iso <= last; iso = addDays(iso, 1)) days.push(iso);
 
-        const grid = el.createDiv({ cls: 'dash-month' });
+        const grid = el.createDiv({ cls: 'nosh-month' });
         for (const iso of days.slice(0, 7)) {
             grid.createDiv({
-                cls: 'dash-month-dow',
+                cls: 'nosh-month-dow',
                 text: dateOf(iso).toLocaleDateString(undefined, { weekday: 'narrow' }),
             });
         }
 
         for (const iso of days) {
-            const cell = grid.createEl('button', { cls: 'dash-cell' });
+            const cell = grid.createEl('button', { cls: 'nosh-cell' });
             if (dateOf(iso).getMonth() !== month) cell.addClass('is-outside');
             if (iso === today) cell.addClass('is-today');
             cell.setAttr('aria-label', humanDay(iso));
-            cell.createDiv({ cls: 'dash-cell-date', text: String(dateOf(iso).getDate()) });
+            cell.createDiv({ cls: 'nosh-cell-date', text: String(dateOf(iso).getDate()) });
 
             const entries = this.entriesFor(iso);
-            const box = cell.createDiv({ cls: 'dash-cell-lines' });
+            const box = cell.createDiv({ cls: 'nosh-cell-lines' });
             if (!entries.length) {
                 cell.addClass('is-empty');
             } else {
@@ -4363,9 +4363,9 @@ class NoshView extends ItemView {
                 for (const n of lines) {
                     const target = parseNum(settings.targets[n.key]);
                     const pct = target > 0 ? (totals[n.key] / target) * 100 : 0;
-                    const line = box.createDiv({ cls: 'dash-cell-line' });
+                    const line = box.createDiv({ cls: 'nosh-cell-line' });
                     line.setAttr('data-state', nutrientState(n.dir, pct));
-                    line.createDiv({ cls: 'dash-cell-fill' }).style.width =
+                    line.createDiv({ cls: 'nosh-cell-fill' }).style.width =
                         Math.max(0, Math.min(100, pct)) + '%';
                 }
             }
@@ -4406,35 +4406,35 @@ class NoshView extends ItemView {
         /* Closes the occasion group: pick when you are eating, then ask what
          * to eat. The rule under it separates that question from the library
          * you would otherwise answer it from yourself. */
-        this.suggestEl = el.createDiv({ cls: 'dash-suggest' });
+        this.suggestEl = el.createDiv({ cls: 'nosh-suggest' });
         this.renderSuggest();
-        el.createDiv({ cls: 'dash-rule' });
+        el.createDiv({ cls: 'nosh-rule' });
 
-        const switcher = el.createDiv({ cls: 'dash-source' });
+        const switcher = el.createDiv({ cls: 'nosh-source' });
         const logged = this.occasionServings();
 
         for (const s of SOURCES) {
-            const b = switcher.createEl('button', { cls: 'dash-source-btn' });
+            const b = switcher.createEl('button', { cls: 'nosh-source-btn' });
             if (!building && s.key === source.key) b.addClass('is-active');
-            b.createSpan({ cls: 'dash-source-name', text: s.label });
+            b.createSpan({ cls: 'nosh-source-name', text: s.label });
 
             /* How many of this tab's notes are in the occasion on screen, so
              * the count answers the same question the strip above it does. */
             const n = ((this.lists && this.lists[s.key]) || [])
                 .filter((r) => logged[r.path] > 0).length;
-            if (n) b.createSpan({ cls: 'dash-source-count', text: String(n) });
+            if (n) b.createSpan({ cls: 'nosh-source-count', text: String(n) });
 
             b.addEventListener('click', () => this.setSource(s.key));
         }
 
-        const build = switcher.createEl('button', { cls: 'dash-source-btn' });
+        const build = switcher.createEl('button', { cls: 'nosh-source-btn' });
         if (building) build.addClass('is-active');
-        build.createSpan({ cls: 'dash-source-name', text: 'Build' });
+        build.createSpan({ cls: 'nosh-source-name', text: 'Build' });
 
         /* Here the count is what is in the meal being assembled, which is the
          * only thing Build has to say about itself. */
         const waiting = Object.keys(this.build.parts).length;
-        if (waiting) build.createSpan({ cls: 'dash-source-count', text: String(waiting) });
+        if (waiting) build.createSpan({ cls: 'nosh-source-count', text: String(waiting) });
 
         build.setAttr('aria-label', 'Put a meal together out of ingredients');
         build.addEventListener('click', () => this.setSource(BUILD_KEY));
@@ -4444,15 +4444,15 @@ class NoshView extends ItemView {
         if (building) this.renderBuild(el);
         else this.renderCompose(el, source);
 
-        const row = el.createDiv({ cls: 'dash-filter' });
+        const row = el.createDiv({ cls: 'nosh-filter' });
         /* The box holds the field and the cross together, so the cross can sit
          * inside the field rather than beside it and take the width with it. */
-        const box = row.createDiv({ cls: 'dash-search-box' });
-        const search = box.createEl('input', { cls: 'dash-search', type: 'text' });
+        const box = row.createDiv({ cls: 'nosh-search-box' });
+        const search = box.createEl('input', { cls: 'nosh-search', type: 'text' });
         search.placeholder = 'Filter ' + source.label.toLowerCase() + '\u2026';
         search.value = this.query;
 
-        const clear = box.createEl('button', { cls: 'dash-search-clear' });
+        const clear = box.createEl('button', { cls: 'nosh-search-clear' });
         clear.setAttr('aria-label', 'Clear the filter');
         setIcon(clear, 'x');
 
@@ -4493,11 +4493,11 @@ class NoshView extends ItemView {
          * that resizes under the cursor is worse than a button that greys. */
         this.foldBtn = null;
         if (source.sectioned) {
-            this.foldBtn = row.createEl('button', { cls: 'dash-fold' });
+            this.foldBtn = row.createEl('button', { cls: 'nosh-fold' });
             this.foldBtn.addEventListener('click', () => this.toggleAll());
         }
 
-        this.listEl = el.createDiv({ cls: 'dash-list' });
+        this.listEl = el.createDiv({ cls: 'nosh-list' });
         this.renderList();
     }
 
@@ -4521,7 +4521,7 @@ class NoshView extends ItemView {
      * that hang off it. Legacy buckets join the second row, where they read
      * as leftovers rather than as somewhere to go on logging. */
     renderOccasions(el) {
-        const strip = el.createDiv({ cls: 'dash-occasions' });
+        const strip = el.createDiv({ cls: 'nosh-occasions' });
         const rows = logRows(this.plugin.settings.log, this.cursor);
         const names = this.occasionsInPlay();
 
@@ -4530,20 +4530,20 @@ class NoshView extends ItemView {
 
         for (const group of [main, rest]) {
             if (!group.length) continue;
-            const line = strip.createDiv({ cls: 'dash-occasion-row' });
+            const line = strip.createDiv({ cls: 'nosh-occasion-row' });
             for (const name of group) this.renderOccasion(line, name, rows);
         }
     }
 
     renderOccasion(line, name, rows) {
-        const b = line.createEl('button', { cls: 'dash-occasion' });
+        const b = line.createEl('button', { cls: 'nosh-occasion' });
         if (name === this.occasion) b.addClass('is-active');
         /* The unassigned bucket has no name of its own to show. */
         if (!OCCASIONS.includes(name)) b.addClass('is-legacy');
-        b.createSpan({ cls: 'dash-occasion-name', text: occasionLabel(name) });
+        b.createSpan({ cls: 'nosh-occasion-name', text: occasionLabel(name) });
 
         const n = rows.filter((r) => r.occasion === name).length;
-        if (n) b.createSpan({ cls: 'dash-occasion-count', text: String(n) });
+        if (n) b.createSpan({ cls: 'nosh-occasion-count', text: String(n) });
 
         b.addEventListener('click', () => {
             if (name === this.occasion) return;
@@ -4558,9 +4558,9 @@ class NoshView extends ItemView {
     /* The meal being assembled. None of it exists in the vault yet, which is
      * the point - a combination only earns a note once it gets repeated. */
     renderBuild(el) {
-        const box = el.createDiv({ cls: 'dash-build' });
+        const box = el.createDiv({ cls: 'nosh-build' });
 
-        const name = box.createEl('input', { cls: 'dash-build-name', type: 'text' });
+        const name = box.createEl('input', { cls: 'nosh-build-name', type: 'text' });
         name.placeholder = 'Name this meal to save it\u2026';
         name.value = this.build.name;
         name.addEventListener('input', () => {
@@ -4568,7 +4568,7 @@ class NoshView extends ItemView {
             this.renderBuildBar();
         });
 
-        this.buildBarEl = box.createDiv({ cls: 'dash-build-bar' });
+        this.buildBarEl = box.createDiv({ cls: 'nosh-build-bar' });
         this.renderBuildBar();
     }
 
@@ -4590,7 +4590,7 @@ class NoshView extends ItemView {
         const parts = this.buildParts();
         if (!parts.length) {
             el.createSpan({
-                cls: 'dash-build-hint',
+                cls: 'nosh-build-hint',
                 text: 'Tick ingredients below to put a meal together.',
             });
             return;
@@ -4598,12 +4598,12 @@ class NoshView extends ItemView {
 
         const kcal = parts.reduce((sum, p) => sum + p.recipe.values.calories * p.servings, 0);
         el.createSpan({
-            cls: 'dash-build-sum',
+            cls: 'nosh-build-sum',
             text: parts.length + (parts.length === 1 ? ' ingredient' : ' ingredients') +
                   ' \u00b7 ' + fmt(kcal) + ' kcal',
         });
 
-        const actions = el.createDiv({ cls: 'dash-build-actions' });
+        const actions = el.createDiv({ cls: 'nosh-build-actions' });
 
         const once = actions.createEl('button', { text: 'Log it' });
         once.setAttr('aria-label', 'Log these ingredients without saving a meal note');
@@ -4737,7 +4737,7 @@ class NoshView extends ItemView {
         }
 
         if (!items.length) {
-            el.createDiv({ cls: 'dash-empty', text: this.emptyMessage(source, !!this.query) });
+            el.createDiv({ cls: 'nosh-empty', text: this.emptyMessage(source, !!this.query) });
             return;
         }
 
@@ -4771,19 +4771,19 @@ class NoshView extends ItemView {
             const chosen = sec.items.filter((r) => this.servingsOf(r.path) > 0).length;
 
             const head = el.createEl(filtering ? 'div' : 'button',
-                { cls: 'dash-group dash-group-head' });
+                { cls: 'nosh-group nosh-group-head' });
             if (chosen) head.addClass('has-selected');
 
             if (!filtering) {
-                head.createSpan({ cls: 'dash-group-caret', text: open ? '\u25be' : '\u25b8' });
+                head.createSpan({ cls: 'nosh-group-caret', text: open ? '\u25be' : '\u25b8' });
                 head.addEventListener('click', () => {
                     this.collapsed[key] = open;
                     this.keepScroll(() => this.renderList());
                 });
             }
-            head.createSpan({ cls: 'dash-group-name', text: sec.name });
+            head.createSpan({ cls: 'nosh-group-name', text: sec.name });
             head.createSpan({
-                cls: 'dash-group-count',
+                cls: 'nosh-group-count',
                 text: chosen ? chosen + ' of ' + sec.items.length : String(sec.items.length),
             });
 
@@ -4851,31 +4851,31 @@ class NoshView extends ItemView {
         const servings = this.servingsOf(r.path);
         const isOn = servings > 0;
 
-        const item = el.createDiv({ cls: 'dash-item' });
+        const item = el.createDiv({ cls: 'nosh-item' });
         if (isOn) item.addClass('is-selected');
 
-        const box = item.createEl('input', { cls: 'dash-check', type: 'checkbox' });
+        const box = item.createEl('input', { cls: 'nosh-check', type: 'checkbox' });
         box.checked = isOn;
         box.addEventListener('change', () => this.tick(r.path, box.checked ? 1 : 0));
 
-        const label = item.createDiv({ cls: 'dash-item-label' });
-        label.createDiv({ cls: 'dash-item-name', text: r.name });
-        const meta = label.createDiv({ cls: 'dash-item-meta' });
+        const label = item.createDiv({ cls: 'nosh-item-label' });
+        label.createDiv({ cls: 'nosh-item-name', text: r.name });
+        const meta = label.createDiv({ cls: 'nosh-item-meta' });
         meta.setText((r.amount ? r.amount + ' \u00b7 ' : '') +
                      fmt(r.values.calories) + ' kcal \u00b7 ' +
                      fmt(r.values.sodium_mg) + ' mg sodium');
-        if (!r.hasGroups) meta.createSpan({ cls: 'dash-item-warn', text: ' \u00b7 no servings' });
+        if (!r.hasGroups) meta.createSpan({ cls: 'nosh-item-warn', text: ' \u00b7 no servings' });
         label.addEventListener('click', () => this.tick(r.path, isOn ? 0 : 1));
 
         if (isOn) {
-            const step = item.createDiv({ cls: 'dash-serv' });
+            const step = item.createDiv({ cls: 'nosh-serv' });
             const minus = step.createEl('button', { text: '\u2212' });
             minus.setAttr('aria-label', 'Fewer servings');
             minus.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.tick(r.path, Math.max(0, servings - SERVING_STEP));
             });
-            step.createSpan({ cls: 'dash-serv-val', text: servings + '\u00d7' });
+            step.createSpan({ cls: 'nosh-serv-val', text: servings + '\u00d7' });
             const plus = step.createEl('button', { text: '+' });
             plus.setAttr('aria-label', 'More servings');
             plus.addEventListener('click', (e) => {
@@ -4884,7 +4884,7 @@ class NoshView extends ItemView {
             });
         }
 
-        const open = item.createEl('button', { cls: 'dash-open', text: '\u2197' });
+        const open = item.createEl('button', { cls: 'nosh-open', text: '\u2197' });
         open.setAttr('aria-label', 'Open note');
         open.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -4897,12 +4897,12 @@ class NoshView extends ItemView {
      * the prompt and the folder. Nothing reaches the vault until the draft has
      * been read, so a bad guess costs a glance. */
     renderCompose(parent, source) {
-        const box = parent.createDiv({ cls: 'dash-ai' });
-        const input = box.createEl('input', { cls: 'dash-ai-input', type: 'text' });
+        const box = parent.createDiv({ cls: 'nosh-ai' });
+        const input = box.createEl('input', { cls: 'nosh-ai-input', type: 'text' });
         input.placeholder = 'Describe a ' + source.noun + '\u2026';
-        const go = box.createEl('button', { cls: 'dash-ai-go', text: 'Draft' });
+        const go = box.createEl('button', { cls: 'nosh-ai-go', text: 'Draft' });
 
-        const shot = box.createEl('button', { cls: 'dash-ai-go dash-ai-shot' });
+        const shot = box.createEl('button', { cls: 'nosh-ai-go nosh-ai-shot' });
         shot.setAttr('aria-label', 'Photograph a label, or a plate of food');
         setIcon(shot, 'camera');
 
@@ -4919,7 +4919,7 @@ class NoshView extends ItemView {
             shot.disabled = true;
             /* Something to watch while it thinks, rather than a dead button. */
             go.empty();
-            go.createSpan({ cls: 'dash-ai-spin', text: '\ud83e\udd66' });
+            go.createSpan({ cls: 'nosh-ai-spin', text: '\ud83e\udd66' });
             try {
                 /* With a picture, the words are about the picture, so it is
                  * said what the picture is before what was said about it. */
@@ -5349,7 +5349,7 @@ class NoshSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     });
                 t.inputEl.rows = 3;
-                t.inputEl.addClass('dash-setting-area');
+                t.inputEl.addClass('nosh-setting-area');
             });
 
         new Setting(containerEl)

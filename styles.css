@@ -1,13 +1,13 @@
 /* DASH Tracker */
 
-.dash-tracker {
+.nosh-tracker {
     padding: 0 12px 16px;
     font-size: var(--font-ui-small);
 }
 
 /* Header ------------------------------------------------------------ */
 
-.dash-tracker .dash-header {
+.nosh-tracker .nosh-header {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -15,7 +15,7 @@
     padding: 4px 0 8px;
 }
 
-.dash-tracker .dash-title {
+.nosh-tracker .nosh-title {
     font-size: var(--font-ui-medium);
     font-weight: var(--font-semibold);
     letter-spacing: 0.01em;
@@ -23,7 +23,7 @@
 
 /* A log entry whose note has gone. Stated plainly, because a total that is
  * short for this reason looks exactly like a day somebody ate less. */
-.dash-tracker .dash-missing {
+.nosh-tracker .nosh-missing {
     display: flex;
     align-items: baseline;
     gap: 8px;
@@ -36,7 +36,7 @@
     border-radius: var(--radius-s);
 }
 
-.dash-tracker .dash-missing button {
+.nosh-tracker .nosh-missing button {
     flex: 0 0 auto;
     margin-left: auto;
     padding: 1px 8px;
@@ -48,12 +48,12 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-missing button:hover {
+.nosh-tracker .nosh-missing button:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
 }
 
-.dash-tracker .dash-summary {
+.nosh-tracker .nosh-summary {
     padding-bottom: 10px;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -64,7 +64,7 @@
  * runs right as things are reached, red runs left for the worst thing gone
  * over. Coloured no more finely than a bar is, and only the numbers speak
  * up. */
-.dash-tracker .dash-score {
+.nosh-tracker .nosh-score {
     display: flex;
     flex-wrap: wrap;
     gap: 6px 16px;
@@ -72,7 +72,7 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-score-part {
+.nosh-tracker .nosh-score-part {
     flex: 1 1 140px;
     min-width: 0;
 }
@@ -80,7 +80,7 @@
 /* Three columns so the number lands over the middle of the bar beneath it
  * whatever the label's width: the label takes the left third, the number
  * the centre, and the right stays empty to balance it. */
-.dash-tracker .dash-score-top {
+.nosh-tracker .nosh-score-top {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: baseline;
@@ -88,22 +88,22 @@
     margin-bottom: 3px;
 }
 
-.dash-tracker .dash-score-label {
+.nosh-tracker .nosh-score-label {
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.dash-tracker .dash-score-num {
+.nosh-tracker .nosh-score-num {
     color: var(--text-normal);
     font-weight: 600;
 }
 
-.dash-tracker .dash-score-num[data-state="met"]  { color: var(--color-green); }
-.dash-tracker .dash-score-num[data-state="near"] { color: var(--color-orange); }
+.nosh-tracker .nosh-score-num[data-state="met"]  { color: var(--color-green); }
+.nosh-tracker .nosh-score-num[data-state="near"] { color: var(--color-orange); }
 
-.dash-tracker .dash-score-bar {
+.nosh-tracker .nosh-score-bar {
     position: relative;
     height: 6px;
     border-radius: 3px;
@@ -111,20 +111,20 @@
     overflow: hidden;
 }
 
-.dash-tracker .dash-score-reach,
-.dash-tracker .dash-score-excess {
+.nosh-tracker .nosh-score-reach,
+.nosh-tracker .nosh-score-excess {
     position: absolute;
     top: 0;
     bottom: 0;
 }
 
-.dash-tracker .dash-score-reach {
+.nosh-tracker .nosh-score-reach {
     left: 50%;
     max-width: 50%;
     background: var(--color-green);
 }
 
-.dash-tracker .dash-score-excess {
+.nosh-tracker .nosh-score-excess {
     right: 50%;
     max-width: 50%;
     background: var(--color-red);
@@ -132,7 +132,7 @@
 
 /* Where the two fills meet, drawn over both so it shows when neither has
  * anything to say yet. */
-.dash-tracker .dash-score-tick {
+.nosh-tracker .nosh-score-tick {
     position: absolute;
     top: -1px;
     bottom: -1px;
@@ -141,13 +141,13 @@
     background: var(--text-faint);
 }
 
-.dash-tracker .dash-score-why {
+.nosh-tracker .nosh-score-why {
     flex-basis: 100%;
     color: var(--text-faint);
 }
 /* Progress bars ----------------------------------------------------- */
 
-.dash-tracker .dash-totals {
+.nosh-tracker .nosh-totals {
     display: flex;
     flex-direction: column;
     gap: 9px;
@@ -156,7 +156,7 @@
     border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.dash-tracker .dash-metric-top {
+.nosh-tracker .nosh-metric-top {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -164,18 +164,18 @@
     margin-bottom: 3px;
 }
 
-.dash-tracker .dash-metric-name {
+.nosh-tracker .nosh-metric-name {
     color: var(--text-normal);
 }
 
-.dash-tracker .dash-metric-val {
+.nosh-tracker .nosh-metric-val {
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.dash-tracker .dash-bar {
+.nosh-tracker .nosh-bar {
     position: relative;
     height: 6px;
     overflow: hidden;
@@ -183,7 +183,7 @@
     border-radius: 3px;
 }
 
-.dash-tracker .dash-bar-fill {
+.nosh-tracker .nosh-bar-fill {
     height: 100%;
     border-radius: 3px;
     background: var(--interactive-accent);
@@ -193,7 +193,7 @@
 /* One block per occasion, in the order they were eaten. The bar keeps saying
  * one thing - whether the target is met - so the split is drawn with breaks
  * and shading rather than with a second set of colours. */
-.dash-tracker .dash-bar-split {
+.nosh-tracker .nosh-bar-split {
     display: flex;
     gap: 2px;
     height: 100%;
@@ -204,44 +204,44 @@
 
 /* Wider than the gap beside it, so the smallest contribution still reads as a
  * block rather than as another break in the bar. */
-.dash-tracker .dash-bar-part {
+.nosh-tracker .nosh-bar-part {
     flex-basis: 0;
     min-width: 3px;
     background: var(--interactive-accent);
 }
 
 /* Reaching a goal is good; approaching a limit is not. */
-.dash-tracker .dash-metric[data-state="met"] .dash-bar-fill,
-.dash-tracker .dash-metric[data-state="met"] .dash-bar-part  { background: var(--color-green); }
-.dash-tracker .dash-metric[data-state="near"] .dash-bar-fill,
-.dash-tracker .dash-metric[data-state="near"] .dash-bar-part { background: var(--color-orange); }
-.dash-tracker .dash-metric[data-state="over"] .dash-bar-fill,
-.dash-tracker .dash-metric[data-state="over"] .dash-bar-part { background: var(--color-red); }
-.dash-tracker .dash-metric[data-dir="info"] .dash-bar-fill,
-.dash-tracker .dash-metric[data-dir="info"] .dash-bar-part  { background: var(--text-faint); }
+.nosh-tracker .nosh-metric[data-state="met"] .nosh-bar-fill,
+.nosh-tracker .nosh-metric[data-state="met"] .nosh-bar-part  { background: var(--color-green); }
+.nosh-tracker .nosh-metric[data-state="near"] .nosh-bar-fill,
+.nosh-tracker .nosh-metric[data-state="near"] .nosh-bar-part { background: var(--color-orange); }
+.nosh-tracker .nosh-metric[data-state="over"] .nosh-bar-fill,
+.nosh-tracker .nosh-metric[data-state="over"] .nosh-bar-part { background: var(--color-red); }
+.nosh-tracker .nosh-metric[data-dir="info"] .nosh-bar-fill,
+.nosh-tracker .nosh-metric[data-dir="info"] .nosh-bar-part  { background: var(--text-faint); }
 
-.dash-tracker .dash-metric[data-state="met"] .dash-metric-val  { color: var(--color-green); }
-.dash-tracker .dash-metric[data-state="over"] .dash-metric-val { color: var(--color-red); }
+.nosh-tracker .nosh-metric[data-state="met"] .nosh-metric-val  { color: var(--color-green); }
+.nosh-tracker .nosh-metric[data-state="over"] .nosh-metric-val { color: var(--color-red); }
 
 /* Recipe list ------------------------------------------------------- */
 
 /* The filter and the fold control share a line: one narrows the list, the
  * other shortens it, and neither deserves a row of its own. */
-.dash-tracker .dash-filter {
+.nosh-tracker .nosh-filter {
     display: flex;
     align-items: center;
     gap: 6px;
     margin-bottom: 10px;
 }
 
-.dash-tracker .dash-search-box {
+.nosh-tracker .nosh-search-box {
     position: relative;
     display: flex;
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.dash-tracker .dash-search {
+.nosh-tracker .nosh-search {
     flex: 1 1 auto;
     min-width: 0;
     font-size: var(--font-ui-smaller);
@@ -249,7 +249,7 @@
     padding-right: 26px;
 }
 
-.dash-tracker .dash-search-clear {
+.nosh-tracker .nosh-search-clear {
     position: absolute;
     right: 3px;
     top: 50%;
@@ -264,20 +264,20 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-search-clear:hover {
+.nosh-tracker .nosh-search-clear:hover {
     color: var(--text-normal);
 }
 
-.dash-tracker .dash-search-clear.is-hidden {
+.nosh-tracker .nosh-search-clear.is-hidden {
     display: none;
 }
 
-.dash-tracker .dash-search-clear .svg-icon {
+.nosh-tracker .nosh-search-clear .svg-icon {
     width: 14px;
     height: 14px;
 }
 
-.dash-tracker .dash-fold {
+.nosh-tracker .nosh-fold {
     flex: 0 0 auto;
     padding: 2px 8px;
     color: var(--text-faint);
@@ -289,19 +289,19 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-fold:hover {
+.nosh-tracker .nosh-fold:hover {
     color: var(--text-normal);
 }
 
 /* Kept in the layout rather than removed, so the filter box does not resize
  * as you type into it. A tab with no sections at all does not make the
  * button in the first place. */
-.dash-tracker .dash-fold.is-hidden {
+.nosh-tracker .nosh-fold.is-hidden {
     visibility: hidden;
     pointer-events: none;
 }
 
-.dash-tracker .dash-group {
+.nosh-tracker .nosh-group {
     padding: 10px 0 4px;
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
@@ -314,7 +314,7 @@
 
 /* A heading that folds its meal away. Kept flat so it still reads as a
  * label rather than as a control competing with the rows under it. */
-.dash-tracker .dash-group-head {
+.nosh-tracker .nosh-group-head {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -327,18 +327,18 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-group-head:hover {
+.nosh-tracker .nosh-group-head:hover {
     color: var(--text-muted);
 }
 
-.dash-tracker .dash-group-caret {
+.nosh-tracker .nosh-group-caret {
     flex: 0 0 auto;
     width: 8px;
     font-size: 9px;
     line-height: 1;
 }
 
-.dash-tracker .dash-group-name {
+.nosh-tracker .nosh-group-name {
     flex: 1 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -346,7 +346,7 @@
 }
 
 /* The tally is what a folded section has left to say. */
-.dash-tracker .dash-group-count {
+.nosh-tracker .nosh-group-count {
     flex: 0 0 auto;
     font-weight: var(--font-normal);
     letter-spacing: 0;
@@ -354,11 +354,11 @@
     font-variant-numeric: tabular-nums;
 }
 
-.dash-tracker .dash-group-head.has-selected .dash-group-count {
+.nosh-tracker .nosh-group-head.has-selected .nosh-group-count {
     color: var(--interactive-accent);
 }
 
-.dash-tracker .dash-item {
+.nosh-tracker .nosh-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -367,33 +367,33 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-item:hover {
+.nosh-tracker .nosh-item:hover {
     background: var(--background-modifier-hover);
 }
 
-.dash-tracker .dash-item.is-selected .dash-item-name {
+.nosh-tracker .nosh-item.is-selected .nosh-item-name {
     color: var(--text-normal);
     font-weight: var(--font-medium);
 }
 
-.dash-tracker .dash-check {
+.nosh-tracker .nosh-check {
     flex: 0 0 auto;
     margin: 0;
 }
 
-.dash-tracker .dash-item-label {
+.nosh-tracker .nosh-item-label {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.dash-tracker .dash-item-name {
+.nosh-tracker .nosh-item-name {
     color: var(--text-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.dash-tracker .dash-item-meta {
+.nosh-tracker .nosh-item-meta {
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
     font-variant-numeric: tabular-nums;
@@ -401,14 +401,14 @@
 
 /* Servings stepper -------------------------------------------------- */
 
-.dash-tracker .dash-serv {
+.nosh-tracker .nosh-serv {
     display: flex;
     flex: 0 0 auto;
     align-items: center;
     gap: 1px;
 }
 
-.dash-tracker .dash-serv button {
+.nosh-tracker .nosh-serv button {
     width: 20px;
     height: 20px;
     padding: 0;
@@ -421,12 +421,12 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-serv button:hover {
+.nosh-tracker .nosh-serv button:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
 }
 
-.dash-tracker .dash-serv-val {
+.nosh-tracker .nosh-serv-val {
     min-width: 26px;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -436,7 +436,7 @@
 
 /* Open-note affordance ---------------------------------------------- */
 
-.dash-tracker .dash-open {
+.nosh-tracker .nosh-open {
     flex: 0 0 auto;
     width: 20px;
     height: 20px;
@@ -450,15 +450,15 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-item:hover .dash-open {
+.nosh-tracker .nosh-item:hover .nosh-open {
     opacity: 1;
 }
 
-.dash-tracker .dash-open:hover {
+.nosh-tracker .nosh-open:hover {
     color: var(--text-normal);
 }
 
-.dash-tracker .dash-empty {
+.nosh-tracker .nosh-empty {
     padding: 12px 4px;
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
@@ -467,7 +467,7 @@
 
 /* Food groups ------------------------------------------------------- */
 
-.dash-tracker .dash-section {
+.nosh-tracker .nosh-section {
     padding: 6px 0 2px;
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
@@ -476,13 +476,13 @@
     letter-spacing: 0.06em;
 }
 
-.dash-tracker .dash-section:first-child {
+.nosh-tracker .nosh-section:first-child {
     padding-top: 0;
 }
 
 /* The same heading as a button, so it can fold the bars under it. Obsidian
  * centres what is in a button; the heading belongs at the left. */
-.dash-tracker button.dash-section-head {
+.nosh-tracker button.nosh-section-head {
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -499,24 +499,24 @@
     cursor: pointer;
 }
 
-.dash-tracker button.dash-section-head:hover {
+.nosh-tracker button.nosh-section-head:hover {
     color: var(--text-muted);
 }
 
 /* The score's heading sits in the summary, between the meal count and the
  * bar it folds, and takes the bars' spacing rather than Input's. */
-.dash-tracker .dash-summary button.dash-section-head {
+.nosh-tracker .nosh-summary button.nosh-section-head {
     padding: 8px 0 4px;
 }
 
 /* The headings over the bars sit closer to them than Input does to the
  * picker: a bar is a thin thing and does not need the room. The first of
  * them takes a little from above instead, so the score's bars can breathe. */
-.dash-tracker .dash-totals button.dash-section-head {
+.nosh-tracker .nosh-totals button.nosh-section-head {
     padding-bottom: 6px;
 }
 
-.dash-tracker .dash-totals > button.dash-section-head:first-child {
+.nosh-tracker .nosh-totals > button.nosh-section-head:first-child {
     padding-top: 8px;
 }
 
@@ -525,14 +525,14 @@
  * Seven columns, a row a week, a square a day. Inside each square the
  * nutrient bars as lines a couple of pixels tall, too small to label and
  * not meant to be: the picture is the colour, week by week. */
-.dash-tracker .dash-month {
+.nosh-tracker .nosh-month {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 3px;
 }
 
 /* Left, over the date in the square beneath, with the same inset. */
-.dash-tracker .dash-month-dow {
+.nosh-tracker .nosh-month-dow {
     text-align: left;
     padding: 0 0 2px 5px;
     color: var(--text-faint);
@@ -542,7 +542,7 @@
 /* A button, so it can be pressed, which means undoing what Obsidian gives
  * every button: centred content would shrink the lines inside to nothing,
  * since an empty div is as wide as its contents. Stretched, they fill. */
-.dash-tracker .dash-cell {
+.nosh-tracker .nosh-cell {
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -559,31 +559,31 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-cell:hover {
+.nosh-tracker .nosh-cell:hover {
     border-color: var(--text-faint);
 }
 
-.dash-tracker .dash-cell.is-today {
+.nosh-tracker .nosh-cell.is-today {
     border-color: var(--interactive-accent);
 }
 
-.dash-tracker .dash-cell.is-outside {
+.nosh-tracker .nosh-cell.is-outside {
     opacity: 0.45;
 }
 
-.dash-tracker .dash-cell-date {
+.nosh-tracker .nosh-cell-date {
     font-size: 10px;
     line-height: 1;
     text-align: left;
     color: var(--text-faint);
 }
 
-.dash-tracker .dash-cell.is-empty .dash-cell-date {
+.nosh-tracker .nosh-cell.is-empty .nosh-cell-date {
     color: var(--text-faint);
     opacity: 0.6;
 }
 
-.dash-tracker .dash-cell-lines {
+.nosh-tracker .nosh-cell-lines {
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -593,7 +593,7 @@
     min-height: 0;
 }
 
-.dash-tracker .dash-cell-line {
+.nosh-tracker .nosh-cell-line {
     flex: 0 0 auto;
     width: 100%;
     height: 3px;
@@ -602,18 +602,18 @@
     overflow: hidden;
 }
 
-.dash-tracker .dash-cell-fill {
+.nosh-tracker .nosh-cell-fill {
     height: 100%;
     background: var(--interactive-accent);
 }
 
-.dash-tracker .dash-cell-line[data-state="met"] .dash-cell-fill  { background: var(--color-green); }
-.dash-tracker .dash-cell-line[data-state="near"] .dash-cell-fill { background: var(--color-orange); }
-.dash-tracker .dash-cell-line[data-state="over"] .dash-cell-fill { background: var(--color-red); }
-.dash-tracker .dash-cell-line[data-state="neutral"] .dash-cell-fill { background: var(--text-faint); }
+.nosh-tracker .nosh-cell-line[data-state="met"] .nosh-cell-fill  { background: var(--color-green); }
+.nosh-tracker .nosh-cell-line[data-state="near"] .nosh-cell-fill { background: var(--color-orange); }
+.nosh-tracker .nosh-cell-line[data-state="over"] .nosh-cell-fill { background: var(--color-red); }
+.nosh-tracker .nosh-cell-line[data-state="neutral"] .nosh-cell-fill { background: var(--text-faint); }
 
 /* Bottom of a target band, e.g. the 4 in "4-5 servings". */
-.dash-tracker .dash-bar-min {
+.nosh-tracker .nosh-bar-min {
     position: absolute;
     top: 0;
     bottom: 0;
@@ -623,7 +623,7 @@
     pointer-events: none;
 }
 
-.dash-tracker .dash-item-warn {
+.nosh-tracker .nosh-item-warn {
     color: var(--text-faint);
     font-style: italic;
 }
@@ -634,13 +634,13 @@
 
 /* Outlined rather than filled, so the day/week tabs above stay the louder
  * of the two rows. */
-.dash-tracker .dash-source {
+.nosh-tracker .nosh-source {
     display: flex;
     gap: 2px;
     padding: 0 0 8px;
 }
 
-.dash-tracker .dash-source-btn {
+.nosh-tracker .nosh-source-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -656,11 +656,11 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-source-btn:hover {
+.nosh-tracker .nosh-source-btn:hover {
     color: var(--text-normal);
 }
 
-.dash-tracker .dash-source-btn.is-active {
+.nosh-tracker .nosh-source-btn.is-active {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
     border-color: var(--background-modifier-border-hover);
@@ -668,7 +668,7 @@
 
 /* Same badge as the occasion strip wears, answering the same question one
  * level down: how many of this tab's notes are in the occasion on screen. */
-.dash-tracker .dash-source-count {
+.nosh-tracker .nosh-source-count {
     padding: 0 5px;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -676,17 +676,17 @@
     border-radius: var(--radius-s);
 }
 
-.dash-tracker .dash-source-btn.is-active .dash-source-count {
+.nosh-tracker .nosh-source-btn.is-active .nosh-source-count {
     color: var(--text-normal);
 }
 
-.dash-tracker .dash-tabs {
+.nosh-tracker .nosh-tabs {
     display: flex;
     gap: 2px;
     padding: 0 0 8px;
 }
 
-.dash-tracker .dash-tab {
+.nosh-tracker .nosh-tab {
     flex: 1 1 0;
     padding: 4px 0;
     color: var(--text-muted);
@@ -698,18 +698,18 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-tab:hover {
+.nosh-tracker .nosh-tab:hover {
     color: var(--text-normal);
 }
 
-.dash-tracker .dash-tab.is-active {
+.nosh-tracker .nosh-tab.is-active {
     color: var(--text-on-accent);
     background: var(--interactive-accent);
 }
 
 /* A free-text setting wants room to be written in, and Obsidian's default
  * gives a textarea the width of a single-line input. */
-.dash-setting-area {
+.nosh-setting-area {
     width: 100%;
     min-width: 260px;
     resize: vertical;
@@ -721,22 +721,22 @@
  * Sits under the bars because it acts on the gaps they have just drawn. Wide
  * and quiet: it is an offer, not the thing the panel is for. */
 
-.dash-tracker .dash-suggest {
+.nosh-tracker .nosh-suggest {
     padding-bottom: 10px;
 }
 
 /* The break between what the day still wants and the library you pick from. */
-.dash-tracker .dash-rule {
+.nosh-tracker .nosh-rule {
     height: 1px;
     margin: 0 0 10px;
     background: var(--background-modifier-border);
 }
 
-.dash-tracker .dash-suggest:empty {
+.nosh-tracker .nosh-suggest:empty {
     display: none;
 }
 
-.dash-tracker .dash-suggest-btn {
+.nosh-tracker .nosh-suggest-btn {
     width: 100%;
     padding: 6px 10px;
     color: var(--text-accent);
@@ -748,14 +748,14 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-suggest-btn:hover:not(:disabled) {
+.nosh-tracker .nosh-suggest-btn:hover:not(:disabled) {
     color: var(--text-accent-hover);
     border-color: var(--text-accent-hover);
     background: var(--background-modifier-hover);
     border-style: solid;
 }
 
-.dash-tracker .dash-suggest-btn:disabled {
+.nosh-tracker .nosh-suggest-btn:disabled {
     opacity: 0.55;
     cursor: default;
 }
@@ -766,7 +766,7 @@
  * because it is the first choice made, not the second: what you are logging
  * into, then what you are logging. */
 
-.dash-tracker .dash-occasions {
+.nosh-tracker .nosh-occasions {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -775,13 +775,13 @@
 
 /* Each row shares its own width, so a row of three and a row of two both fill
  * the panel rather than the second row inheriting three-column gaps. */
-.dash-tracker .dash-occasion-row {
+.nosh-tracker .nosh-occasion-row {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
 }
 
-.dash-tracker .dash-occasion {
+.nosh-tracker .nosh-occasion {
     display: flex;
     align-items: center;
     gap: 5px;
@@ -797,12 +797,12 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-occasion:hover {
+.nosh-tracker .nosh-occasion:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
 }
 
-.dash-tracker .dash-occasion.is-active {
+.nosh-tracker .nosh-occasion.is-active {
     color: var(--text-on-accent);
     background: var(--interactive-accent);
     border-color: var(--interactive-accent);
@@ -810,7 +810,7 @@
 
 /* The count is the only thing saying an occasion already holds something, so
  * it stays legible once the button goes accent-coloured. */
-.dash-tracker .dash-occasion-count {
+.nosh-tracker .nosh-occasion-count {
     padding: 0 5px;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -818,7 +818,7 @@
     border-radius: var(--radius-s);
 }
 
-.dash-tracker .dash-occasion.is-active .dash-occasion-count {
+.nosh-tracker .nosh-occasion.is-active .nosh-occasion-count {
     color: var(--text-on-accent);
     background: rgba(255, 255, 255, 0.25);
 }
@@ -826,7 +826,7 @@
 /* A bucket that is not one of the five: a kind-slot an older note named, or
  * the unassigned one. Dashed, so it reads as something to empty rather than
  * somewhere to keep logging into. */
-.dash-tracker .dash-occasion.is-legacy {
+.nosh-tracker .nosh-occasion.is-legacy {
     border-style: dashed;
     font-style: italic;
 }
@@ -836,7 +836,7 @@
  * A meal being put together. Nothing here has touched the vault yet, so it
  * reads as a draft rather than as part of the list below it. */
 
-.dash-tracker .dash-build {
+.nosh-tracker .nosh-build {
     padding: 10px;
     margin-bottom: 8px;
     background: var(--background-secondary);
@@ -844,12 +844,12 @@
     border-radius: var(--radius-s);
 }
 
-.dash-tracker .dash-build-name {
+.nosh-tracker .nosh-build-name {
     width: 100%;
     font-size: var(--font-ui-smaller);
 }
 
-.dash-tracker .dash-build-bar {
+.nosh-tracker .nosh-build-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -858,37 +858,37 @@
     padding-top: 8px;
 }
 
-.dash-tracker .dash-build-hint,
-.dash-tracker .dash-build-sum {
+.nosh-tracker .nosh-build-hint,
+.nosh-tracker .nosh-build-sum {
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
 }
 
-.dash-tracker .dash-build-sum {
+.nosh-tracker .nosh-build-sum {
     color: var(--text-normal);
     font-weight: var(--font-medium);
 }
 
-.dash-tracker .dash-build-actions {
+.nosh-tracker .nosh-build-actions {
     display: flex;
     gap: 6px;
     margin-left: auto;
 }
 
-.dash-tracker .dash-build-actions button {
+.nosh-tracker .nosh-build-actions button {
     padding: 3px 10px;
     font-size: var(--font-ui-smaller);
     cursor: pointer;
 }
 
-.dash-tracker .dash-build-actions button:disabled {
+.nosh-tracker .nosh-build-actions button:disabled {
     opacity: 0.5;
     cursor: default;
 }
 
 /* Date navigation --------------------------------------------------- */
 
-.dash-tracker .dash-nav {
+.nosh-tracker .nosh-nav {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -897,7 +897,7 @@
 
 /* Today sits centred beneath the date label. It is absent whenever the view is
  * already on today, so the row collapses rather than leaving a gap. */
-.dash-tracker .dash-day-actions {
+.nosh-tracker .nosh-day-actions {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -905,11 +905,11 @@
     padding-bottom: 8px;
 }
 
-.dash-tracker .dash-day-actions:empty {
+.nosh-tracker .nosh-day-actions:empty {
     display: none;
 }
 
-.dash-tracker .dash-nav-btn {
+.nosh-tracker .nosh-nav-btn {
     width: 22px;
     height: 22px;
     padding: 0;
@@ -923,19 +923,19 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-nav-btn:hover {
+.nosh-tracker .nosh-nav-btn:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
 }
 
-.dash-tracker .dash-nav-label {
+.nosh-tracker .nosh-nav-label {
     flex: 1 1 auto;
     color: var(--text-normal);
     font-weight: var(--font-medium);
     text-align: center;
 }
 
-.dash-tracker .dash-today {
+.nosh-tracker .nosh-today {
     flex: 0 0 auto;
     padding: 2px 8px;
     color: var(--text-muted);
@@ -946,14 +946,14 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-today:hover {
+.nosh-tracker .nosh-today:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
 }
 
 /* Week day strip ---------------------------------------------------- */
 
-.dash-tracker .dash-day {
+.nosh-tracker .nosh-day {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -962,39 +962,39 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-day:hover {
+.nosh-tracker .nosh-day:hover {
     background: var(--background-modifier-hover);
 }
 
-.dash-tracker .dash-day.is-empty .dash-day-meta {
+.nosh-tracker .nosh-day.is-empty .nosh-day-meta {
     color: var(--text-faint);
 }
 
-.dash-tracker .dash-day.is-today .dash-day-name {
+.nosh-tracker .nosh-day.is-today .nosh-day-name {
     color: var(--interactive-accent);
     font-weight: var(--font-semibold);
 }
 
-.dash-tracker .dash-day-name {
+.nosh-tracker .nosh-day-name {
     flex: 0 0 4.5em;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     font-variant-numeric: tabular-nums;
 }
 
-.dash-tracker .dash-day-mid {
+.nosh-tracker .nosh-day-mid {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.dash-tracker .dash-day-meta {
+.nosh-tracker .nosh-day-meta {
     margin-bottom: 3px;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     font-variant-numeric: tabular-nums;
 }
 
-.dash-tracker .dash-day .dash-bar {
+.nosh-tracker .nosh-day .nosh-bar {
     height: 4px;
 }
 
@@ -1002,19 +1002,19 @@
 
 /* Sits under the source switcher, quieter than the tabs above it, so the
  * list stays the thing you look at. */
-.dash-tracker .dash-ai {
+.nosh-tracker .nosh-ai {
     display: flex;
     gap: 4px;
     padding: 0 0 8px;
 }
 
-.dash-tracker .dash-ai-input {
+.nosh-tracker .nosh-ai-input {
     flex: 1 1 auto;
     min-width: 0;
     font-size: var(--font-ui-smaller);
 }
 
-.dash-tracker .dash-ai-go {
+.nosh-tracker .nosh-ai-go {
     flex: 0 0 auto;
     padding: 2px 10px;
     color: var(--text-accent);
@@ -1026,13 +1026,13 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-ai-go:hover:not(:disabled) {
+.nosh-tracker .nosh-ai-go:hover:not(:disabled) {
     color: var(--text-accent-hover);
     border-color: var(--text-accent-hover);
     background: var(--background-modifier-hover);
 }
 
-.dash-tracker .dash-ai-shot {
+.nosh-tracker .nosh-ai-shot {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1043,12 +1043,12 @@
 /* The icon is the whole button, so it is sized to be pressed rather than
  * to match the words beside it - and on a phone that is the difference
  * between a target and a decoration. */
-.dash-tracker .dash-ai-shot .svg-icon {
+.nosh-tracker .nosh-ai-shot .svg-icon {
     width: 18px;
     height: 18px;
 }
 
-.dash-tracker .dash-ai-go:disabled {
+.nosh-tracker .nosh-ai-go:disabled {
     opacity: 0.6;
     cursor: default;
 }
@@ -1068,7 +1068,7 @@
  * centring is left alone and starts telling the truth again. Nothing here is
  * scoped to a phone, because --keyboard-height is 0px everywhere else. */
 
-.modal-container.dash-modal-fit-container {
+.modal-container.nosh-modal-fit-container {
     bottom: var(--keyboard-height, 0px);
     /* The status bar is not drawable, and a tall card would otherwise put its
      * title under the clock. */
@@ -1079,7 +1079,7 @@
 /* Obsidian caps a phone card at 100vh less the status bar, which does not know
  * about the keyboard either. Written through the container so it wins on
  * specificity rather than on load order. */
-.modal-container.dash-modal-fit-container .modal.dash-modal-fit {
+.modal-container.nosh-modal-fit-container .modal.nosh-modal-fit {
     display: flex;
     flex-direction: column;
     max-height: calc(100vh - var(--keyboard-height, 0px) -
@@ -1088,7 +1088,7 @@
 
 /* min-height is what lets it actually shrink: a flex item will not go below
  * its content otherwise, and the scroll never starts. */
-.modal-container.dash-modal-fit-container .modal.dash-modal-fit .modal-content {
+.modal-container.nosh-modal-fit-container .modal.nosh-modal-fit .modal-content {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -1097,25 +1097,25 @@
 
 /* While the keys are up the card gives up its comfortable spacing: the room
  * has halved, and what matters is seeing the field and the buttons at once. */
-.modal.dash-modal-fit.dash-keyed .dash-draft .dash-draft-row {
+.modal.nosh-modal-fit.nosh-keyed .nosh-draft .nosh-draft-row {
     padding-bottom: 4px;
 }
 
-.modal.dash-modal-fit.dash-keyed .dash-draft .dash-draft-actions {
+.modal.nosh-modal-fit.nosh-keyed .nosh-draft .nosh-draft-actions {
     padding-top: 8px;
 }
 
-.modal.dash-modal-fit.dash-keyed .dash-draft-extra {
+.modal.nosh-modal-fit.nosh-keyed .nosh-draft-extra {
     min-height: 3em;
 }
 
 /* Somewhere to put the keyboard away, opposite the close button, and only
  * there when there is one to put away. */
-.dash-keyboard-down {
+.nosh-keyboard-down {
     display: none;
 }
 
-.modal.dash-modal-fit.dash-keyed .dash-keyboard-down {
+.modal.nosh-modal-fit.nosh-keyed .nosh-keyboard-down {
     position: absolute;
     top: var(--size-4-3, 12px);
     inset-inline-start: var(--size-4-3, 12px);
@@ -1131,43 +1131,43 @@
     z-index: 1;
 }
 
-.modal.dash-modal-fit.dash-keyed .dash-keyboard-down .svg-icon {
+.modal.nosh-modal-fit.nosh-keyed .nosh-keyboard-down .svg-icon {
     width: 20px;
     height: 20px;
 }
 /* Draft confirmation ------------------------------------------------ */
 
-.dash-draft .dash-draft-row {
+.nosh-draft .nosh-draft-row {
     display: flex;
     align-items: center;
     gap: 8px;
     padding-bottom: 8px;
 }
 
-.dash-draft .dash-draft-row label {
+.nosh-draft .nosh-draft-row label {
     flex: 0 0 3.5em;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
 }
 
-.dash-draft .dash-draft-row input,
-.dash-draft .dash-draft-row select {
+.nosh-draft .nosh-draft-row input,
+.nosh-draft .nosh-draft-row select {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.dash-draft .dash-draft-table {
+.nosh-draft .nosh-draft-table {
     width: 100%;
     border-collapse: collapse;
     font-size: var(--font-ui-smaller);
 }
 
-.dash-draft .dash-draft-table td {
+.nosh-draft .nosh-draft-table td {
     padding: 3px 0;
     border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.dash-draft .dash-draft-table td:last-child {
+.nosh-draft .nosh-draft-table td:last-child {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
@@ -1175,11 +1175,11 @@
 /* The portions, which are the part of this card that can be argued with.
  * The name takes the room the numbers do not, so a long ingredient wraps
  * rather than pushing its own portion off the edge. */
-.dash-draft .dash-draft-portions {
+.nosh-draft .nosh-draft-portions {
     padding: 2px 0 12px;
 }
 
-.dash-draft .dash-draft-portion {
+.nosh-draft .nosh-draft-portion {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1187,13 +1187,13 @@
     font-size: var(--font-ui-smaller);
 }
 
-.dash-draft .dash-draft-portion-name {
+.nosh-draft .nosh-draft-portion-name {
     flex: 1 1 auto;
     min-width: 0;
     color: var(--text-muted);
 }
 
-.dash-draft .dash-draft-num {
+.nosh-draft .nosh-draft-num {
     flex: 0 0 auto;
     width: 4.5em;
     padding: 2px 6px;
@@ -1202,12 +1202,12 @@
     font-size: var(--font-ui-smaller);
 }
 
-.dash-draft .dash-draft-unit {
+.nosh-draft .nosh-draft-unit {
     flex: 0 0 5.5em;
     color: var(--text-muted);
 }
 
-.dash-draft .dash-draft-groups {
+.nosh-draft .nosh-draft-groups {
     padding: 10px 0 0;
     color: var(--text-accent);
     font-size: var(--font-ui-smaller);
@@ -1215,7 +1215,7 @@
 
 /* The photograph, shown back before it is sent, held short enough that the
  * question under it and the buttons are on screen with it. */
-.dash-draft .dash-draft-shot img {
+.nosh-draft .nosh-draft-shot img {
     display: block;
     max-width: 100%;
     max-height: 38vh;
@@ -1224,19 +1224,19 @@
     object-fit: contain;
 }
 
-.dash-draft .dash-draft-ask input {
+.nosh-draft .nosh-draft-ask input {
     width: 100%;
 }
 
 /* Estimates, not measurements. The caveat stays on screen to the end. */
-.dash-draft .dash-draft-note {
+.nosh-draft .nosh-draft-note {
     padding: 8px 0 0;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     line-height: 1.5;
 }
 
-.dash-draft .dash-draft-log {
+.nosh-draft .nosh-draft-log {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1244,7 +1244,7 @@
     font-size: var(--font-ui-smaller);
 }
 
-.dash-draft .dash-draft-actions {
+.nosh-draft .nosh-draft-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
@@ -1253,41 +1253,41 @@
 
 /* Something to watch while Claude thinks. The button keeps its width, so the
  * row does not jump when the label swaps out. */
-.dash-tracker .dash-ai-spin {
+.nosh-tracker .nosh-ai-spin {
     display: inline-block;
-    animation: dash-tumble 1.4s linear infinite;
+    animation: nosh-tumble 1.4s linear infinite;
 }
 
-@keyframes dash-tumble {
+@keyframes nosh-tumble {
     to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dash-tracker .dash-ai-spin { animation: none; }
+    .nosh-tracker .nosh-ai-spin { animation: none; }
 }
 
 /* A meal rests on its parts, so they read before its numbers do. */
 /* A suggestion is judged on whether it is worth cooking, so the steps sit with
  * the numbers rather than waiting in the note written afterwards. */
 /* The pre-flight ask: a few fields, then what they add up to. */
-.dash-draft .dash-draft-extra {
+.nosh-draft .nosh-draft-extra {
     width: 100%;
     margin-bottom: 10px;
     resize: vertical;
     font-size: var(--font-ui-smaller);
 }
 
-.dash-draft .dash-draft-preview {
+.nosh-draft .nosh-draft-preview {
     margin-bottom: 10px;
     font-size: var(--font-ui-smaller);
 }
 
-.dash-draft .dash-draft-preview summary {
+.nosh-draft .nosh-draft-preview summary {
     color: var(--text-muted);
     cursor: pointer;
 }
 
-.dash-draft .dash-draft-preview pre {
+.nosh-draft .nosh-draft-preview pre {
     max-height: 220px;
     margin: 8px 0 0;
     padding: 8px 10px;
@@ -1300,7 +1300,7 @@
     border-radius: var(--radius-s);
 }
 
-.dash-draft .dash-draft-method {
+.nosh-draft .nosh-draft-method {
     margin: 0 0 10px;
     padding-left: 1.4em;
     color: var(--text-normal);
@@ -1308,11 +1308,11 @@
     line-height: 1.7;
 }
 
-.dash-draft .dash-draft-method li {
+.nosh-draft .nosh-draft-method li {
     margin-bottom: 4px;
 }
 
-.dash-draft .dash-draft-chat {
+.nosh-draft .nosh-draft-chat {
     display: inline-block;
     margin-bottom: 10px;
     color: var(--text-accent);
@@ -1320,11 +1320,11 @@
     text-decoration: none;
 }
 
-.dash-draft .dash-draft-chat:hover {
+.nosh-draft .nosh-draft-chat:hover {
     text-decoration: underline;
 }
 
-.dash-draft .dash-draft-parts {
+.nosh-draft .nosh-draft-parts {
     margin: 0 0 10px;
     padding-left: 1.2em;
     color: var(--text-muted);
@@ -1334,13 +1334,13 @@
 
 /* The header controls travel together, so the title keeps the whole left side
  * and neither icon drifts. */
-.dash-tracker .dash-actions {
+.nosh-tracker .nosh-actions {
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
-.dash-tracker .dash-gear {
+.nosh-tracker .nosh-gear {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1353,31 +1353,31 @@
     cursor: pointer;
 }
 
-.dash-tracker .dash-gear:hover {
+.nosh-tracker .nosh-gear:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
 }
 
-.dash-tracker .dash-gear .svg-icon {
+.nosh-tracker .nosh-gear .svg-icon {
     width: 15px;
     height: 15px;
 }
 
 /* A reload off disk is usually over before the eye catches it, so the turn is
  * the only proof it happened. */
-.dash-tracker .dash-gear-spin .svg-icon {
-    animation: dash-tumble 0.7s linear infinite;
+.nosh-tracker .nosh-gear-spin .svg-icon {
+    animation: nosh-tumble 0.7s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dash-tracker .dash-gear-spin .svg-icon { animation: none; }
+    .nosh-tracker .nosh-gear-spin .svg-icon { animation: none; }
 }
 
 /* Asking about a recipe ---------------------------------------------- *
  *
  * A conversation rather than a form, so it reads as one: the question above,
  * the answer below it, and the box to ask the next one still in reach. */
-.dash-probe .dash-probe-source {
+.nosh-probe .nosh-probe-source {
     padding: 0 0 10px;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -1385,20 +1385,20 @@
 
 /* Bounded, so a long answer scrolls inside the modal rather than pushing the
  * box you type into off the bottom of it. */
-.dash-probe .dash-probe-log {
+.nosh-probe .nosh-probe-log {
     max-height: 46vh;
     overflow-y: auto;
 }
 
-.dash-probe .dash-probe-log:not(:empty) {
+.nosh-probe .nosh-probe-log:not(:empty) {
     margin-bottom: 12px;
 }
 
-.dash-probe .dash-probe-turn {
+.nosh-probe .nosh-probe-turn {
     padding-bottom: 12px;
 }
 
-.dash-probe .dash-probe-who {
+.nosh-probe .nosh-probe-who {
     padding-bottom: 2px;
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
@@ -1406,39 +1406,39 @@
     letter-spacing: 0.06em;
 }
 
-.dash-probe .dash-probe-said {
+.nosh-probe .nosh-probe-said {
     font-size: var(--font-ui-smaller);
     line-height: 1.6;
 }
 
 /* Rendered markdown arrives with its own margins, which would otherwise open
  * a gap between the label and the first line of the answer. */
-.dash-probe .dash-probe-said > :first-child { margin-top: 0; }
-.dash-probe .dash-probe-said > :last-child { margin-bottom: 0; }
+.nosh-probe .nosh-probe-said > :first-child { margin-top: 0; }
+.nosh-probe .nosh-probe-said > :last-child { margin-bottom: 0; }
 
-.dash-probe .dash-probe-said ul,
-.dash-probe .dash-probe-said ol {
+.nosh-probe .nosh-probe-said ul,
+.nosh-probe .nosh-probe-said ol {
     margin: 6px 0;
     padding-left: 1.3em;
 }
 
-.dash-probe .dash-probe-you .dash-probe-said {
+.nosh-probe .nosh-probe-you .nosh-probe-said {
     color: var(--text-muted);
 }
 
-.dash-probe .dash-probe-failed {
+.nosh-probe .nosh-probe-failed {
     color: var(--text-error);
 }
 
 /* Openers, offered until there is a conversation to read instead. */
-.dash-probe .dash-probe-chips {
+.nosh-probe .nosh-probe-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     padding-bottom: 10px;
 }
 
-.dash-probe .dash-probe-chip {
+.nosh-probe .nosh-probe-chip {
     padding: 3px 10px;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -1449,7 +1449,7 @@
     cursor: pointer;
 }
 
-.dash-probe .dash-probe-chip:hover {
+.nosh-probe .nosh-probe-chip:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
 }
