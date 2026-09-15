@@ -9,6 +9,32 @@ the nutrient numbers cannot express.
 
 Nothing leaves your vault unless you ask it to.
 
+## Disclosures
+
+Nosh works entirely offline. The optional **Nosh AI** features are the only
+part that talks to anything, and they are off until you give them a
+credential. With them on:
+
+- **Network use.** What you type into a draft, the note you are asking about,
+  and any photograph you take are sent to the Anthropic API at
+  `api.anthropic.com`. Nothing is sent until you press the button that asks
+  for it. There is no telemetry and no other network use.
+- **Account and cost.** Nosh AI needs an account on the Anthropic developer
+  platform, and every request is billed to it at API rates. A claude.ai
+  subscription cannot be used; [Credentials](#credentials) explains why.
+- **A local program.** If you choose the `ant` CLI as the way in, Nosh runs
+  `ant auth print-credentials --access-token` on your computer to borrow a
+  short-lived token. Desktop only, fixed arguments, nothing else is run.
+- **Links to claude.ai.** A meal note drafted with a method carries a *Cook
+  this with Claude* link. Opening it takes the recipe to claude.ai in your
+  browser, in the address of the page. Nothing happens until you click it.
+- **Where the credential lives.** An API key is kept in plain text in
+  `data.json` in the plugin folder, which is inside your vault. See
+  [Credentials](#credentials).
+
+No accounts with the author, no payments, no ads, and no files read or
+written outside the vault.
+
 ## How it decides what a note is
 
 **Tags, not folders.** A note is a meal or an ingredient because it says so:
@@ -206,11 +232,17 @@ wants something cheap; inventing one runs once a day and is the harder job.
 
 ### Credentials
 
-Two ways in:
+Nosh AI runs against the Anthropic developer platform, the same place an
+API key comes from, and every request is billed to that account. Two ways
+to hand it a credential:
 
-- **The `ant` CLI** (desktop only) reads a profile you have already logged into.
-  The credential never touches the vault. Prefer this where you can.
-- **An API key**, stored in `data.json` inside your vault.
+- **An API key**, from [platform.claude.com](https://platform.claude.com),
+  stored in `data.json` inside your vault. Works everywhere, phone included,
+  and is the way in for most people.
+- **The `ant` CLI** (desktop only) reads a profile you have already logged
+  into with `ant auth login`. That login is to the developer platform, not to
+  claude.ai. The credential never touches the vault. Prefer this where you
+  can.
 
 > **On the API key.** `data.json` is a plain file in your vault. Anything that
 > reads your vault can read it — other plugins, whatever you sync with, and any
@@ -218,11 +250,38 @@ Two ways in:
 > profile on a machine that has one. This repository ignores `data.json` for
 > exactly that reason.
 
+**Why there is no "sign in with Claude".** Some plugins borrow the login
+that Claude Code or the Claude app keeps on your machine, so a Pro or Max
+subscription pays for the requests. Anthropic's consumer terms allow that
+login only in Claude Code and claude.ai, and using it anywhere else is a
+breach that Anthropic actively blocks. Nosh does not do it, and will not. The
+same goes for OpenAI: *Sign in with ChatGPT* is an identity service and does
+not carry a plan's model access into other apps. Until either company offers
+a sanctioned way for a plugin to use a subscription, an API key is the honest
+path, and it is what every reviewed Obsidian AI plugin uses.
+
 ## Install
 
-Not yet in the community plugin list. To install by hand, put `main.js`,
-`manifest.json` and `styles.css` in `<vault>/.obsidian/plugins/nosh/` and
-enable it in **Settings → Community plugins**.
+Nosh is not yet in the community plugin list. Until it is:
+
+- **With BRAT.** Install the *Beta Reviewers Auto-update Tool* from the
+  community list, choose *Add a beta plugin*, and give it
+  `brearleyjonathon/nosh`. BRAT installs the latest release and keeps it
+  updated.
+- **By hand.** Download `main.js`, `manifest.json` and `styles.css` from the
+  latest [release](https://github.com/brearleyjonathon/nosh/releases), put
+  them in `<vault>/.obsidian/plugins/nosh/`, and enable Nosh under
+  **Settings → Community plugins**.
+
+## Companion skills
+
+Nosh reads notes; it does not mind who wrote them. The `skills/` folder holds
+two [Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills)
+for Claude — one that writes an ingredient note and one that writes a meal
+note, each in exactly the frontmatter Nosh reads — so a meal described to
+Claude in a chat lands in the vault as something the picker can log. Each
+skill's `SKILL.md` says how to install it and what to tell it about your
+vault.
 
 ## Credit
 
