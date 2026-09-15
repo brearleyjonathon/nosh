@@ -3744,7 +3744,10 @@ class NoshView extends ItemView {
      * Only what is outstanding goes in - a brief padded with satisfied lines
      * buries the two numbers that actually matter. Hidden bars are left out
      * too, on the grounds that a target you do not watch is not one you want
-     * dinner chosen around. */
+     * dinner chosen around. Reference bars are the one exception: nothing
+     * about them is outstanding, since they are never judged, but carbs so
+     * far is still something a dinner can be chosen around, so they go in
+     * as plain fact, marked as such. */
     remainingBrief() {
         const settings = this.plugin.settings;
         const totals = this.totalsFor([this.cursor]).totals;
@@ -3756,13 +3759,21 @@ class NoshView extends ItemView {
         const short = [];
         const room = [];
         const groups = [];
+        const reference = [];
 
         for (const n of NUTRIENTS) {
             if (hiddenN.includes(n.key)) continue;
             const target = parseNum(settings.targets[n.key]);
+            const shape = nutrientShape(n, settings);
+            if (shape === 'reference') {
+                reference.push('- ' + n.label + ': ' + fmt(totals[n.key]) + ' ' +
+                               n.unit + ' so far' +
+                               (target ? ' against a ' + fmt(target) + ' ' +
+                                         n.unit + ' figure' : ''));
+                continue;
+            }
             if (!target) continue;
             const left = target - totals[n.key];
-            const shape = nutrientShape(n, settings);
 
             if (shape === 'floor' && left > 0) {
                 short.push('- ' + n.label + ': ' + fmt(left) + ' ' + n.unit +
@@ -3796,7 +3807,7 @@ class NoshView extends ItemView {
             }
         }
 
-        return { short: short, room: room, groups: groups };
+        return { short: short, room: room, groups: groups, reference: reference };
     }
 
     suggestionPrompt(asked) {
@@ -3846,6 +3857,7 @@ class NoshView extends ItemView {
         section('Still short of target:', brief.short);
         section('Food groups not yet met:', brief.groups);
         section('Room left before the limits:', brief.room);
+        section('For reference only, not a target either way:', brief.reference);
 
         const extra = String(ask.extra || '').trim();
         if (extra) {
