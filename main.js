@@ -1,7 +1,8 @@
 'use strict';
 
 const { Plugin, ItemView, PluginSettingTab, Setting, Modal, Menu, Notice,
-        requestUrl, setIcon, getAllTags, MarkdownRenderer, Component } = require('obsidian');
+        requestUrl, setIcon, getAllTags, MarkdownRenderer, Component,
+        normalizePath } = require('obsidian');
 
 const VIEW_TYPE_DASH = 'nosh-view';
 
@@ -143,9 +144,11 @@ const SUB_REPORTS = 'Reports';
 const LOG_SCHEMA = 2;
 
 function noshFolder(settings, sub) {
-    const root = String((settings && settings.noshFolder) || '')
-        .trim().replace(/^\/+|\/+$/g, '');
-    if (!root) return sub || '';
+    /* Typed by a person, so it may carry backslashes, doubled slashes or a
+     * leading one. normalizePath settles all of that the way Obsidian does. */
+    const typed = String((settings && settings.noshFolder) || '').trim();
+    const root = typed ? normalizePath(typed).replace(/^\/+|\/+$/g, '') : '';
+    if (!root || root === '.') return sub || '';
     return sub ? root + '/' + sub : root;
 }
 
@@ -3517,7 +3520,9 @@ class NoshView extends ItemView {
         });
 
         /* Development only: main.js is read once, at load, so an edit to it
-         * needs the plugin taken down and brought back up. */
+         * needs the plugin taken down and brought back up. There is no
+         * setting for this on screen; put "devReload": true in data.json by
+         * hand, or use the Hot Reload community plugin instead. */
         if (this.plugin.settings.devReload) {
             const fresh = actions.createEl('button', { cls: 'nosh-gear' });
             fresh.setAttr('aria-label', 'Reload Nosh from disk');
@@ -5555,22 +5560,6 @@ class NoshSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     this.plugin.refreshViews();
                     this.redraw();
-                }));
-
-        new Setting(containerEl).setName('Developer').setHeading();
-
-        new Setting(containerEl)
-            .setName('Reload button')
-            .setDesc('Puts a button in the view header that unloads Nosh and ' +
-                     'loads it again, so an edit to main.js shows without ' +
-                     'restarting Obsidian. Of no use unless you are working ' +
-                     'on the plugin itself.')
-            .addToggle((tg) => tg
-                .setValue(!!this.plugin.settings.devReload)
-                .onChange(async (on) => {
-                    this.plugin.settings.devReload = on;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshViews();
                 }));
     }
 }
