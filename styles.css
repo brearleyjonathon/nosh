@@ -217,8 +217,8 @@
 .nosh-tracker .nosh-metric[data-state="near"] .nosh-bar-part { background: var(--color-orange); }
 .nosh-tracker .nosh-metric[data-state="over"] .nosh-bar-fill,
 .nosh-tracker .nosh-metric[data-state="over"] .nosh-bar-part { background: var(--color-red); }
-.nosh-tracker .nosh-metric[data-dir="info"] .nosh-bar-fill,
-.nosh-tracker .nosh-metric[data-dir="info"] .nosh-bar-part  { background: var(--text-faint); }
+.nosh-tracker .nosh-metric[data-dir="reference"] .nosh-bar-fill,
+.nosh-tracker .nosh-metric[data-dir="reference"] .nosh-bar-part  { background: var(--text-faint); }
 
 .nosh-tracker .nosh-metric[data-state="met"] .nosh-metric-val  { color: var(--color-green); }
 .nosh-tracker .nosh-metric[data-state="over"] .nosh-metric-val { color: var(--color-red); }

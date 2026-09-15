@@ -7,11 +7,13 @@ const { Plugin, ItemView, PluginSettingTab, Setting, Modal, Menu, Notice,
 const VIEW_TYPE_DASH = 'nosh-view';
 
 /*
- * dir describes how a bar should be read:
+ * dir describes how a bar should be read, as DASH intends it:
  *   'goal'  - aim to reach the target (green once you get there)
  *   'limit' - aim to stay under it   (amber near it, red past it)
  *   'range' - aim to land inside min..max (green inside, red past max)
  *   'info'  - shown for reference, no judgement
+ * It is the default only. Settings can turn any nutrient into a floor, a
+ * ceiling or a reference bar; see nutrientShape.
  */
 const NUTRIENTS = [
     { key: 'calories',     label: 'Calories',      unit: 'kcal', dir: 'limit' },
@@ -222,6 +224,10 @@ const DEFAULT_SETTINGS = {
      * what FOOD_GROUPS says. An empty object is a vault that agrees with
      * DASH about every bar. */
     groupDirs: {},
+    /* key -> 'floor' | 'ceiling' | 'reference', the same again for the
+     * nutrient bars, and again only where the vault disagrees with
+     * NUTRIENTS. */
+    nutrientDirs: {},
     /* What the targets were last filled in from. Remembered so the pattern
      * can be nudged and applied again without being typed out twice. */
     dietCalories: DASH_REFERENCE,
@@ -2071,9 +2077,9 @@ class NoshDraftModal extends Modal {
 
 /* The judgement behind a bar's colour, lifted out of the view so a report
  * reaches the same verdict as the sidebar rather than a second opinion. */
-function nutrientState(dir, pct) {
-    if (dir === 'goal') return pct >= 100 ? 'met' : 'under';
-    if (dir === 'limit') return pct > 100 ? 'over' : pct >= 80 ? 'near' : 'under';
+function nutrientState(shape, pct) {
+    if (shape === 'floor') return pct >= 100 ? 'met' : 'under';
+    if (shape === 'ceiling') return pct > 100 ? 'over' : pct >= 80 ? 'near' : 'under';
     return 'neutral';
 }
 
@@ -2109,6 +2115,30 @@ function groupState(shape, value, min, max) {
     if (shape === 'ceiling') return value > max ? 'over' : pct >= 80 ? 'near' : 'under';
     if (value > max) return shape === 'floor' ? 'met' : 'over';
     return value >= min ? 'met' : 'under';
+}
+
+/* The same again for a nutrient. NUTRIENTS carries what DASH intends -
+ * a goal is a floor, a limit is a ceiling, and info is a reference bar,
+ * drawn grey and never judged, so out of the score and out of the prompts.
+ * nutrientDirs carries what this vault decided instead. There is no range,
+ * because a nutrient has one target, not two. */
+const NUTRIENT_SHAPES = ['floor', 'ceiling', 'reference'];
+
+function defaultNutrientShape(n) {
+    if (n.dir === 'limit') return 'ceiling';
+    return n.dir === 'goal' ? 'floor' : 'reference';
+}
+
+function nutrientShape(n, settings) {
+    const said = ((settings && settings.nutrientDirs) || {})[n.key];
+    return NUTRIENT_SHAPES.includes(said) ? said : defaultNutrientShape(n);
+}
+
+/* What a nutrient's shape means, in the words under its name in settings. */
+function nutrientShapeNote(shape) {
+    if (shape === 'ceiling') return 'A ceiling: aim to stay under this.';
+    if (shape === 'floor') return 'A floor: aim to reach this.';
+    return 'Shown for reference: drawn grey, never judged, not in the score.';
 }
 
 /* --- the score -------------------------------------------------------- */
@@ -2153,23 +2183,24 @@ function groupSpec(settings, g) {
     return { shape: groupShape(g, settings), min: parseNum(t.min), max: parseNum(t.max) };
 }
 
-/* The bars one day is judged on. A nutrient's direction is its shape; a food
- * group's shape is whatever the vault settled on. Hidden bars are out, and so
- * is anything shown for reference. Calories has one rule of its own: under the
- * target it says nothing at all - eating less is not something DASH rewards -
- * and only going over costs anything. */
+/* The bars one day is judged on. Every bar's shape is whatever the vault
+ * settled on. Hidden bars are out, and so is anything shown for reference.
+ * Calories has one rule of its own while it is a ceiling: under the target it
+ * says nothing at all - eating less is not something DASH rewards - and only
+ * going over costs anything. Made a floor, it is judged like any floor. */
 function dayCredits(settings, totals) {
     const out = [];
     const hiddenN = settings.hiddenNutrients || [];
     for (const n of NUTRIENTS) {
-        if (n.dir === 'info' || hiddenN.includes(n.key)) continue;
+        const shape = nutrientShape(n, settings);
+        if (shape === 'reference' || hiddenN.includes(n.key)) continue;
         const target = parseNum(settings.targets[n.key]);
         if (target <= 0) continue;
         const value = totals[n.key];
         let bar = null;
-        if (n.key === 'calories') {
+        if (n.key === 'calories' && shape === 'ceiling') {
             if (value > target) bar = barCredit(n.key, n.label, 'ceiling', value, 0, target);
-        } else if (n.dir === 'limit') {
+        } else if (shape === 'ceiling') {
             bar = barCredit(n.key, n.label, 'ceiling', value, 0, target);
         } else {
             bar = barCredit(n.key, n.label, 'floor', value, target, 0);
@@ -2672,7 +2703,7 @@ function probePrompt(recipe, settings) {
             const against = target
                 ? ' (' + Math.round((value / target) * 100) + '% of the ' +
                   fmt(target) + ' ' + n.unit + ' ' +
-                  (n.dir === 'limit' ? 'limit' : 'target') + ')'
+                  (nutrientShape(n, settings) === 'ceiling' ? 'limit' : 'target') + ')'
                 : '';
             lines.push('- ' + n.label + ': ' + fmt(value) + ' ' + n.unit + against);
         }
@@ -3107,6 +3138,14 @@ module.exports = class NoshPlugin extends Plugin {
             const said = dirs[g.key];
             if (GROUP_SHAPES.includes(said) && said !== defaultShape(g)) {
                 this.settings.groupDirs[g.key] = said;
+            }
+        }
+        const nDirs = saved.nutrientDirs || {};
+        this.settings.nutrientDirs = {};
+        for (const n of NUTRIENTS) {
+            const said = nDirs[n.key];
+            if (NUTRIENT_SHAPES.includes(said) && said !== defaultNutrientShape(n)) {
+                this.settings.nutrientDirs[n.key] = said;
             }
         }
 
@@ -3723,11 +3762,12 @@ class NoshView extends ItemView {
             const target = parseNum(settings.targets[n.key]);
             if (!target) continue;
             const left = target - totals[n.key];
+            const shape = nutrientShape(n, settings);
 
-            if (n.dir === 'goal' && left > 0) {
+            if (shape === 'floor' && left > 0) {
                 short.push('- ' + n.label + ': ' + fmt(left) + ' ' + n.unit +
                            ' short of ' + fmt(target) + ' ' + n.unit);
-            } else if (n.dir === 'limit') {
+            } else if (shape === 'ceiling') {
                 room.push('- ' + n.label + ': ' + fmt(Math.max(0, left)) + ' ' +
                           n.unit + ' left of ' + fmt(target) + ' ' + n.unit);
             }
@@ -4180,13 +4220,14 @@ class NoshView extends ItemView {
             const value = totals[n.key];
             const pct = target > 0 ? (value / target) * 100 : 0;
 
-            const state = nutrientState(n.dir, pct);
+            const shape = nutrientShape(n, this.plugin.settings);
+            const state = nutrientState(shape, pct);
 
             this.renderBar(el, {
                 label: n.label,
                 valueText: fmt(value) + ' / ' + fmt(target) + ' ' + n.unit +
                            ' · ' + Math.round(pct) + '%',
-                pct: pct, state: state, dir: n.dir,
+                pct: pct, state: state, dir: shape,
                 segments: split.map((sp) => ({
                     value: sp.values[n.key],
                     label: (sp.occasion || 'Unsorted') + ' \u00b7 ' +
@@ -4369,7 +4410,7 @@ class NoshView extends ItemView {
                     const target = parseNum(settings.targets[n.key]);
                     const pct = target > 0 ? (totals[n.key] / target) * 100 : 0;
                     const line = box.createDiv({ cls: 'nosh-cell-line' });
-                    line.setAttr('data-state', nutrientState(n.dir, pct));
+                    line.setAttr('data-state', nutrientState(nutrientShape(n, settings), pct));
                     line.createDiv({ cls: 'nosh-cell-fill' }).style.width =
                         Math.max(0, Math.min(100, pct)) + '%';
                 }
@@ -5037,10 +5078,11 @@ class NoshView extends ItemView {
             const target = parseNum(settings.targets[n.key]) * scale;
             const value = totals[n.key];
             const pct = target > 0 ? (value / target) * 100 : 0;
+            const shape = nutrientShape(n, settings);
             return {
-                key: n.key, label: n.label, unit: n.unit, dir: n.dir,
+                key: n.key, label: n.label, unit: n.unit, dir: shape,
                 value: value, target: target, pct: pct,
-                state: nutrientState(n.dir, pct),
+                state: nutrientState(shape, pct),
             };
         });
 
@@ -5421,7 +5463,7 @@ class NoshSettingTab extends PluginSettingTab {
             .setName('Fill the targets from this')
             .setDesc('Overwrites every nutrient target and every food-group ' +
                      'range. Which bars are shown, and whether each is a floor, ' +
-                     'a range or a ceiling, are left as you set them.')
+                     'a range, a ceiling or a reference, are left as you set them.')
             .addButton((b) => b
                 .setButtonText('Fill')
                 .onClick(async () => {
@@ -5447,13 +5489,28 @@ class NoshSettingTab extends PluginSettingTab {
 
         for (const n of NUTRIENTS) {
             const hidden = (this.plugin.settings.hiddenNutrients || []).includes(n.key);
-            const note = n.dir === 'goal' ? 'Aim to reach this.'
-                : n.dir === 'limit' ? 'Aim to stay under this.'
-                : 'Shown for reference.';
+            const shape = nutrientShape(n, this.plugin.settings);
+            const desc = (of) => nutrientShapeNote(of) + ' Reads the ' + n.key +
+                                 ' frontmatter field.';
 
-            new Setting(containerEl)
+            /* Held so the dropdown can rewrite the line under the name. */
+            const row = new Setting(containerEl)
                 .setName(n.label + ' (' + n.unit + ')')
-                .setDesc(note + ' Reads the ' + n.key + ' frontmatter field.')
+                .setDesc(desc(shape))
+                .addDropdown((d) => d
+                    .addOption('floor', 'Floor')
+                    .addOption('ceiling', 'Ceiling')
+                    .addOption('reference', 'Reference')
+                    .setValue(shape)
+                    .onChange(async (v) => {
+                        /* As with the groups: agreeing with DASH is not
+                         * stored, so the nutrient follows the constant. */
+                        if (v === defaultNutrientShape(n)) delete this.plugin.settings.nutrientDirs[n.key];
+                        else this.plugin.settings.nutrientDirs[n.key] = v;
+                        await this.plugin.saveSettings();
+                        this.plugin.refreshViews();
+                        row.setDesc(desc(nutrientShape(n, this.plugin.settings)));
+                    }))
                 .addText((t) => t
                     .setValue(String(this.plugin.settings.targets[n.key]))
                     .onChange(async (v) => {
@@ -5555,6 +5612,7 @@ class NoshSettingTab extends PluginSettingTab {
                     this.plugin.settings.targets = Object.assign({}, DEFAULT_TARGETS);
                     this.plugin.settings.groupTargets = JSON.parse(JSON.stringify(DEFAULT_GROUP_TARGETS));
                     this.plugin.settings.groupDirs = {};
+                    this.plugin.settings.nutrientDirs = {};
                     this.plugin.settings.dietCalories = DASH_REFERENCE;
                     this.plugin.settings.dietSodium = SODIUM_STANDARD;
                     await this.plugin.saveSettings();

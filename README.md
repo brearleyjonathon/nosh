@@ -121,9 +121,9 @@ target. A floor pays out in proportion to how much of the minimum is there; a
 ceiling pays in full up to the maximum and then loses it at the same rate,
 reaching nothing at double; a range does both. Every bar weighs the same, as
 the published DASH accordance scores have it — if one should matter more, say
-so by which bars you show. Carbs stay out, being for reference, and calories
-only count when over: eating less is not something DASH rewards. Hidden bars
-are out too.
+so by which bars you show. Carbs stay out by default, being for reference,
+and calories only count when over: eating less is not something DASH rewards.
+Hidden bars are out too.
 
 The week is judged bar by bar over the days that have anything logged, so a
 day you did not log is missing rather than a zero, with the weekly groups read
@@ -133,9 +133,13 @@ tab scores the month the same way, over its per-day bars alone.
 ### The arithmetic
 
 Every bar in play gets a **credit** between 0 and 1, from its value `v` and
-its own shape. Nutrients take their direction as a shape — a goal is a floor,
-a limit is a ceiling — and food groups take whatever shape the settings gave
-them.
+its own shape. Every bar takes whatever shape the settings gave it. A nutrient
+is a **floor**, a **ceiling** or a **reference** — reference bars are drawn
+grey and never judged — and defaults to what DASH intends: protein, fibre,
+potassium and calcium floors; calories, fat, saturated fat and sodium
+ceilings; carbs a reference. A food group is a floor, a **range** or a
+ceiling. Both can be changed per bar in settings, and the score, the bar
+colours and the prompts all follow.
 
 ```
 floor    (minimum m)              credit = min(1, v / m)
@@ -148,10 +152,10 @@ range    (m … M)                  the floor rule below m, the ceiling rule
 So half the fibre is half a credit, sodium at 3,450 against 2,300 is half a
 credit, and anything at double its ceiling is none. The exceptions:
 
-- **Carbs** are never scored; they are shown for reference.
-- **Calories** are a ceiling that is absent while you are under it — it
-  joins the average only when `v > target`, and then loses credit like any
-  ceiling.
+- **Reference** bars are never scored. Carbs is one unless you say otherwise.
+- **Calories** are, by default, a ceiling that is absent while you are under
+  it — it joins the average only when `v > target`, and then loses credit like
+  any ceiling. Made a floor, it is scored like any other floor.
 - **Fats & oils**, like lean meat and sweets, is a ceiling by default: under
   its minimum costs nothing, since staying low is the point.
 - **Hidden bars** are out, and so is any bar whose target is 0.
