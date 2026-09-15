@@ -25,14 +25,17 @@ const NUTRIENTS = [
 ];
 
 /* The food-group side of DASH, which the nutrient numbers cannot express.
- * Counts are the 2,000 kcal reference pattern. */
+ * Counts are the 2,000 kcal reference pattern. Fats & oils is a limit, as
+ * meat and sweets are: the pattern names two to three servings, but coming
+ * in under is the point, not a shortfall, so the score never asks for the
+ * minimum. */
 const FOOD_GROUPS = [
     { key: 'serv_grains',     label: 'Grains',       period: 'day',  dir: 'range' },
     { key: 'serv_vegetables', label: 'Vegetables',   period: 'day',  dir: 'range', overOk: true },
     { key: 'serv_fruit',      label: 'Fruit',        period: 'day',  dir: 'range', overOk: true },
     { key: 'serv_dairy',      label: 'Low-fat dairy',period: 'day',  dir: 'range' },
     { key: 'serv_meat',       label: 'Lean meat/fish', period: 'day', dir: 'limit' },
-    { key: 'serv_fats',       label: 'Fats & oils',  period: 'day',  dir: 'range' },
+    { key: 'serv_fats',       label: 'Fats & oils',  period: 'day',  dir: 'limit' },
     { key: 'serv_nuts',       label: 'Nuts & seeds', period: 'week', dir: 'range', overOk: true },
     { key: 'serv_legumes',    label: 'Legumes',      period: 'week', dir: 'range', overOk: true },
     { key: 'serv_sweets',     label: 'Sweets',       period: 'week', dir: 'limit' },
@@ -620,6 +623,9 @@ function aiModelId(settings, key) {
  * anything Claude has to supply itself lands on a half-cup step. Foods a cup
  * cannot sensibly describe keep their own unit. */
 const AI_PORTIONS = [
+    '- A portion is a number and a unit, reported apart: `quantity` is the',
+    '  number alone, `unit` is what follows it - "cup", "cup, cooked", "oz",',
+    '  "medium banana", "large egg", "tbsp", "tablet".',
     '- Portions exist to be pictured, so measure by volume in half-cup steps:',
     '  0.5 cup, 1 cup, 1.5 cups. Round to the nearest half cup rather than',
     '  reporting 0.4 or 0.7 of one.',
@@ -629,8 +635,8 @@ const AI_PORTIONS = [
     '- A portion the description states outright is kept as stated, in the unit',
     '  it was given. Only what you supply yourself lands on a half cup.',
     '- Where no portion is given at all, assume a common one and mark it in',
-    '  brackets: "1 cup (portion assumed, not stated)". Never let an assumption',
-    '  go unmarked.',
+    '  brackets at the end of the unit: quantity 1, unit "cup (portion',
+    '  assumed, not stated)". Never let an assumption go unmarked.',
 ];
 
 const AI_DASH = [
@@ -665,21 +671,26 @@ const AI_INGREDIENT_SYSTEM = [
     '',
     '- One ingredient per call. If the description names a whole dish, take only',
     '  the single ingredient asked for and say so in `note`.',
-    '- Nutrients describe the whole portion named in `amount`, not 100 g of it.',
+    '- Nutrients describe the whole portion named by `quantity` and `unit`,',
+    '  not 100 g of it.',
 ].concat(AI_PORTIONS, AI_SLOTS, AI_DASH, [
     '- `note` is a sentence or two on what drives the numbers, or on what you',
     '  had to assume. No preamble, no restating the name.',
 ]).join('\n');
 
 const AI_MEAL_SYSTEM = [
-    'You turn a plain description of a meal into one totalled entry for a DASH',
-    'diet log. Estimate from standard reference data, USDA where you have it.',
+    'You turn a plain description of a meal into a DASH diet log entry, one',
+    'ingredient at a time. Estimate from standard reference data, USDA where',
+    'you have it.',
     '',
-    '- Break the meal into its ingredients, give each a portion, then report the',
-    '  totals for the meal as a whole. Every number you return is the sum across',
-    '  the ingredients, never one ingredient standing alone.',
-    '- `ingredients` lists each part as "Name, portion", matching the portions',
-    '  you actually totalled: "Greek yogurt, Fage 0%, 0.5 cup".',
+    '- Break the meal into its ingredients and report each one on its own, in',
+    '  `ingredients`. Every number belongs to the ingredient it sits with, for',
+    '  that ingredient\'s own portion - never the meal, and never a share of it.',
+    '- Do not total anything. The totals are added up from the parts afterwards,',
+    '  and an ingredient carrying the whole meal\'s numbers would be counted',
+    '  once for itself and again for everything beside it.',
+    '- Name each part as it would be read on a shopping list - "Greek yogurt,',
+    '  Fage 0%" - and give its portion in `quantity` and `unit`.',
 ].concat(AI_PORTIONS, AI_SLOTS, AI_DASH, [
     '- `note` is a sentence or two on how the meal sits against DASH: what',
     '  carries the fiber or potassium, what pushes the sodium. No preamble.',
@@ -694,8 +705,9 @@ const AI_PHOTO = [
     '',
     'If it shows a nutrition panel, read it rather than estimating it:',
     '- Take the per-serving column, not the per-100g one and not the whole',
-    '  container, and put the serving size the panel names in `amount`. How',
-    '  many of them were eaten is not your question; it is logged separately.',
+    '  container. The serving the panel names is the portion - unless the',
+    '  words alongside say how much was eaten, in which case that is the',
+    '  portion, and the numbers are scaled to it from the panel\'s figures.',
     '- A panel prints nutrients, never DASH servings. Those come from what the',
     '  food is - the product name, the ingredients list - as they always do.',
     '- Read what is legible and estimate only what is not, from standard',
@@ -709,7 +721,9 @@ const AI_PHOTO = [
     '- The portion is where you will be wrong, not the identification. Judge it',
     '  against whatever gives you scale - the plate, a fork, a hand - say what',
     '  you judged it against, and mark it assumed exactly as an unstated',
-    '  portion is marked.',
+    '  portion is marked. If the words alongside say how much was eaten -',
+    '  half, the left one, two of them - that settles the portion, and only',
+    '  what remains unsaid is assumed.',
     '',
     'A photograph too dark, too far or too angled to read is worth saying so',
     'about. Fill the form from what you can genuinely see and let `note` carry',
@@ -736,6 +750,38 @@ function aiNumbers(props, whole) {
     return props;
 }
 
+/* One ingredient of a meal, carrying its own portion and its own numbers.
+ * The meal's totals are added up from these rather than asked for: a number
+ * that is the sum of the others cannot disagree with them, and an amount
+ * changed afterwards can be scaled only if something knows what it was an
+ * amount of. */
+function aiPartSchema() {
+    const props = aiNumbers({
+        name: {
+            type: 'string',
+            description: 'The ingredient, as it would read on a shopping list, ' +
+                         'e.g. "Greek yogurt, Fage 0%".',
+        },
+        quantity: {
+            type: 'number',
+            description: 'How much of it, as a number alone: 0.5, 1, 2.',
+        },
+        unit: {
+            type: 'string',
+            description: 'What the number counts, as it follows the number: ' +
+                         '"cup", "cup, cooked", "oz", "medium banana", "tbsp". ' +
+                         'Any assumption goes in brackets at the end.',
+        },
+    }, 'ingredient portion');
+
+    return {
+        type: 'object',
+        additionalProperties: false,
+        required: Object.keys(props),
+        properties: props,
+    };
+}
+
 function aiSchema(name, description, props) {
     return {
         name,
@@ -760,9 +806,16 @@ function aiIngredientTool() {
                 type: 'string',
                 description: 'Short title-case name for the note, e.g. "Greek Yogurt". Becomes the filename.',
             },
-            amount: {
+            quantity: {
+                type: 'number',
+                description: 'How much of it these numbers describe, as a number ' +
+                             'alone: 0.5, 1, 2.',
+            },
+            unit: {
                 type: 'string',
-                description: 'The portion these numbers describe, with any assumption in brackets at the end.',
+                description: 'What the number counts, as it follows the number: ' +
+                             '"cup", "cup, cooked", "oz", "medium banana", "tbsp". ' +
+                             'Any assumption goes in brackets at the end.',
             },
             meal_type: {
                 type: 'string',
@@ -778,12 +831,16 @@ function aiIngredientTool() {
         }, 'portion'));
 }
 
+/* No totals are asked for. The meal is its ingredients, and what it comes to
+ * is arithmetic - done here, where it can be done again the moment a portion
+ * is corrected. */
 function aiMealTool() {
     return aiSchema(
         'log_meal',
-        'Record one whole meal as eaten, totalled across its ingredients, with its ' +
-        'DASH food-group servings. Call this once for the meal described.',
-        aiNumbers({
+        'Record one whole meal as eaten, ingredient by ingredient, each with its ' +
+        'nutrition and its DASH food-group servings. Call this once for the meal ' +
+        'described.',
+        {
             name: {
                 type: 'string',
                 description: 'Short title-case name for the meal, e.g. "Oatmeal, Greek Yogurt, and Berry Bowl". Becomes the filename.',
@@ -797,15 +854,16 @@ function aiMealTool() {
             },
             ingredients: {
                 type: 'array',
-                items: { type: 'string' },
-                description: 'Each ingredient as "Name, portion", e.g. "Walnuts, 1 oz". ' +
-                             'These are the parts the totals add up.',
+                items: aiPartSchema(),
+                description: 'Every part of the meal, each with its own portion and ' +
+                             'its own numbers for that portion. The meal is the sum ' +
+                             'of these, so nothing here may be a total.',
             },
             note: {
                 type: 'string',
                 description: 'One or two sentences on how the meal sits against DASH.',
             },
-        }, 'meal'));
+        });
 }
 
 /* A suggestion needs the method as well, since a meal nobody has cooked yet
@@ -906,8 +964,9 @@ const AI_SUGGEST_SYSTEM = [
     '- Where the shortfalls cannot all be met without the meal turning absurd,',
     '  meet the ones that matter most and say which you left alone.',
     '- `name` is what the dish is called, titled as a recipe would title it.',
-    '- `ingredients` lists each part as "Name, portion", and every number you',
-    '  return is the total across all of them.',
+    '- `ingredients` is every part of the dish, each with its own portion in',
+    '  `quantity` and `unit` and its own numbers for that portion. Do not total',
+    '  them: the meal is added up from the parts afterwards.',
     '- `method` is how to cook it: ordered steps, one per item, each carrying its',
     '  own timings and quantities so a step reads without the ingredient list',
     '  beside it. Enough to cook from, not an essay.',
@@ -1117,6 +1176,81 @@ async function aiHeaders(settings) {
     return headers;
 }
 
+/* --- portions ------------------------------------------------------- */
+
+/* A portion is a number and the words after it, kept apart so the number can
+ * be moved. "1.5" and "cup, cooked" read back as "1.5 cup, cooked"; a unit
+ * that is already a whole phrase - "portion (assumed)" - reads the same way. */
+function amountText(qty, unit) {
+    const said = String(unit || '').trim();
+    const n = fmtServings(qty);
+    return said ? n + ' ' + said : n;
+}
+
+/* The parts a draft is made of, in the one shape the card and the totals both
+ * read. A meal has as many as it has ingredients; a single ingredient has
+ * exactly one, which is the note itself. `base` is what Claude reported and
+ * `baseQty` the portion it reported them for, so any other portion is a
+ * multiplication away and the original is never lost to rounding. */
+function draftParts(kind, draft) {
+    const partOf = (src, name) => {
+        const values = {};
+        for (const n of NUTRIENTS) values[n.key] = parseNum(src[n.key]);
+        for (const g of FOOD_GROUPS) values[g.key] = parseNum(src[g.key]);
+        /* A portion reported as zero describes nothing, and would leave the
+         * numbers beside it with no portion to be scaled from. Read as one,
+         * which is the only portion those numbers can honestly belong to. */
+        const said = parseNum(src.quantity);
+        const qty = said > 0 ? said : 1;
+        return {
+            name: String(name || src.name || '').trim(),
+            unit: String(src.unit || '').trim(),
+            qty: qty,
+            baseQty: qty,
+            base: values,
+        };
+    };
+
+    if (kind === 'ingredients') return [partOf(draft, draft.name)];
+    return (Array.isArray(draft.ingredients) ? draft.ingredients : [])
+        .filter((p) => p && typeof p === 'object')
+        .map((p) => partOf(p, p.name));
+}
+
+/* What one part comes to at the portion it is currently set to. Dialled to
+ * nothing it contributes nothing, which is the same thing the ingredient list
+ * says by leaving it out. */
+function partScale(part) {
+    return part.baseQty > 0 ? part.qty / part.baseQty : 0;
+}
+
+/* The totals, written back onto the draft under the same flat keys the notes
+ * and the frontmatter have always read. Everything downstream of here is
+ * untouched by parts existing: it still finds a number under `sodium_mg`.
+ * The portion text is rebuilt at the same time, from the same parts, so the
+ * words and the numbers cannot describe different meals. */
+function retotalDraft(kind, draft, parts) {
+    const round = (v) => Math.round(v * 100) / 100;
+    const keys = NUTRIENTS.map((n) => n.key).concat(FOOD_GROUPS.map((g) => g.key));
+    for (const key of keys) {
+        let sum = 0;
+        for (const part of parts) sum += part.base[key] * partScale(part);
+        draft[key] = round(sum);
+    }
+
+    /* A part dialled to nothing is not an ingredient of anything: it leaves
+     * the list rather than lingering as "Spinach, 0 cup". */
+    const used = parts.filter((part) => part.qty > 0);
+    if (kind === 'ingredients') {
+        const one = parts[0];
+        draft.amount = one ? amountText(one.qty, one.unit) : '';
+    } else {
+        draft.ingredients = used.map(
+            (part) => part.name + ', ' + amountText(part.qty, part.unit));
+    }
+    return draft;
+}
+
 /* --- the call ------------------------------------------------------- */
 
 async function aiDraft(plugin, kind, description, photo) {
@@ -1140,7 +1274,9 @@ async function aiDraft(plugin, kind, description, photo) {
         throw: false,
         body: JSON.stringify({
             model: aiModelId(plugin.settings, spec.model),
-            max_tokens: 4096,
+            /* A meal reports every number once per ingredient now, so a long
+             * one writes several times what a single set of totals did. */
+            max_tokens: 8192,
             thinking: { type: 'adaptive' },
             output_config: { effort: plugin.settings.aiEffort || 'medium' },
             system: photo ? spec.system + AI_PHOTO : spec.system,
@@ -1164,6 +1300,16 @@ async function aiDraft(plugin, kind, description, photo) {
     const block = ((body && body.content) || []).find(
         (b) => b.type === 'tool_use' && b.name === tool.name);
     if (!block) throw new Error('Claude answered without filling the form. Try naming the amount plainly.');
+
+    /* A meal is the sum of its parts, so a meal without parts is a note full
+     * of zeroes waiting to be filed as food. Refuse it here, where it is still
+     * an error message, rather than in the vault where it is a wrong day. */
+    if (kind !== 'ingredients' &&
+        !(Array.isArray(block.input.ingredients) &&
+          block.input.ingredients.some((p) => p && typeof p === 'object'))) {
+        throw new Error('Claude answered without breaking the meal into ingredients. ' +
+                        'Try naming what was in it.');
+    }
 
     return block.input;
 }
@@ -1687,18 +1833,106 @@ class NoshExistsModal extends Modal {
     }
 }
 
+/* A photograph answers what, and rarely how much: the label says a serving,
+ * the plate says a plate, and neither says whether it was half or two. So the
+ * picture is shown back for a moment with room for a sentence, and the words
+ * ride along with it. Leaving the box empty is an answer too. */
+class NoshPhotoModal extends Modal {
+    constructor(app, photo, seed, onDone) {
+        super(app);
+        this.photo = photo;
+        this.seed = seed || '';
+        this.onDone = onDone;
+        this.answer = null;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        this.unfit = fitModalToKeyboard(this);
+        contentEl.addClass('dash-draft');
+        this.setTitle('What is this, and how much of it?');
+
+        const shown = contentEl.createDiv({ cls: 'dash-draft-shot' });
+        const img = shown.createEl('img');
+        img.src = 'data:' + this.photo.type + ';base64,' + this.photo.data;
+        img.alt = 'The photograph about to be sent';
+
+        const ask = contentEl.createDiv({ cls: 'dash-draft-ask' });
+        const said = ask.createEl('input', { type: 'text' });
+        said.value = this.seed;
+        said.placeholder = 'Half of it. The one on the left. Two of these\u2026';
+        said.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { this.answer = said.value; this.close(); }
+        });
+
+        contentEl.createDiv({
+            cls: 'dash-draft-note',
+            text: 'A label is read as the serving it prints, and a plate as what is ' +
+                  'on it, unless you say otherwise here.',
+        });
+
+        const actions = contentEl.createDiv({ cls: 'dash-draft-actions' });
+        const cancel = actions.createEl('button', { text: 'Cancel' });
+        cancel.addEventListener('click', () => this.close());
+
+        const go = actions.createEl('button', { cls: 'mod-cta', text: 'Draft' });
+        go.addEventListener('click', () => { this.answer = said.value; this.close(); });
+
+        window.setTimeout(() => said.focus(), 50);
+    }
+
+    /* Dismissing leaves the answer null: the picture is dropped, not sent
+     * without a word. */
+    onClose() {
+        if (this.unfit) { this.unfit(); this.unfit = null; }
+        this.contentEl.empty();
+        this.onDone(this.answer);
+    }
+}
+
 /* --- confirmation --------------------------------------------------- */
 
 /* Nothing reaches the vault until this has been read. The numbers are
  * estimates and the portion may be an outright guess; both are on screen
- * before the note exists. */
+ * before the note exists, and both can be corrected there. A label that was
+ * misread, a portion that was really half, a sodium figure you happen to know
+ * - fixed here, not found in the frontmatter later. */
 class NoshDraftModal extends Modal {
     constructor(app, view, kind, draft) {
         super(app);
         this.view = view;
         this.kind = kind;
         this.draft = Object.assign({}, draft);
+        this.parts = draftParts(kind, this.draft);
         this.shouldLog = true;
+    }
+
+    /* One place where a changed portion becomes a changed meal: the draft's
+     * totals, the figures on screen and the food groups under them, all from
+     * the same parts in the same pass. */
+    retotal() {
+        retotalDraft(this.kind, this.draft, this.parts);
+
+        for (const n of NUTRIENTS) {
+            const cell = this.figures && this.figures[n.key];
+            if (cell) cell.setText(fmt(parseNum(this.draft[n.key])) + ' ' + n.unit);
+        }
+
+        if (this.groupsEl) {
+            const on = FOOD_GROUPS
+                .filter((g) => parseNum(this.draft[g.key]) > 0)
+                .map((g) => g.label + ' ' + fmtServings(parseNum(this.draft[g.key])));
+            this.groupsEl.setText(
+                on.length ? on.join(' · ') : 'No food-group servings');
+        }
+
+        /* The chat carries the recipe, and the recipe is the portions - so it
+         * is rebuilt here rather than fixed at the moment the card opened. */
+        if (this.chatEl) {
+            this.chatEl.setAttr('href', claudeRecipeLink(
+                this.draft.name, this.draft.ingredients || [],
+                this.chatSteps, this.draft.serves));
+        }
     }
 
     onOpen() {
@@ -1734,16 +1968,27 @@ class NoshDraftModal extends Modal {
             mealEl.addEventListener('change', () => { this.draft.meal_type = mealEl.value; });
         }
 
-        /* What the numbers rest on, before the numbers. For a meal that is the
-         * list of parts and their portions; for an ingredient it is the single
-         * portion, whose bracketed caveat is the honest part of the estimate. */
-        const parts = Array.isArray(this.draft.ingredients)
-            ? this.draft.ingredients.filter(Boolean) : [];
-        if (parts.length) {
-            const list = contentEl.createEl('ul', { cls: 'dash-draft-parts' });
-            for (const p of parts) list.createEl('li', { text: String(p) });
-        } else if (this.draft.amount) {
-            contentEl.createDiv({ cls: 'dash-draft-amount', text: this.draft.amount });
+        /* What the numbers rest on, and the only place they can be argued
+         * with. A portion is the one thing on this card you know better than
+         * Claude does - it was your plate - and it is where an estimate goes
+         * wrong. Move it and everything below follows. */
+        const portions = contentEl.createDiv({ cls: 'dash-draft-portions' });
+        for (const part of this.parts) {
+            const row = portions.createDiv({ cls: 'dash-draft-portion' });
+            row.createSpan({
+                cls: 'dash-draft-portion-name',
+                text: this.kind === 'ingredients' ? 'Amount' : part.name,
+            });
+            const box = row.createEl('input', { cls: 'dash-draft-num', type: 'number' });
+            box.min = '0';
+            box.step = 'any';
+            box.inputMode = 'decimal';
+            box.value = String(Math.round(part.qty * 100) / 100);
+            box.addEventListener('input', () => {
+                part.qty = Math.max(0, parseNum(box.value));
+                this.retotal();
+            });
+            row.createSpan({ cls: 'dash-draft-unit', text: part.unit });
         }
 
         /* A suggestion is being judged on whether it is worth cooking, so the
@@ -1755,29 +2000,31 @@ class NoshDraftModal extends Modal {
             const how = contentEl.createEl('ol', { cls: 'dash-draft-method' });
             for (const step of steps) how.createEl('li', { text: String(step) });
 
+            /* Built from the portions as they stand, so a halved ingredient
+             * is halved in the chat too. */
             const chat = contentEl.createEl('a', {
                 cls: 'dash-draft-chat',
                 text: 'Cook this with Claude',
-                href: claudeRecipeLink(this.draft.name, parts, steps, this.draft.serves),
             });
             chat.setAttr('target', '_blank');
             chat.setAttr('rel', 'noopener');
+            this.chatEl = chat;
+            this.chatSteps = steps;
         }
 
+        /* Read, not typed. Every figure here is what the portions above come
+         * to, and a number you could overwrite would only be a number that had
+         * stopped describing the food. */
         const table = contentEl.createEl('table', { cls: 'dash-draft-table' });
+        this.figures = {};
         for (const n of NUTRIENTS) {
             const tr = table.createEl('tr');
             tr.createEl('td', { text: n.label });
-            tr.createEl('td', { text: fmt(parseNum(this.draft[n.key])) + ' ' + n.unit });
+            this.figures[n.key] = tr.createEl('td');
         }
 
-        const groups = FOOD_GROUPS
-            .filter((g) => parseNum(this.draft[g.key]) > 0)
-            .map((g) => g.label + ' ' + fmt(parseNum(this.draft[g.key])));
-        contentEl.createDiv({
-            cls: 'dash-draft-groups',
-            text: groups.length ? groups.join(' · ') : 'No food-group servings',
-        });
+        this.groupsEl = contentEl.createDiv({ cls: 'dash-draft-groups' });
+        this.retotal();
 
         if (this.draft.note) {
             contentEl.createDiv({ cls: 'dash-draft-note', text: this.draft.note });
@@ -3811,17 +4058,17 @@ class NoshView extends ItemView {
         return out;
     }
 
-    /* One quiet line under the meal count. In Day view it is two numbers,
-     * because today and the week answer different questions - am I on track
-     * now, did the pattern hold - and the week already contains the day.
-     * Blended into one they would say nothing anyone could act on. */
+    /* One number under the meal count, for the span on screen: the day's in
+     * Day view, the week's in Week, the month's in Month. Today and the week
+     * answer different questions - am I on track now, did the pattern hold -
+     * and the tab is how you ask one rather than the other. It folds away
+     * under its own heading, like the bars do. */
     renderScore(mode) {
-        const weekOf = weekDays(this.cursor, this.plugin.settings.weekStart);
-        const today = mode === 'day' ? this.dayScore(this.cursor) : null;
-        const whole = mode === 'month'
-            ? this.spanScore(monthDays(this.cursor), false)
-            : this.weekScore(weekOf);
-        if (!today && !whole) return;
+        const got = mode === 'day' ? this.dayScore(this.cursor)
+            : mode === 'month' ? this.spanScore(monthDays(this.cursor), false)
+            : this.weekScore(weekDays(this.cursor, this.plugin.settings.weekStart));
+        if (!got) return;
+        if (!this.renderSectionHead(this.summaryEl, 'score', 'Composite score')) return;
 
         const row = this.summaryEl.createDiv({ cls: 'dash-score' });
         row.setAttr('title', 'From the middle: green goes right as the things to ' +
@@ -3850,17 +4097,14 @@ class NoshView extends ItemView {
             reach.style.width = ((got.reach === null ? 1 : got.reach) * 50) + '%';
             bar.createDiv({ cls: 'dash-score-tick' });
         };
-        put(this.cursor === todayIso() ? 'Today' : 'Day', today);
-        put(mode === 'month' ? 'Month' : 'Week', whole);
+        put(mode === 'month' ? 'Month' : mode === 'week' ? 'Week'
+            : this.cursor === todayIso() ? 'Today' : 'Day', got);
 
-        /* What pulled it down, on request. The day's list in Day view, the
-         * week's in Week view: the number you are looking at is the one that
-         * gets explained. */
+        /* What pulled it down, on request. */
         if (this.scoreOpen) {
-            const of = today || whole;
             const why = row.createDiv({ cls: 'dash-score-why' });
-            why.setText(of.worst.length
-                ? 'Costing most: ' + of.worst.map((b) =>
+            why.setText(got.worst.length
+                ? 'Costing most: ' + got.worst.map((b) =>
                     b.label + ' ' + Math.round(b.credit * 100) + '%').join(' · ')
                 : 'Every bar met.');
         }
@@ -4666,8 +4910,8 @@ class NoshView extends ItemView {
          * ask with different evidence, and a picture is often worth a word
          * anyway: how much of it was eaten, which of the two things on the
          * plate is being logged. */
-        const run = async (photo) => {
-            const text = input.value.trim();
+        const run = async (photo, words) => {
+            const text = String(words || '').trim();
             if (!text && !photo) return;
 
             input.disabled = true;
@@ -4677,8 +4921,13 @@ class NoshView extends ItemView {
             go.empty();
             go.createSpan({ cls: 'dash-ai-spin', text: '\ud83e\udd66' });
             try {
+                /* With a picture, the words are about the picture, so it is
+                 * said what the picture is before what was said about it. */
                 const draft = await aiDraft(this.plugin, source.key,
-                    text || 'This photograph is the ' + source.noun + '.', photo);
+                    photo ? ['This photograph is the ' + source.noun + '.', text]
+                                .filter(Boolean).join(' ')
+                          : text,
+                    photo);
                 input.value = '';
                 new NoshDraftModal(this.app, this, source.key, draft).open();
             } catch (e) {
@@ -4691,8 +4940,10 @@ class NoshView extends ItemView {
             }
         };
 
-        go.addEventListener('click', () => run(null));
-        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(null); });
+        go.addEventListener('click', () => run(null, input.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') run(null, input.value);
+        });
 
         shot.addEventListener('click', async () => {
             if (shot.disabled) return;
@@ -4709,7 +4960,14 @@ class NoshView extends ItemView {
             } finally {
                 shot.disabled = false;
             }
-            if (photo) run(photo);
+            if (!photo) return;
+            /* A moment with the picture before it goes: what it is, and how
+             * much of it was eaten. Whatever was already typed is the start
+             * of the answer. */
+            const words = await new Promise((resolve) => {
+                new NoshPhotoModal(this.app, photo, input.value, resolve).open();
+            });
+            if (words !== null) run(photo, words);
         });
     }
 

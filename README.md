@@ -77,10 +77,11 @@ still means something to Dataview, to a reader, and to anyone you share it with.
 
 ## The score
 
-Under the meal count sit two scores out of 100, each with a bar: today, and
-the week. They are kept apart on purpose — *am I on track right now* and *did
-the pattern hold* are different questions, and one blended figure would answer
-neither.
+Under the meal count sits a **composite score** out of 100, with a bar, for
+the span on screen: the day's in Day view, the week's in Week, the month's
+in Month. Today and the week are never blended — *am I on track right now*
+and *did the pattern hold* are different questions, and the tab is how you
+ask one rather than the other. The heading folds it away like the bars.
 
 The number sits over the middle of its bar, and both fills start there. Green
 runs right as the things to reach are reached, all the way to the edge when
@@ -125,6 +126,8 @@ credit, and anything at double its ceiling is none. The exceptions:
 - **Calories** are a ceiling that is absent while you are under it — it
   joins the average only when `v > target`, and then loses credit like any
   ceiling.
+- **Fats & oils**, like lean meat and sweets, is a ceiling by default: under
+  its minimum costs nothing, since staying low is the point.
 - **Hidden bars** are out, and so is any bar whose target is 0.
 - Weekly groups are not in a day's score; they are judged in the week's.
 
@@ -174,7 +177,15 @@ Off unless you give it credentials. Four things use it:
   button beside **Draft** takes a nutrition label, which is read rather than
   guessed at, or a plate of food, which is estimated and says what it assumed
   about the portion. On a phone that is the camera or the photo roll. The
-  picture is shrunk and sent to the API with whatever you typed alongside it.
+  picture is shown back for a moment with room to say what it is and how much
+  of it you ate — *half of it*, *the one on the left*, *two of these* — and
+  then shrunk and sent to the API with those words. Left blank, a label is
+  read as the serving it prints and a plate as what is on it.
+  The draft comes back as a card listing every ingredient with its portion,
+  and the portions are yours to correct — it was your plate, and a portion is
+  where an estimate goes wrong. Change one and the nutrients and DASH servings
+  below are recomputed from the parts. The numbers themselves are read-only
+  for the same reason: they belong to the ingredients, not to the note.
 - **What's for…** — takes what the day still has room for and suggests a meal
   that fits, with a method. Ask it before it runs: how many you are cooking for,
   how much of a production it should be, what needs using up.

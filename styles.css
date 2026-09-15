@@ -503,6 +503,12 @@
     color: var(--text-muted);
 }
 
+/* The score's heading sits in the summary, between the meal count and the
+ * bar it folds, and takes the bars' spacing rather than Input's. */
+.dash-tracker .dash-summary button.dash-section-head {
+    padding: 8px 0 4px;
+}
+
 /* The headings over the bars sit closer to them than Input does to the
  * picker: a bar is a thin thing and does not need the room. The first of
  * them takes a little from above instead, so the score's bars can breathe. */
@@ -1150,14 +1156,6 @@
     min-width: 0;
 }
 
-/* The portion, and whatever had to be assumed about it, reads before the
- * numbers that rest on it. */
-.dash-draft .dash-draft-amount {
-    padding: 2px 0 10px;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-}
-
 .dash-draft .dash-draft-table {
     width: 100%;
     border-collapse: collapse;
@@ -1174,10 +1172,60 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* The portions, which are the part of this card that can be argued with.
+ * The name takes the room the numbers do not, so a long ingredient wraps
+ * rather than pushing its own portion off the edge. */
+.dash-draft .dash-draft-portions {
+    padding: 2px 0 12px;
+}
+
+.dash-draft .dash-draft-portion {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: var(--font-ui-smaller);
+}
+
+.dash-draft .dash-draft-portion-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-muted);
+}
+
+.dash-draft .dash-draft-num {
+    flex: 0 0 auto;
+    width: 4.5em;
+    padding: 2px 6px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--font-ui-smaller);
+}
+
+.dash-draft .dash-draft-unit {
+    flex: 0 0 5.5em;
+    color: var(--text-muted);
+}
+
 .dash-draft .dash-draft-groups {
     padding: 10px 0 0;
     color: var(--text-accent);
     font-size: var(--font-ui-smaller);
+}
+
+/* The photograph, shown back before it is sent, held short enough that the
+ * question under it and the buttons are on screen with it. */
+.dash-draft .dash-draft-shot img {
+    display: block;
+    max-width: 100%;
+    max-height: 38vh;
+    margin: 0 auto 10px;
+    border-radius: var(--radius-m);
+    object-fit: contain;
+}
+
+.dash-draft .dash-draft-ask input {
+    width: 100%;
 }
 
 /* Estimates, not measurements. The caveat stays on screen to the end. */
