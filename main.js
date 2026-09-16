@@ -1,7 +1,7 @@
 'use strict';
 
 const { Plugin, ItemView, PluginSettingTab, Setting, Modal, Menu, Notice,
-        requestUrl, setIcon, getAllTags, MarkdownRenderer, Component,
+        setIcon, getAllTags, MarkdownRenderer, Component,
         normalizePath } = require('obsidian');
 
 const VIEW_TYPE_DASH = 'nosh-view';
@@ -1260,6 +1260,146 @@ function retotalDraft(kind, draft, parts) {
     return draft;
 }
 
+/* --- the wire ------------------------------------------------------- */
+
+/* Every call to the API used to be one POST that said nothing until the
+ * whole answer was ready. On desktop that is fine. On a phone, requestUrl
+ * goes through the native HTTP stack, and that gives up after about a minute
+ * with nothing on the wire - and a draft with thinking turned on is silent
+ * for longer than that. So the answer is asked for as a stream, which keeps
+ * bytes moving the whole time, and is put back together here into the shape
+ * the one-piece reply had, so nothing downstream needs to know. fetch rather
+ * than requestUrl because requestUrl hands over a body only once it is
+ * complete; the extra header is what tells the API to answer a call made
+ * straight from a webview. */
+
+const AI_BROWSER_HEADER = 'anthropic-dangerous-direct-browser-access';
+
+async function aiCall(headers, payload) {
+    const sent = Object.assign({ [AI_BROWSER_HEADER]: 'true' }, headers);
+    let res;
+    try {
+        res = await fetch(AI_ENDPOINT, {
+            method: 'POST',
+            headers: sent,
+            body: JSON.stringify(Object.assign({ stream: true }, payload)),
+        });
+    } catch (e) {
+        throw new Error('Could not reach api.anthropic.com. Check the connection and try again.');
+    }
+
+    /* A refusal is one JSON document, not a stream. */
+    if (res.status !== 200) {
+        let body = null;
+        try { body = JSON.parse(await res.text()); } catch (e) { /* status only */ }
+        return { status: res.status, body: body };
+    }
+
+    const message = { content: [] };
+    const partial = {};     // a tool_use input arrives as JSON in pieces, by block
+    let finished = false;
+
+    const take = (data) => {
+        switch (data.type) {
+            case 'message_start':
+                Object.assign(message, data.message, { content: [] });
+                break;
+            case 'content_block_start':
+                message.content[data.index] = Object.assign({}, data.content_block);
+                if (data.content_block.type === 'tool_use') partial[data.index] = '';
+                break;
+            case 'content_block_delta': {
+                const block = message.content[data.index];
+                const d = data.delta;
+                if (!block || !d) break;
+                if (d.type === 'text_delta') {
+                    block.text = (block.text || '') + d.text;
+                } else if (d.type === 'input_json_delta') {
+                    partial[data.index] = (partial[data.index] || '') + d.partial_json;
+                } else if (d.type === 'thinking_delta') {
+                    block.thinking = (block.thinking || '') + d.thinking;
+                } else if (d.type === 'signature_delta') {
+                    block.signature = d.signature;
+                }
+                break;
+            }
+            case 'content_block_stop': {
+                const block = message.content[data.index];
+                if (block && block.type === 'tool_use') {
+                    const json = partial[data.index] || '';
+                    try {
+                        block.input = json.trim() ? JSON.parse(json) : {};
+                    } catch (e) {
+                        throw new Error('Claude\'s answer arrived garbled. Try again.');
+                    }
+                }
+                break;
+            }
+            case 'message_delta':
+                Object.assign(message, data.delta || {});
+                if (data.usage) message.usage = Object.assign({}, message.usage, data.usage);
+                break;
+            case 'message_stop':
+                finished = true;
+                break;
+            case 'error':
+                throw new Error((data.error && data.error.message) ||
+                                'The API reported an error part way through.');
+            default:
+                /* ping, and whatever the API adds later */
+        }
+    };
+
+    /* Server-sent events: blank-line separated, each a few "field: value"
+     * lines. The data line carries a type of its own, so the event line is
+     * not needed. */
+    let buffer = '';
+    const event = (raw) => {
+        const data = raw.split('\n')
+            .filter((l) => l.startsWith('data:'))
+            .map((l) => l.slice(5).replace(/^ /, ''))
+            .join('\n');
+        if (!data.trim()) return;
+        let parsed;
+        try { parsed = JSON.parse(data); } catch (e) { return; }
+        take(parsed);
+    };
+    const feed = (chunk) => {
+        buffer = (buffer + chunk).replace(/\r\n/g, '\n');
+        let at;
+        while ((at = buffer.indexOf('\n\n')) !== -1) {
+            event(buffer.slice(0, at));
+            buffer = buffer.slice(at + 2);
+        }
+    };
+
+    try {
+        if (res.body && typeof res.body.getReader === 'function') {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            for (;;) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                feed(decoder.decode(value, { stream: true }));
+            }
+            feed(decoder.decode());
+        } else {
+            feed(await res.text());
+        }
+        if (buffer.trim()) event(buffer);
+    } catch (e) {
+        /* The API's own complaints come through take() as Errors; anything
+         * else is the connection going out from under the read. */
+        if (e instanceof TypeError) {
+            throw new Error('The connection dropped before Claude finished. Try again.');
+        }
+        throw e;
+    }
+
+    if (!finished) throw new Error('The connection dropped before Claude finished. Try again.');
+    return { status: 200, body: message };
+}
+
 /* --- the call ------------------------------------------------------- */
 
 async function aiDraft(plugin, kind, description, photo) {
@@ -1276,28 +1416,21 @@ async function aiDraft(plugin, kind, description, photo) {
            { type: 'text', text: description }]
         : description;
 
-    const res = await requestUrl({
-        url: AI_ENDPOINT,
-        method: 'POST',
-        headers,
-        throw: false,
-        body: JSON.stringify({
-            model: aiModelId(plugin.settings, spec.model),
-            /* A meal reports every number once per ingredient now, so a long
-             * one writes several times what a single set of totals did. */
-            max_tokens: 8192,
-            thinking: { type: 'adaptive' },
-            output_config: { effort: plugin.settings.aiEffort || 'medium' },
-            system: photo ? spec.system + AI_PHOTO : spec.system,
-            tools: [tool],
-            /* One tool, and it must be called. The answer is the form, not prose. */
-            tool_choice: { type: 'tool', name: tool.name },
-            messages: [{ role: 'user', content: content }],
-        }),
+    const res = await aiCall(headers, {
+        model: aiModelId(plugin.settings, spec.model),
+        /* A meal reports every number once per ingredient now, so a long
+         * one writes several times what a single set of totals did. */
+        max_tokens: 8192,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: plugin.settings.aiEffort || 'medium' },
+        system: photo ? spec.system + AI_PHOTO : spec.system,
+        tools: [tool],
+        /* One tool, and it must be called. The answer is the form, not prose. */
+        tool_choice: { type: 'tool', name: tool.name },
+        messages: [{ role: 'user', content: content }],
     });
 
-    let body = null;
-    try { body = JSON.parse(res.text); } catch (e) { /* handled as a missing message below */ }
+    const body = res.body;
 
     if (res.status !== 200) {
         // A stale bearer should not poison the next attempt.
@@ -1327,22 +1460,15 @@ async function aiDraft(plugin, kind, description, photo) {
  * settings can answer "does this work" without inventing a note. */
 async function aiPing(plugin) {
     const headers = await aiHeaders(plugin.settings);
-    const res = await requestUrl({
-        url: AI_ENDPOINT,
-        method: 'POST',
-        headers,
-        throw: false,
-        body: JSON.stringify({
-            model: aiModelId(plugin.settings),
-            max_tokens: 16,
-            messages: [{ role: 'user', content: 'Reply with the word ok.' }],
-        }),
+    const res = await aiCall(headers, {
+        model: aiModelId(plugin.settings),
+        max_tokens: 16,
+        messages: [{ role: 'user', content: 'Reply with the word ok.' }],
     });
 
     if (res.status === 200) return;
     if (res.status === 401) forgetAntToken();
-    let said = null;
-    try { said = JSON.parse(res.text).error.message; } catch (e) { /* status only */ }
+    const said = res.body && res.body.error && res.body.error.message;
     throw new Error(said || ('The API answered ' + res.status + '.'));
 }
 
@@ -2452,25 +2578,18 @@ async function aiReading(plugin, markdown) {
     const tool = aiReportTool();
     const headers = await aiHeaders(plugin.settings);
 
-    const res = await requestUrl({
-        url: AI_ENDPOINT,
-        method: 'POST',
-        headers,
-        throw: false,
-        body: JSON.stringify({
-            model: aiModelId(plugin.settings),
-            max_tokens: 4096,
-            thinking: { type: 'adaptive' },
-            output_config: { effort: plugin.settings.aiEffort || 'medium' },
-            system: AI_REPORT_SYSTEM,
-            tools: [tool],
-            tool_choice: { type: 'tool', name: tool.name },
-            messages: [{ role: 'user', content: markdown }],
-        }),
+    const res = await aiCall(headers, {
+        model: aiModelId(plugin.settings),
+        max_tokens: 4096,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: plugin.settings.aiEffort || 'medium' },
+        system: AI_REPORT_SYSTEM,
+        tools: [tool],
+        tool_choice: { type: 'tool', name: tool.name },
+        messages: [{ role: 'user', content: markdown }],
     });
 
-    let body = null;
-    try { body = JSON.parse(res.text); } catch (e) { /* handled below */ }
+    const body = res.body;
 
     if (res.status !== 200) {
         if (res.status === 401) forgetAntToken();
@@ -2739,26 +2858,19 @@ function probePrompt(recipe, settings) {
 async function aiAsk(plugin, system, messages) {
     const headers = await aiHeaders(plugin.settings);
 
-    const res = await requestUrl({
-        url: AI_ENDPOINT,
-        method: 'POST',
-        headers,
-        throw: false,
-        body: JSON.stringify({
-            /* The harder of the two models, for the same reason a suggestion
-             * gets it: this is asked once over a cup of tea, not once a
-             * mouthful, and the answer is worth thinking about. */
-            model: aiModelId(plugin.settings, 'aiSuggestModel'),
-            max_tokens: 2048,
-            thinking: { type: 'adaptive' },
-            output_config: { effort: plugin.settings.aiEffort || 'medium' },
-            system,
-            messages,
-        }),
+    const res = await aiCall(headers, {
+        /* The harder of the two models, for the same reason a suggestion
+         * gets it: this is asked once over a cup of tea, not once a
+         * mouthful, and the answer is worth thinking about. */
+        model: aiModelId(plugin.settings, 'aiSuggestModel'),
+        max_tokens: 2048,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: plugin.settings.aiEffort || 'medium' },
+        system,
+        messages,
     });
 
-    let body = null;
-    try { body = JSON.parse(res.text); } catch (e) { /* handled below */ }
+    const body = res.body;
 
     if (res.status !== 200) {
         if (res.status === 401) forgetAntToken();
