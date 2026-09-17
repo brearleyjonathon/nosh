@@ -228,6 +228,10 @@ const DEFAULT_SETTINGS = {
      * nutrient bars, and again only where the vault disagrees with
      * NUTRIENTS. */
     nutrientDirs: {},
+    /* key -> how much the bar counts for in the score, nutrient and group
+     * keys alike, and only where it is not 1. Every bar weighs 1 until the
+     * vault says otherwise, so an empty object is the plain average. */
+    weights: {},
     /* What the targets were last filled in from. Remembered so the pattern
      * can be nudged and applied again without being typed out twice. */
     dietCalories: DASH_REFERENCE,
@@ -245,6 +249,16 @@ const DEFAULT_SETTINGS = {
 const MEAL_ORDER = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert'];
 
 const OCCASIONS = MEAL_ORDER;
+
+/* The three that a day is built around. A snack or a pudding is eaten as
+ * well as these, never instead of one. */
+const MAIN_MEALS = ['Breakfast', 'Lunch', 'Dinner'];
+
+/* How much of a day each occasion is, when nothing else is said. Weights
+ * rather than fractions: what matters is how a meal stands against the meals
+ * still to come, and that is worked out at the time, from what has been
+ * logged. Someone who eats a big breakfast says so in the suggestion note. */
+const MEAL_SHARE = { Breakfast: 25, Lunch: 30, Dinner: 35, Snack: 10, Dessert: 5 };
 
 /* What an occasion is called on screen, where that differs from the key it is
  * stored under. The key never changes - it is what the log is written to - so
@@ -962,14 +976,21 @@ function claudeRecipeLink(name, parts, steps, serves) {
  * still wanted and invents a meal that lands on them. Same tool, same draft,
  * same note in the end - only the instructions differ. */
 const AI_SUGGEST_SYSTEM = [
-    'You propose one meal to round out a day of DASH eating. You are given what',
-    'the day still has room for; answer with a single meal that fits it.',
+    'You propose one meal in a day of DASH eating. You are given what the day',
+    'still has room for, what else is still to be eaten, and roughly how much',
+    'of the remainder is this meal\'s; answer with a single meal that fits.',
     '',
     '- Suggest something a person would actually cook and eat. Ordinary',
     '  ingredients, ordinary method - not a pile of things chosen to hit numbers.',
-    '- Close the shortfalls as far as one sensible meal can, and stay inside',
-    '  every limit given. A limit is a ceiling rather than a target: landing well',
-    '  under one is a good outcome, not a miss.',
+    '- Take this meal\'s share of what is outstanding and no more. Each line',
+    '  gives the whole day\'s figure and, where other meals are still to come,',
+    '  the part that belongs here: aim at the part. Only a meal with nothing',
+    '  after it closes the day\'s gaps outright, and even then only as far as',
+    '  one sensible meal can.',
+    '- Stay inside every limit given, and leave the meals still to come their',
+    '  room under it. A limit is a ceiling rather than a target: landing well',
+    '  under one is a good outcome, not a miss. Where a limit is already',
+    '  passed, add as little to it as the dish allows.',
     '- Where the shortfalls cannot all be met without the meal turning absurd,',
     '  meet the ones that matter most and say which you left alone.',
     '- `name` is what the dish is called, titled as a recipe would title it.',
@@ -985,7 +1006,8 @@ const AI_SUGGEST_SYSTEM = [
     '  a single serving is what gets logged.',
 ].concat(AI_PORTIONS, AI_SLOTS, AI_DASH, [
     '- `note` says in a sentence or two what this meal does for the day: which',
-    '  shortfall it closes, and anything it deliberately leaves short.',
+    '  shortfall it closes or chips at, what it leaves for the meals still to',
+    '  come, and anything it deliberately leaves short.',
 ]).join('\n');
 
 /* What the picker's two tabs mean on this side: which prompt, which tool,
@@ -2269,6 +2291,44 @@ function nutrientShapeNote(shape) {
 
 /* --- the score -------------------------------------------------------- */
 
+/* How much a bar counts for in the score. 1 unless the settings say so, and
+ * never 0: a bar that should not count is hidden, not weightless. */
+function barWeight(settings, key) {
+    const w = Number(((settings && settings.weights) || {})[key]);
+    return isFinite(w) && w > 0 ? w : 1;
+}
+
+/* The box beside a bar's shape in settings. 1 is the default and is not
+ * written down; anything that is not a positive number reads as 1. */
+function weightInput(plugin, c, key) {
+    c.inputEl.type = 'number';
+    c.inputEl.step = '0.25';
+    c.inputEl.min = '0';
+    c.inputEl.style.width = '4em';
+    c.inputEl.setAttr('aria-label', 'Weight in the score');
+    c.inputEl.setAttr('title', 'Weight in the score: 1 is the default, 2 counts double, 0.5 half');
+    c.setValue(String(barWeight(plugin.settings, key))).onChange(async (v) => {
+        const w = Number(v);
+        if (isFinite(w) && w > 0 && w !== 1) plugin.settings.weights[key] = w;
+        else delete plugin.settings.weights[key];
+        await plugin.saveSettings();
+        plugin.refreshViews();
+    });
+}
+
+/* How far through its calories today is, from 0 to 1. While the day is
+ * still being eaten, a floor is judged against this share of its minimum
+ * rather than the whole of it: a third of the calories in, a third of the
+ * fibre expected. That is what lets the day start at 100 and move with each
+ * meal, instead of starting near 0 and climbing. Once the calories are in
+ * the share is 1 and the floor is the floor. A vault with no calorie target
+ * has nothing to pace by. */
+function paceOf(settings, totals) {
+    const target = parseNum(settings.targets.calories);
+    if (target <= 0) return 1;
+    return Math.max(0, Math.min(1, totals.calories / target));
+}
+
 /* How one bar is doing, as credit from 0 to 1, or null for a bar with nothing
  * to say. The shape is the bar's own. A floor pays in proportion to how much
  * of the minimum is there; a ceiling pays in full up to the maximum and then
@@ -2288,14 +2348,14 @@ function creditFor(shape, value, min, max) {
  * should be there is - null for a ceiling, which has nothing to reach - and
  * `excess` how far past what should not be there it went, null for a floor,
  * which cannot be overdone. A range answers both. The bar on screen is drawn
- * from these two; the number is drawn from the credit. */
-function barCredit(key, label, kind, value, min, max) {
+ * from these two; the number is drawn from the credit, times the weight. */
+function barCredit(key, label, kind, value, min, max, weight) {
     const credit = creditFor(kind, value, min, max);
     if (credit === null) return null;
     const short = kind !== 'ceiling' && min > 0 && value < min;
     const over = kind !== 'floor' && max > 0 && value > max;
     return {
-        key: key, label: label, credit: credit,
+        key: key, label: label, credit: credit, weight: weight > 0 ? weight : 1,
         reach: kind === 'ceiling' ? null : (short ? credit : 1),
         excess: kind === 'floor' ? null : (over ? 1 - credit : 0),
     };
@@ -2313,56 +2373,73 @@ function groupSpec(settings, g) {
  * settled on. Hidden bars are out, and so is anything shown for reference.
  * Calories has one rule of its own while it is a ceiling: under the target it
  * says nothing at all - eating less is not something DASH rewards - and only
- * going over costs anything. Made a floor, it is judged like any floor. */
-function dayCredits(settings, totals) {
+ * going over costs anything. Made a floor, it is judged like any floor.
+ *
+ * `live` is a day still being eaten - today - and its floors and ranges are
+ * paced: each minimum is scaled by the share of the calorie target in so far,
+ * so a floor is short only if it is behind the calories. Ceilings are not
+ * paced, because a ceiling is a budget and spending some of it at breakfast
+ * is not a breach. Any other day is settled and judged on the whole. */
+function dayCredits(settings, totals, live) {
     const out = [];
     const hiddenN = settings.hiddenNutrients || [];
+    const pace = live ? paceOf(settings, totals) : 1;
     for (const n of NUTRIENTS) {
         const shape = nutrientShape(n, settings);
         if (shape === 'reference' || hiddenN.includes(n.key)) continue;
         const target = parseNum(settings.targets[n.key]);
         if (target <= 0) continue;
         const value = totals[n.key];
+        const w = barWeight(settings, n.key);
         let bar = null;
         if (n.key === 'calories' && shape === 'ceiling') {
-            if (value > target) bar = barCredit(n.key, n.label, 'ceiling', value, 0, target);
+            if (value > target) bar = barCredit(n.key, n.label, 'ceiling', value, 0, target, w);
         } else if (shape === 'ceiling') {
-            bar = barCredit(n.key, n.label, 'ceiling', value, 0, target);
+            bar = barCredit(n.key, n.label, 'ceiling', value, 0, target, w);
         } else {
-            bar = barCredit(n.key, n.label, 'floor', value, target, 0);
+            bar = barCredit(n.key, n.label, 'floor', value, target * pace, 0, w);
         }
         if (bar) out.push(bar);
     }
     for (const g of FOOD_GROUPS) {
         if (g.period !== 'day') continue;
         const spec = groupSpec(settings, g);
-        const bar = spec && barCredit(g.key, g.label, spec.shape, totals[g.key], spec.min, spec.max);
+        const bar = spec && barCredit(g.key, g.label, spec.shape, totals[g.key],
+                                      spec.min * pace, spec.max, barWeight(settings, g.key));
         if (bar) out.push(bar);
     }
     return out;
 }
 
-/* Out of 100, the plain average over the bars in play. Equal weight, on
- * purpose: every weighting is an argument nobody can settle, and the
- * published DASH accordance scores do not try. If one bar should matter more,
- * say so by which bars are showing.
+/* Out of 100, the weighted mean over the bars in play. Every bar weighs 1
+ * until settings say otherwise, so with nothing said it is the plain average
+ * the published DASH accordance scores use; with something said, a bar at
+ * weight 2 costs twice what it would at 1. Never below 0: a credit is
+ * already in 0..1, so the mean is too, and there is nothing to subtract from
+ * the far side of nothing.
  *
- * Alongside it, the two things the bar draws. `reach` is the average over the
- * things to reach, because that is progress and progress averages. `excess`
- * is the worst thing gone over, not the average, because an average would
- * let two clean ceilings hide a third at double - and the point of red is
- * not to be hidden. `worst` is the three bars costing most, since a number
- * without them is a scold and with them is a list. */
+ * Alongside it, the two things the bar draws. `reach` is the weighted mean
+ * over the things to reach, because that is progress and progress averages.
+ * `excess` is the worst thing gone over, not the average, because an average
+ * would let two clean ceilings hide a third at double - and the point of red
+ * is not to be hidden. `worst` is the three bars costing most - weight
+ * counted, so a heavy bar surfaces first - since a number without them is a
+ * scold and with them is a list. */
 function scoreOf(bars) {
     if (!bars.length) return null;
-    const mean = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
-    const reaches = bars.map((b) => b.reach).filter((x) => x !== null);
-    const excesses = bars.map((b) => b.excess).filter((x) => x !== null);
+    const wmean = (xs, of) => {
+        let num = 0, den = 0;
+        for (const b of xs) { num += b.weight * of(b); den += b.weight; }
+        return den > 0 ? num / den : null;
+    };
+    const loss = (b) => b.weight * (1 - b.credit);
+    const reaches = bars.filter((b) => b.reach !== null);
+    const excesses = bars.filter((b) => b.excess !== null).map((b) => b.excess);
     const worst = bars.filter((b) => b.credit < 1)
-        .sort((a, b) => a.credit - b.credit).slice(0, 3);
+        .sort((a, b) => loss(b) - loss(a)).slice(0, 3);
     return {
-        score: Math.round(mean(bars.map((b) => b.credit)) * 100),
-        reach: mean(reaches),
+        score: Math.max(0, Math.round(wmean(bars, (b) => b.credit) * 100)),
+        reach: wmean(reaches, (b) => b.reach),
         excess: excesses.length ? Math.max.apply(null, excesses) : null,
         bars: bars.length,
         worst: worst,
@@ -3260,6 +3337,14 @@ module.exports = class NoshPlugin extends Plugin {
                 this.settings.nutrientDirs[n.key] = said;
             }
         }
+        /* A weight is a positive number on a bar that exists, and 1 is not
+         * worth keeping: the plain average needs nothing written down. */
+        const weights = saved.weights || {};
+        this.settings.weights = {};
+        for (const bar of NUTRIENTS.concat(FOOD_GROUPS)) {
+            const w = Number(weights[bar.key]);
+            if (isFinite(w) && w > 0 && w !== 1) this.settings.weights[bar.key] = w;
+        }
 
         /* Before day/week tracking the log was a single flat selection with no
          * date. Carry it onto today rather than dropping it. */
@@ -3570,6 +3655,10 @@ class NoshView extends ItemView {
         super(leaf);
         this.plugin = plugin;
         this.query = '';
+        /* The list narrowed to what is ticked, and what that list has shown
+         * since it was switched on; see keptPaths(). */
+        this.tickedOnly = false;
+        this.kept = null;
         this.mode = 'day';
         this.source = 'ingredients';
         this.collapsed = {};   // 'source/Meal' -> true, remembered while the view lives
@@ -3852,19 +3941,51 @@ class NoshView extends ItemView {
         return { totals, meals };
     }
 
-    /* What the day still has room for, in the terms a recipe can act on.
-     * Only what is outstanding goes in - a brief padded with satisfied lines
-     * buries the two numbers that actually matter. Hidden bars are left out
-     * too, on the grounds that a target you do not watch is not one you want
-     * dinner chosen around. Reference bars are the one exception: nothing
-     * about them is outstanding, since they are never judged, but carbs so
-     * far is still something a dinner can be chosen around, so they go in
-     * as plain fact, marked as such. */
+    /* Which main meals still lie ahead of the one being asked for, and what
+     * slice of the day's remainder that leaves it. A later main meal with
+     * nothing logged is still to come; an earlier one with nothing logged is
+     * taken as skipped, so this meal inherits its share. A snack or a
+     * pudding is never expected, which is why a dinner with breakfast and
+     * lunch logged owns the whole remainder; asked for themselves, they are
+     * weighed against every main meal not yet logged, and once all three are
+     * they close what a snack can. */
+    mealPlan() {
+        const logged = new Set(this.entriesFor(this.cursor).map((e) => e.occasion));
+        const asked = this.occasion;
+        const main = MAIN_MEALS.includes(asked);
+        const later = main ? MAIN_MEALS.slice(MAIN_MEALS.indexOf(asked) + 1) : MAIN_MEALS;
+        const toCome = later.filter((m) => !logged.has(m));
+        const weight = MEAL_SHARE[asked] || MEAL_SHARE.Snack;
+        const ahead = toCome.reduce((sum, m) => sum + MEAL_SHARE[m], 0);
+        return { toCome: toCome, share: weight / (weight + ahead) };
+    }
+
+    /* What the day still has room for, in the terms a recipe can act on,
+     * and how much of it is this meal's. Only what is outstanding goes in -
+     * a brief padded with satisfied lines buries the two numbers that
+     * actually matter. Hidden bars are left out too, on the grounds that a
+     * target you do not watch is not one you want dinner chosen around.
+     * Reference bars are the one exception: nothing about them is
+     * outstanding, since they are never judged, but carbs so far is still
+     * something a dinner can be chosen around, so they go in as plain fact,
+     * marked as such.
+     *
+     * Every line carries the whole day's figure, and where other meals are
+     * still to come, this meal's slice of it as well. The day's figure keeps
+     * the scale honest and the slice says how far to go; either alone reads
+     * as the whole ask. A limit already passed says by how much, since a
+     * meal can only keep out of the way of something it knows the size of. */
     remainingBrief() {
         const settings = this.plugin.settings;
         const totals = this.totalsFor([this.cursor]).totals;
-        const weekTotals = this.totalsFor(
-            weekDays(this.cursor, settings.weekStart)).totals;
+        const week = weekDays(this.cursor, settings.weekStart);
+        const weekTotals = this.totalsFor(week).totals;
+        /* Today included: a week's gap is spread over the days that can
+         * still do something about it. */
+        const daysLeft = Math.max(1, 7 - week.indexOf(this.cursor));
+        const plan = this.mealPlan();
+        const share = plan.share;
+        const whole = !plan.toCome.length;
 
         const hiddenN = settings.hiddenNutrients || [];
         const hiddenG = settings.hiddenGroups || [];
@@ -3873,26 +3994,53 @@ class NoshView extends ItemView {
         const groups = [];
         const reference = [];
 
+        /* The slice, as a clause on the end of a line. It is a steer and not
+         * a target, so it is rounded to the kind of figure a cook holds in
+         * their head: milligrams and calories to fifty, grams whole, and
+         * anything smaller to a half. A slice too small to print is still
+         * worth saying, since the alternative reads as the whole figure. */
+        const roughly = (x) => {
+            const step = x >= 100 ? 50 : x >= 10 ? 1 : 0.5;
+            return fmt(Math.round(x / step) * step);
+        };
+        const sliceOf = (amount, unit) => {
+            const part = roughly(amount * share);
+            return part === '0' ? '; only a little of that here'
+                                : '; about ' + part + unit + ' of that here';
+        };
+        const capOf = (amount, unit) => {
+            const part = roughly(amount * share);
+            return part === '0' ? '; next to none here'
+                                : '; no more than about ' + part + unit + ' here';
+        };
+
         for (const n of NUTRIENTS) {
             if (hiddenN.includes(n.key)) continue;
             const target = parseNum(settings.targets[n.key]);
             const shape = nutrientShape(n, settings);
+            const unit = ' ' + n.unit;
             if (shape === 'reference') {
-                reference.push('- ' + n.label + ': ' + fmt(totals[n.key]) + ' ' +
-                               n.unit + ' so far' +
-                               (target ? ' against a ' + fmt(target) + ' ' +
-                                         n.unit + ' figure' : ''));
+                reference.push('- ' + n.label + ': ' + fmt(totals[n.key]) + unit +
+                               ' so far' +
+                               (target ? ' against a ' + fmt(target) + unit +
+                                         ' figure' : ''));
                 continue;
             }
             if (!target) continue;
             const left = target - totals[n.key];
 
             if (shape === 'floor' && left > 0) {
-                short.push('- ' + n.label + ': ' + fmt(left) + ' ' + n.unit +
-                           ' short of ' + fmt(target) + ' ' + n.unit);
+                short.push('- ' + n.label + ': ' + fmt(left) + unit +
+                           ' short of ' + fmt(target) + unit +
+                           (whole ? '' : sliceOf(left, unit)));
+            } else if (shape === 'ceiling' && left < 0) {
+                room.push('- ' + n.label + ': already ' + fmt(-left) + unit +
+                          ' over ' + fmt(target) + unit +
+                          '; add as little as the dish allows');
             } else if (shape === 'ceiling') {
-                room.push('- ' + n.label + ': ' + fmt(Math.max(0, left)) + ' ' +
-                          n.unit + ' left of ' + fmt(target) + ' ' + n.unit);
+                room.push('- ' + n.label + ': ' + fmt(left) + unit +
+                          ' left of ' + fmt(target) + unit +
+                          (whole ? '' : capOf(left, unit)));
             }
         }
 
@@ -3902,20 +4050,37 @@ class NoshView extends ItemView {
             const min = parseNum(t.min);
             const max = parseNum(t.max);
             /* Weekly groups are judged against the week, exactly as the bars
-             * judge them, so the brief cannot contradict what is on screen. */
+             * judge them, so the brief cannot contradict what is on screen.
+             * Their gap is spread over the days left before this meal takes
+             * its slice, so a Monday dinner does not try to eat the week's
+             * legumes, and that slice is said even where the meal owns the
+             * day, because today's part is not the whole figure. */
             const perWeek = g.period === 'week';
             const have = perWeek ? weekTotals[g.key] : totals[g.key];
             const per = perWeek ? ' this week' : ' today';
+            const toGo = perWeek
+                ? ', ' + daysLeft + (daysLeft === 1 ? ' day' : ' days') + ' to go'
+                : '';
+            const days = perWeek ? daysLeft : 1;
+            const said = whole && !perWeek;
 
             if (groupShape(g, settings) === 'ceiling') {
-                if (max > 0) {
-                    room.push('- ' + g.label + ': ' + fmt(Math.max(0, max - have)) +
-                              ' of ' + fmt(max) + ' servings left' + per);
+                if (!(max > 0)) continue;
+                const left = max - have;
+                if (left < 0) {
+                    room.push('- ' + g.label + ': already ' + fmt(-left) +
+                              ' over the ' + fmt(max) + per +
+                              '; none here if it can be helped');
+                } else {
+                    room.push('- ' + g.label + ': ' + fmt(left) + ' of ' +
+                              fmt(max) + ' servings left' + per + toGo +
+                              (said ? '' : capOf(left / days, '')));
                 }
             } else if (have < min) {
-                groups.push('- ' + g.label + ': ' + fmt(min - have) + ' more' + per +
-                            ' (aim ' + fmt(min) +
-                            (max > min ? '-' + fmt(max) : '') + ')');
+                groups.push('- ' + g.label + ': ' + fmt(min - have) + ' more' +
+                            per + toGo + ' (aim ' + fmt(min) +
+                            (max > min ? '-' + fmt(max) : '') + ')' +
+                            (said ? '' : sliceOf((min - have) / days, '')));
             }
         }
 
@@ -3925,10 +4090,30 @@ class NoshView extends ItemView {
     suggestionPrompt(asked) {
         const ask = asked || {};
         const brief = this.remainingBrief();
+        const plan = this.mealPlan();
+        const what = this.occasion.toLowerCase();
         const lines = [
-            'Suggest one ' + this.occasion.toLowerCase() + ' to finish ' +
-            humanDay(this.cursor) + '.',
+            'Suggest one ' + what + ' for ' + humanDay(this.cursor) + '.',
         ];
+
+        /* What else the day has in it, said before any number, because it
+         * is what the numbers mean: a shortfall with dinner still to come is
+         * a different ask from the same shortfall at dinner. The share is
+         * rounded to a round figure, since it is a steer and not a target. */
+        if (plan.toCome.length) {
+            const names = plan.toCome.map((m) => m.toLowerCase());
+            const last = names.pop();
+            const list = names.length ? names.join(', ') + ' and ' + last : last;
+            const many = plan.toCome.length > 1;
+            lines.push(list.charAt(0).toUpperCase() + list.slice(1) +
+                       (many ? ' are' : ' is') + ' still to come. Take about ' +
+                       Math.round(plan.share * 20) * 5 +
+                       '% of what is outstanding and leave the rest of the room for ' +
+                       (many ? 'them' : 'it') + '.');
+        } else {
+            lines.push('Nothing is planned after this. Close what one ' + what +
+                       ' sensibly can, and stay inside what is left.');
+        }
 
         const serves = Math.max(1, parseNum(ask.serves) || 1);
         if (serves > 1) {
@@ -3995,13 +4180,18 @@ class NoshView extends ItemView {
         el.empty();
 
         const brief = this.remainingBrief();
-        const outstanding = brief.short.length + brief.groups.length;
+        /* Room under a limit counts: a day that met its fibre by lunch still
+         * wants a dinner, and one that fits is exactly what is being asked
+         * for. Only a day with nothing left to say - every bar hidden, or
+         * no targets set - has no question to put. */
+        const outstanding = brief.short.length + brief.groups.length +
+                            brief.room.length;
 
         const go = el.createEl('button', { cls: 'nosh-suggest-btn' });
         if (!outstanding) {
-            go.setText('Every target met');
+            go.setText('Nothing to aim at');
             go.disabled = true;
-            go.setAttr('aria-label', 'Nothing is outstanding for today');
+            go.setAttr('aria-label', 'No target is set or shown for today');
             return;
         }
 
@@ -4179,7 +4369,12 @@ class NoshView extends ItemView {
      * day nobody logged is missing, not a zero - and the weekly bars are
      * read against the week, exactly as the bars below the number are. */
     dayScore(iso) {
-        return scoreOf(dayCredits(this.plugin.settings, this.totalsFor([iso]).totals));
+        const settings = this.plugin.settings;
+        const totals = this.totalsFor([iso]).totals;
+        const live = iso === todayIso();
+        const out = scoreOf(dayCredits(settings, totals, live));
+        if (out && live) out.pace = paceOf(settings, totals);
+        return out;
     }
 
     weekScore(days) { return this.spanScore(days, true); }
@@ -4193,9 +4388,9 @@ class NoshView extends ItemView {
         for (const iso of days) {
             if (!this.entriesFor(iso).length) continue;
             logged++;
-            for (const b of dayCredits(settings, this.totalsFor([iso]).totals)) {
+            for (const b of dayCredits(settings, this.totalsFor([iso]).totals, iso === todayIso())) {
                 const at = sum[b.key] || (sum[b.key] = {
-                    label: b.label, credit: 0, n: 0,
+                    label: b.label, weight: b.weight, credit: 0, n: 0,
                     reach: 0, reachN: 0, excess: 0, excessN: 0,
                 });
                 at.credit += b.credit;
@@ -4207,7 +4402,7 @@ class NoshView extends ItemView {
         const bars = Object.keys(sum).map((key) => {
             const at = sum[key];
             return {
-                key: key, label: at.label, credit: at.credit / at.n,
+                key: key, label: at.label, weight: at.weight, credit: at.credit / at.n,
                 reach: at.reachN ? at.reach / at.reachN : null,
                 excess: at.excessN ? at.excess / at.excessN : null,
             };
@@ -4216,7 +4411,8 @@ class NoshView extends ItemView {
         for (const g of FOOD_GROUPS) {
             if (!weekly || g.period !== 'week') continue;
             const spec = groupSpec(settings, g);
-            const bar = spec && barCredit(g.key, g.label, spec.shape, totals[g.key], spec.min, spec.max);
+            const bar = spec && barCredit(g.key, g.label, spec.shape, totals[g.key],
+                                          spec.min, spec.max, barWeight(settings, g.key));
             if (bar) bars.push(bar);
         }
         /* No days, no score: the weekly floors would otherwise read an empty
@@ -4240,31 +4436,25 @@ class NoshView extends ItemView {
         if (!this.renderSectionHead(this.summaryEl, 'score', 'Composite score')) return;
 
         const row = this.summaryEl.createDiv({ cls: 'nosh-score' });
-        row.setAttr('title', 'From the middle: green goes right as the things to ' +
-                             'reach are reached, red goes left for the worst thing ' +
-                             'gone over. The number averages every bar you have ' +
-                             'showing, calories only when over. Tap for what is ' +
-                             'costing most.');
+        row.setAttr('title', 'The weighted average of every bar you have ' +
+                             'showing, calories only when over; today the ' +
+                             'floors are judged on pace with the calories. ' +
+                             'Tap for what is costing most.');
         const put = (label, got) => {
             if (!got) return;
             const part = row.createDiv({ cls: 'nosh-score-part' });
-            /* Label to the left, number over the middle - which is where the
-             * two fills meet, so the number sits on the thing it summarises. */
             const top = part.createDiv({ cls: 'nosh-score-top' });
             top.createSpan({ cls: 'nosh-score-label', text: label });
             const num = top.createSpan({ cls: 'nosh-score-num', text: String(got.score) });
             num.setAttr('data-state', scoreState(got.score));
 
-            /* Both fills start at the middle. Green goes right as the things to
-             * reach are reached, all the way to the edge when they all are; red
-             * goes left for the worst thing gone over. Nothing either side of
-             * the middle is a day with nothing to show yet. */
+            /* The bar is the number, filled from the left and coloured as the
+             * number is - nothing finer, because the bars below already say
+             * which way each thing went. */
             const bar = part.createDiv({ cls: 'nosh-score-bar' });
-            const excess = bar.createDiv({ cls: 'nosh-score-excess' });
-            excess.style.width = ((got.excess || 0) * 50) + '%';
-            const reach = bar.createDiv({ cls: 'nosh-score-reach' });
-            reach.style.width = ((got.reach === null ? 1 : got.reach) * 50) + '%';
-            bar.createDiv({ cls: 'nosh-score-tick' });
+            const fill = bar.createDiv({ cls: 'nosh-score-fill' });
+            fill.style.width = got.score + '%';
+            fill.setAttr('data-state', scoreState(got.score));
         };
         put(mode === 'month' ? 'Month' : mode === 'week' ? 'Week'
             : this.cursor === todayIso() ? 'Today' : 'Day', got);
@@ -4272,10 +4462,14 @@ class NoshView extends ItemView {
         /* What pulled it down, on request. */
         if (this.scoreOpen) {
             const why = row.createDiv({ cls: 'nosh-score-why' });
-            why.setText(got.worst.length
+            /* Today says so, because a floor at 60% mid-morning is behind
+             * pace rather than short, and the words should say which. */
+            const paced = got.pace === undefined ? ''
+                : 'On pace, ' + Math.round(got.pace * 100) + '% of calories in. ';
+            why.setText(paced + (got.worst.length
                 ? 'Costing most: ' + got.worst.map((b) =>
                     b.label + ' ' + Math.round(b.credit * 100) + '%').join(' · ')
-                : 'Every bar met.');
+                : 'Every bar met.'));
         }
         row.addEventListener('click', () => {
             this.scoreOpen = !this.scoreOpen;
@@ -4619,7 +4813,6 @@ class NoshView extends ItemView {
          * inside the field rather than beside it and take the width with it. */
         const box = row.createDiv({ cls: 'nosh-search-box' });
         const search = box.createEl('input', { cls: 'nosh-search', type: 'text' });
-        search.placeholder = 'Filter ' + source.label.toLowerCase() + '\u2026';
         search.value = this.query;
 
         const clear = box.createEl('button', { cls: 'nosh-search-clear' });
@@ -4655,6 +4848,26 @@ class NoshView extends ItemView {
             }
         });
         clear.addEventListener('click', wipe);
+
+        /* The other way to narrow the list: down to what is already ticked,
+         * for going back over a meal rather than adding to it. An icon alone
+         * does not say which list the box is searching, so the box says. */
+        const only = row.createEl('button', { cls: 'nosh-only' });
+        only.setAttr('aria-label', 'Show only what is ticked');
+        setIcon(only, 'list-checks');
+        const showOnly = () => {
+            only.toggleClass('is-active', this.tickedOnly);
+            only.setAttr('aria-pressed', String(this.tickedOnly));
+            search.placeholder = 'Filter ' + (this.tickedOnly ? 'ticked ' : '') +
+                                 source.label.toLowerCase() + '\u2026';
+        };
+        showOnly();
+        only.addEventListener('click', () => {
+            this.tickedOnly = !this.tickedOnly;
+            this.kept = null;
+            showOnly();
+            this.keepScroll(() => this.renderList());
+        });
 
         /* Meals arrive in one alphabetical run with nothing to fold, so the
          * button is not made at all there and the filter takes the whole row.
@@ -4868,8 +5081,19 @@ class NoshView extends ItemView {
         this.renderList();
     }
 
-    emptyMessage(source, filtering) {
-        if (filtering) return 'No ' + source.noun + ' matches that filter.';
+    emptyMessage(source) {
+        if (this.query) {
+            return 'No ' + (this.tickedOnly ? 'ticked ' : '') + source.noun +
+                   ' matches that filter.';
+        }
+        /* The toggle outlives a change of day, so an empty list says why it is
+         * empty rather than leaving it to look like an empty day. */
+        if (this.tickedOnly) {
+            const what = 'Only ticked ' + source.label.toLowerCase() + ' are showing.';
+            return this.source === BUILD_KEY
+                ? 'Nothing in this meal yet. ' + what
+                : 'Nothing ticked in ' + occasionLabel(this.occasion) + ' yet. ' + what;
+        }
 
         const settings = this.plugin.settings;
         const tag = settings.tag || 'nutrition';
@@ -4891,14 +5115,19 @@ class NoshView extends ItemView {
         /* Building draws on ingredients whichever tab was last on screen. */
         const source = this.sourceDef();
         const listKey = this.source === BUILD_KEY ? 'ingredients' : source.key;
-        const items = ((this.lists && this.lists[listKey]) || []).filter(
-            (r) => !this.query || r.name.toLowerCase().includes(this.query));
+        const kept = this.tickedOnly ? this.keptPaths() : null;
+        const items = ((this.lists && this.lists[listKey]) || []).filter((r) =>
+            (!this.query || r.name.toLowerCase().includes(this.query)) &&
+            (!kept || kept.has(r.path)));
+
+        // A filter is a search: it shows its hits rather than where they are hiding.
+        const filtering = !!this.query || this.tickedOnly;
 
         /* A filter forces every section open, so the fold control has nothing
-         * to say while one is typed. */
+         * to say while one is on. */
         if (this.foldBtn) {
             const keys = this.sectionKeys(source);
-            const useful = !this.query && keys.length > 1;
+            const useful = !filtering && keys.length > 1;
             this.foldBtn.toggleClass('is-hidden', !useful);
             if (useful) {
                 this.foldBtn.setText(
@@ -4907,7 +5136,7 @@ class NoshView extends ItemView {
         }
 
         if (!items.length) {
-            el.createDiv({ cls: 'nosh-empty', text: this.emptyMessage(source, !!this.query) });
+            el.createDiv({ cls: 'nosh-empty', text: this.emptyMessage(source) });
             return;
         }
 
@@ -4931,9 +5160,6 @@ class NoshView extends ItemView {
             }
             byMeal[name].items.push(r);
         }
-
-        // A filter is a search: it shows its hits rather than where they are hiding.
-        const filtering = !!this.query;
 
         for (const sec of sections) {
             const key = source.key + '/' + sec.name;
@@ -4959,6 +5185,27 @@ class NoshView extends ItemView {
 
             if (open) for (const r of sec.items) this.renderItem(el, r);
         }
+    }
+
+    /* What the ticked-only list shows: whatever is ticked now, plus whatever
+     * it has shown since it was switched on. A row unticked there - or
+     * stepped down to nothing - stays put to be ticked again, rather than
+     * vanishing from under a thumb that meant to press plus. Another day,
+     * occasion or tab starts again from what is ticked there; a meal being
+     * built belongs to no day, so it keeps its rows across them. Read after
+     * dayServings is rebuilt, since that is what servingsOf() answers from. */
+    keptPaths() {
+        const building = this.source === BUILD_KEY;
+        const key = building ? BUILD_KEY
+            : [this.source, this.cursor, this.occasion].join('\n');
+        if (!this.kept || this.kept.key !== key) {
+            this.kept = { key: key, paths: new Set() };
+        }
+        const ticked = building ? this.build.parts : this.dayServings;
+        for (const path of Object.keys(ticked)) {
+            if (this.servingsOf(path) > 0) this.kept.paths.add(path);
+        }
+        return this.kept.paths;
     }
 
     /* Servings logged in the occasion on screen, keyed by note path. The list
@@ -5287,11 +5534,30 @@ class NoshView extends ItemView {
             }
         }
 
+        const vault = this.app.vault;
         const folder = noshFolder(settings, SUB_REPORTS);
-        await ensureFolder(this.app.vault, folder);
-        const path = freePath(this.app.vault, folder, safeName(reportTitle(r)));
-        const file = await this.app.vault.create(path, body);
-        await this.app.workspace.getLeaf(false).openFile(file);
+        await ensureFolder(vault, folder);
+
+        /* One report a day or a week. Exporting the same span again rewrites
+         * the note already there - anything typed into it by hand goes with
+         * it - rather than filing "Nosh 2026-09-15 2" beside it. */
+        const name = safeName(reportTitle(r));
+        const found = vault.getAbstractFileByPath((folder ? folder + '/' : '') + name + '.md');
+        let file;
+        if (found && found.extension === 'md') {
+            await vault.modify(found, body);
+            file = found;
+        } else {
+            file = await vault.create(freePath(vault, folder, name), body);
+        }
+
+        /* A report exported again is often still open from the last time,
+         * and opening it once more would give it a second tab. */
+        const workspace = this.app.workspace;
+        const open = workspace.getLeavesOfType('markdown').find((leaf) =>
+            (leaf.getViewState().state || {}).file === file.path);
+        if (open) await workspace.revealLeaf(open);
+        else await workspace.getLeaf(false).openFile(file);
         return file;
     }
 
@@ -5608,7 +5874,9 @@ class NoshSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName('Daily nutrient targets').setHeading();
         containerEl.createDiv({
             cls: 'setting-item-description',
-            text: 'The Week tab multiplies each of these by seven.',
+            text: 'Shape, weight in the score, target, and whether the bar ' +
+                  'shows. A weight of 1 is the default; 2 counts double, 0.5 ' +
+                  'half. The Week tab multiplies each target by seven.',
         });
 
         for (const n of NUTRIENTS) {
@@ -5635,6 +5903,7 @@ class NoshSettingTab extends PluginSettingTab {
                         this.plugin.refreshViews();
                         row.setDesc(desc(nutrientShape(n, this.plugin.settings)));
                     }))
+                .addText((c) => weightInput(this.plugin, c, n.key))
                 .addText((t) => t
                     .setValue(String(this.plugin.settings.targets[n.key]))
                     .onChange(async (v) => {
@@ -5657,9 +5926,10 @@ class NoshSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName('Food group servings').setHeading();
         containerEl.createDiv({
             cls: 'setting-item-description',
-            text: 'Minimum and maximum servings for each DASH food group. ' +
-                  'Per-day groups are multiplied by seven in the Week tab; ' +
-                  'per-week groups are already weekly.',
+            text: 'Shape, weight in the score, then minimum and maximum ' +
+                  'servings for each DASH food group. Per-day groups are ' +
+                  'multiplied by seven in the Week tab; per-week groups are ' +
+                  'already weekly.',
         });
 
         for (const g of FOOD_GROUPS) {
@@ -5693,6 +5963,7 @@ class NoshSettingTab extends PluginSettingTab {
                         this.plugin.refreshViews();
                         row.setDesc(desc(groupShape(g, this.plugin.settings)));
                     }))
+                .addText((c) => weightInput(this.plugin, c, g.key))
                 .addText((c) => {
                     c.inputEl.type = 'number';
                     c.inputEl.style.width = '4em';
@@ -5728,8 +5999,8 @@ class NoshSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Reset targets')
             .setDesc('Back to the DASH 2,000 kcal reference pattern with the ' +
-                     'standard 2,300 mg sodium limit, and the pattern above ' +
-                     'back to what it was shipped with.')
+                     'standard 2,300 mg sodium limit, and every shape and ' +
+                     'weight above back to what it was shipped with.')
             .addButton((b) => b
                 .setButtonText('Reset')
                 .onClick(async () => {
@@ -5737,6 +6008,7 @@ class NoshSettingTab extends PluginSettingTab {
                     this.plugin.settings.groupTargets = JSON.parse(JSON.stringify(DEFAULT_GROUP_TARGETS));
                     this.plugin.settings.groupDirs = {};
                     this.plugin.settings.nutrientDirs = {};
+                    this.plugin.settings.weights = {};
                     this.plugin.settings.dietCalories = DASH_REFERENCE;
                     this.plugin.settings.dietSodium = SODIUM_STANDARD;
                     await this.plugin.saveSettings();

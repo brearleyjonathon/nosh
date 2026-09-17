@@ -86,6 +86,12 @@ time, or **Build** a meal out of ingredients. A build can be logged as it is —
 its ingredients are recorded separately, which is what a one-off actually is —
 or named and saved as a meal note you can reach for again.
 
+The ticked-list button beside the filter narrows the list to what is already
+ticked — in the occasion, or in the meal being built — for going back over a
+meal rather than adding to it. The filter box still searches within it. A row
+unticked there stays on screen until you switch the button off or move to
+another day, occasion or tab, so a slip of the thumb can be put right.
+
 A saved meal records what it is made of:
 
 ```yaml
@@ -109,21 +115,28 @@ in Month. Today and the week are never blended — *am I on track right now*
 and *did the pattern hold* are different questions, and the tab is how you
 ask one rather than the other. The heading folds it away like the bars.
 
-The number sits over the middle of its bar, and both fills start there. Green
-runs right as the things to reach are reached, all the way to the edge when
-they all are; red runs left for the worst thing gone over — the worst rather
-than the average, because an average would let two clean limits hide a third
-at double. Nothing either side of the middle is a day with nothing to show
-yet.
+The bar is the number, filled from the left: a day at 73 is a bar
+three-quarters full. It is coloured as the number is and no finer, because
+the bars below already say which way each thing went.
 
-Each is the plain average of how far every bar you have showing is from its
-target. A floor pays out in proportion to how much of the minimum is there; a
-ceiling pays in full up to the maximum and then loses it at the same rate,
-reaching nothing at double; a range does both. Every bar weighs the same, as
-the published DASH accordance scores have it — if one should matter more, say
-so by which bars you show. Carbs stay out by default, being for reference,
-and calories only count when over: eating less is not something DASH rewards.
+Each is the weighted average of how far every bar you have showing is from
+its target. A floor pays out in proportion to how much of the minimum is
+there; a ceiling pays in full up to the maximum and then loses it at the same
+rate, reaching nothing at double; a range does both. Every bar weighs 1 until
+you say otherwise, which is the plain average the published DASH accordance
+scores use; each row in settings has a weight beside its shape, and 2 counts
+double, 0.5 half. Carbs stay out by default, being for reference, and
+calories only count when over: eating less is not something DASH rewards.
 Hidden bars are out too.
+
+Today is judged on pace. While the day's calories are still coming in, a
+floor is measured against the share of its minimum that the calories so far
+call for — a third of the calories in, a third of the fibre expected. So the
+day starts at 100 and moves with each meal, the right things holding it there
+and the wrong things pulling it down, and once the calories are in it reads
+exactly as a finished day does. Every other day is settled and judged on the
+whole. Ceilings are never paced: a ceiling is a budget, and spending some of
+it at breakfast is not a breach.
 
 The week is judged bar by bar over the days that have anything logged, so a
 day you did not log is missing rather than a zero, with the weekly groups read
@@ -147,6 +160,8 @@ ceiling  (maximum M)              credit = 1                    while v ≤ M
                                           = max(0, 1 − (v − M) / M)  past it
 range    (m … M)                  the floor rule below m, the ceiling rule
                                   above M, 1 in between
+today    (pace p = min(1, kcal so far / kcal target))
+                                  m becomes m × p for every floor and range
 ```
 
 So half the fibre is half a credit, sodium at 3,450 against 2,300 is half a
@@ -160,19 +175,28 @@ credit, and anything at double its ceiling is none. The exceptions:
   its minimum costs nothing, since staying low is the point.
 - **Hidden bars** are out, and so is any bar whose target is 0.
 - Weekly groups are not in a day's score; they are judged in the week's.
+- **Today** is on pace, as above: every floor's and range's minimum is
+  scaled by the share of the calorie target eaten so far, in the Day tab and
+  inside the week and month averages alike. A day with a third of its
+  calories and a third of its fibre is whole on fibre. Once the calories are
+  in, or on any other day, the minimum is the minimum.
 
-The **score** is the mean credit over the bars in play, times 100, rounded.
-Every bar weighs the same.
+The **score** is the weighted mean credit over the bars in play, times 100,
+rounded, and never below 0. Each bar's weight is the one beside it in
+settings, 1 unless changed, so a bar at 2 costs twice what it would at 1.
 
-The bar is drawn from two more figures. Each floor and range also reports
+The report carries two more figures. Each floor and range also reports
 **reach** — its credit while short, 1 once the minimum is met — and each
 ceiling and range reports **excess** — `1 − credit` while over, 0 otherwise.
-Green is the *mean* reach across the things to reach; red is the *maximum*
-excess across the things that can be overdone. Half the bar is 1.
+The report gives the *weighted mean* reach across the things to reach and
+the *maximum* excess across the things that can be overdone — the worst
+rather than the average, because an average would let two clean limits hide
+a third at double. The three bars "costing most" are ranked by weight times
+what they lost.
 
 For the **week**, each per-day bar's credit, reach and excess are averaged
 across the days with anything logged, then the weekly groups are scored once
-against the week's totals and their targets, and the score, green and red
+against the week's totals and their targets, and the score, reach and excess
 are taken over that combined set exactly as for a day. A week with no logged
 days has no score.
 
@@ -198,6 +222,10 @@ column down and it lands on the thing that brought it. A food eaten twice is
 one row with its servings added up, since the question is about the food and
 not the sitting.
 
+There is one report per day or week. Exporting the same span again rewrites
+that note in place, so anything typed into it by hand is replaced along with
+the numbers.
+
 ## Nosh AI (optional)
 
 Off unless you give it credentials. Four things use it:
@@ -217,8 +245,13 @@ Off unless you give it credentials. Four things use it:
   below are recomputed from the parts. The numbers themselves are read-only
   for the same reason: they belong to the ingredients, not to the note.
 - **What's for…** — takes what the day still has room for and suggests a meal
-  that fits, with a method. Ask it before it runs: how many you are cooking for,
-  how much of a production it should be, what needs using up.
+  that fits, with a method. It knows which meals are still to come: a
+  breakfast is asked to take about a quarter of what is outstanding and leave
+  the rest for lunch and dinner, while a dinner with both already logged is
+  asked to close what one meal sensibly can and stay inside what is left. A
+  limit already passed is said as such, so the meal can keep out of its way.
+  Ask it before it runs: how many you are cooking for, how much of a
+  production it should be, what needs using up.
 - **Ask about this recipe** — open a recipe and interrogate it: what the sodium
   rides on, what would make it go further, what to serve alongside. Command
   palette, or right-click the note.

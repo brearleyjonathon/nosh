@@ -59,11 +59,9 @@
     font-size: var(--font-ui-smaller);
 }
 
-/* The score sits under the meal count, a number and a bar for today and for
- * the week. Both fills start at the bar's middle, under the number: green
- * runs right as things are reached, red runs left for the worst thing gone
- * over. Coloured no more finely than a bar is, and only the numbers speak
- * up. */
+/* The score sits under the meal count, a number and a bar for the span on
+ * screen. The bar is the number, filled from the left, and both are coloured
+ * no more finely than a bar below is. */
 .nosh-tracker .nosh-score {
     display: flex;
     flex-wrap: wrap;
@@ -77,12 +75,10 @@
     min-width: 0;
 }
 
-/* Three columns so the number lands over the middle of the bar beneath it
- * whatever the label's width: the label takes the left third, the number
- * the centre, and the right stays empty to balance it. */
+/* Label left, number right, as the bars below have it. */
 .nosh-tracker .nosh-score-top {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    display: flex;
+    justify-content: space-between;
     align-items: baseline;
     gap: 8px;
     margin-bottom: 3px;
@@ -111,35 +107,15 @@
     overflow: hidden;
 }
 
-.nosh-tracker .nosh-score-reach,
-.nosh-tracker .nosh-score-excess {
-    position: absolute;
-    top: 0;
-    bottom: 0;
+.nosh-tracker .nosh-score-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--interactive-accent);
+    transition: width 160ms ease-out, background-color 160ms ease-out;
 }
 
-.nosh-tracker .nosh-score-reach {
-    left: 50%;
-    max-width: 50%;
-    background: var(--color-green);
-}
-
-.nosh-tracker .nosh-score-excess {
-    right: 50%;
-    max-width: 50%;
-    background: var(--color-red);
-}
-
-/* Where the two fills meet, drawn over both so it shows when neither has
- * anything to say yet. */
-.nosh-tracker .nosh-score-tick {
-    position: absolute;
-    top: -1px;
-    bottom: -1px;
-    left: calc(50% - 1px);
-    width: 2px;
-    background: var(--text-faint);
-}
+.nosh-tracker .nosh-score-fill[data-state="met"]  { background: var(--color-green); }
+.nosh-tracker .nosh-score-fill[data-state="near"] { background: var(--color-orange); }
 
 .nosh-tracker .nosh-score-why {
     flex-basis: 100%;
@@ -225,8 +201,8 @@
 
 /* Recipe list ------------------------------------------------------- */
 
-/* The filter and the fold control share a line: one narrows the list, the
- * other shortens it, and neither deserves a row of its own. */
+/* The filter, the ticked-only toggle and the fold control share a line: two
+ * narrow the list, the other shortens it, and none deserves a row of its own. */
 .nosh-tracker .nosh-filter {
     display: flex;
     align-items: center;
@@ -299,6 +275,37 @@
 .nosh-tracker .nosh-fold.is-hidden {
     visibility: hidden;
     pointer-events: none;
+}
+
+/* Ticked only. As quiet as the fold beside it while off; on, it wears the
+ * accent, since a list quietly missing most of its rows needs to say so. */
+.nosh-tracker .nosh-only {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 6px;
+    color: var(--text-faint);
+    background: transparent;
+    border: 1px solid transparent;
+    box-shadow: none;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+}
+
+.nosh-tracker .nosh-only:hover {
+    color: var(--text-normal);
+}
+
+.nosh-tracker .nosh-only.is-active {
+    color: var(--text-accent);
+    background: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border-hover);
+}
+
+.nosh-tracker .nosh-only .svg-icon {
+    width: 15px;
+    height: 15px;
 }
 
 .nosh-tracker .nosh-group {
