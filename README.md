@@ -9,6 +9,10 @@ the nutrient numbers cannot express.
 
 Nothing leaves your vault unless you ask it to.
 
+<img width="1280" height="640" alt="social-card" src="https://github.com/user-attachments/assets/e8c896e9-895b-4724-b388-564374928c41" />
+
+Visit the new website: [nosh.heath](nosh.health) 
+
 ## Disclosures
 
 Nosh works entirely offline. The optional Nosh AI features are the only part
@@ -34,6 +38,12 @@ With them on:
 
 There are no accounts with the author, no payments and no ads, and no files
 are read or written outside the vault.
+
+# UI
+The project is based in the Obsidian sidebar in desktop and mobile. 
+
+<img width="2436" height="2420" alt="nosh-dark" src="https://github.com/user-attachments/assets/a1e3d437-0cbf-4575-a326-255b705065a6" />
+<img width="2436" height="2420" alt="nosh-light" src="https://github.com/user-attachments/assets/08acc345-8f96-4c5d-8aa9-c11da9945145" />
 
 ## How it decides what a note is
 
