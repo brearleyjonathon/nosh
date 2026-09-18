@@ -469,6 +469,45 @@ button { font: inherit; color: inherit; }
 }
 
 
+/* ---------- Targets ---------- */
+.tg-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: clamp(24px, 5vw, 64px); align-items: start; }
+.tg-copy ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.tg-copy li { display: flex; gap: 12px; color: var(--text-2); font-size: 0.9375rem; }
+.tg-copy li::before { content: ""; flex: none; width: 8px; height: 8px; margin-top: 9px; border-radius: 50%; background: var(--accent); }
+.tg-controls { margin-top: 28px; display: grid; gap: 22px; }
+.tg-field label, .tg-field .lbl { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--font-head); font-weight: 600; font-size: 0.9375rem; margin-bottom: 10px; }
+.tg-field output { font-family: var(--font-body); font-weight: 600; font-size: 1.25rem; color: var(--primary-text); }
+.slider { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; margin: 0; cursor: pointer; }
+.slider::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(to right, var(--primary) 0 var(--pct, 33%), var(--bg-3) var(--pct, 33%)); }
+.slider::-moz-range-track { height: 6px; border-radius: 999px; background: var(--bg-3); }
+.slider::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--primary); }
+.slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--bg); border: 2px solid var(--primary-text); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+.slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--bg); border: 2px solid var(--primary-text); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+.slider:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 4px; border-radius: 999px; }
+.slider-ends { display: flex; justify-content: space-between; font-size: 0.8125rem; color: var(--text-3); margin-top: 2px; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.seg button { padding: 10px 6px; border-radius: 10px; border: 1px solid var(--rule-2); background: var(--bg); cursor: pointer; font-family: var(--font-body); font-weight: 500; font-size: 0.9375rem; transition: border-color .2s, background-color .2s; }
+.seg button:hover { border-color: var(--text-3); }
+.seg button[aria-pressed="true"] { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-text); }
+.seg button small { display: block; font-weight: 400; font-size: 0.75rem; color: var(--text-3); margin-top: 2px; }
+.tg-panel { display: grid; gap: 22px; }
+.tg-table { display: grid; }
+.tg-table h3 { font-size: 0.8125rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
+.tg-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--rule); font-size: 0.9375rem; }
+.tg-row span:first-child { color: var(--text-2); }
+.tg-row b { font-weight: 600; white-space: nowrap; }
+.tg-row.follows b { color: var(--primary-text); }
+.tg-row.typed b { color: var(--accent-text); }
+.tg-row small { color: var(--text-3); font-size: 0.8125rem; margin-left: 6px; font-weight: 400; }
+.tg-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8125rem; color: var(--text-2); }
+.tg-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tg-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.tg-note { font-size: 0.875rem; color: var(--text-3); }
+@media (max-width: 860px) {
+  .tg-grid { grid-template-columns: 1fr; }
+  .seg { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ---------- Nosh AI ---------- */
 .ai-grid { display: grid; grid-template-columns: auto 1fr; gap: clamp(28px, 6vw, 80px); align-items: center; }
 .ai-media { display: grid; place-items: center; }
@@ -1020,6 +1059,74 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
   </div>
 </section>
 
+<!-- ============ TARGETS ============ -->
+<section class="section" id="targets" aria-labelledby="targets-title">
+  <div class="wrap">
+    <div class="tg-grid">
+      <div class="tg-copy">
+        <div class="eyebrow reveal">Targets</div>
+        <h2 id="targets-title" class="reveal" style="--i:1">Type your calories. Every target follows.</h2>
+        <p class="reveal muted" style="--i:2">Every DASH pattern is the same plan at a different size, so one figure fills in all of them. This is the arithmetic Nosh runs when you press Fill in settings. Every row stays editable afterwards.</p>
+        <ul>
+          <li class="reveal" style="--i:3">The 2,000 kcal reference is 18% protein, 55% carbohydrate, 27% fat and 6% saturated fat. The grams keep those shares as the calories move.</li>
+          <li class="reveal" style="--i:4">Potassium and calcium are amounts to reach, not shares of a meal. They stay put.</li>
+          <li class="reveal" style="--i:5">Sodium is asked separately and does not scale. 2,300 mg is the standard limit, 1,500 the lower target for bringing blood pressure down, and anything between is a step on the way.</li>
+          <li class="reveal" style="--i:6">Servings scale the same way, rounded to the half. Dairy holds at 2 to 3 a day whatever the size, as DASH does.</li>
+        </ul>
+        <div class="tg-controls reveal" style="--i:7">
+          <div class="tg-field">
+            <label for="kcalRange">Calories a day <output id="kcalOut" for="kcalRange" class="num">2,000</output></label>
+            <input class="slider" type="range" id="kcalRange" min="1000" max="4000" step="50" value="2000" aria-describedby="kcalEnds">
+            <div class="slider-ends num" id="kcalEnds"><span>1,000</span><span>4,000</span></div>
+          </div>
+          <div class="tg-field">
+            <div class="lbl" id="sodiumLbl">Sodium a day</div>
+            <div class="seg" role="group" aria-labelledby="sodiumLbl">
+              <button type="button" aria-pressed="true" data-sodium="2300"><span class="num">2,300</span><small>standard</small></button>
+              <button type="button" aria-pressed="false" data-sodium="2000"><span class="num">2,000</span><small>a step down</small></button>
+              <button type="button" aria-pressed="false" data-sodium="1700"><span class="num">1,700</span><small>another</small></button>
+              <button type="button" aria-pressed="false" data-sodium="1500"><span class="num">1,500</span><small>lower target</small></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel tg-panel reveal" style="--i:2" aria-live="polite" aria-atomic="false">
+        <div class="tg-table" id="tgNutrients">
+          <h3>Daily nutrient targets</h3>
+          <div class="tg-row follows" data-t="calories"><span>Calories</span><b class="num">2,000 kcal</b></div>
+          <div class="tg-row follows" data-t="protein"><span>Protein <small>floor</small></span><b class="num">90 g</b></div>
+          <div class="tg-row follows" data-t="carbs"><span>Carbs <small>reference</small></span><b class="num">275 g</b></div>
+          <div class="tg-row follows" data-t="fat"><span>Fat <small>ceiling</small></span><b class="num">60 g</b></div>
+          <div class="tg-row follows" data-t="satfat"><span>Saturated fat <small>ceiling</small></span><b class="num">13 g</b></div>
+          <div class="tg-row follows" data-t="fiber"><span>Fiber <small>floor</small></span><b class="num">30 g</b></div>
+          <div class="tg-row typed" data-t="sodium"><span>Sodium <small>ceiling</small></span><b class="num">2,300 mg</b></div>
+          <div class="tg-row" data-t="potassium"><span>Potassium <small>floor</small></span><b class="num">4,700 mg</b></div>
+          <div class="tg-row" data-t="calcium"><span>Calcium <small>floor</small></span><b class="num">1,250 mg</b></div>
+        </div>
+        <div class="tg-table" id="tgGroups">
+          <h3>Food-group servings</h3>
+          <div class="tg-row follows" data-g="grains"><span>Grains <small>a day</small></span><b class="num">6–8</b></div>
+          <div class="tg-row follows" data-g="vegetables"><span>Vegetables <small>a day</small></span><b class="num">4–5</b></div>
+          <div class="tg-row follows" data-g="fruit"><span>Fruit <small>a day</small></span><b class="num">4–5</b></div>
+          <div class="tg-row" data-g="dairy"><span>Low-fat dairy <small>a day</small></span><b class="num">2–3</b></div>
+          <div class="tg-row follows" data-g="meat"><span>Lean meat/fish <small>a day</small></span><b class="num">≤ 6</b></div>
+          <div class="tg-row follows" data-g="fats"><span>Fats &amp; oils <small>a day</small></span><b class="num">≤ 3</b></div>
+          <div class="tg-row follows" data-g="nuts"><span>Nuts &amp; seeds <small>a week</small></span><b class="num">4–5</b></div>
+          <div class="tg-row follows" data-g="legumes"><span>Legumes <small>a week</small></span><b class="num">4–5</b></div>
+          <div class="tg-row follows" data-g="sweets"><span>Sweets <small>a week</small></span><b class="num">≤ 5</b></div>
+        </div>
+        <div class="tg-legend" aria-hidden="true">
+          <span><i style="background: var(--primary)"></i>Follows the calories</span>
+          <span><i style="background: var(--accent)"></i>Typed separately</span>
+          <span><i style="background: var(--neutral-bar)"></i>Held</span>
+        </div>
+        <p class="tg-note">A scale of the reference rather than the published table for each calorie level. It lands near it without being it, and every row is yours to change.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ NOSH AI ============ -->
 <section class="section" id="ai" aria-labelledby="ai-title">
   <div class="wrap">
@@ -1237,6 +1344,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
           <li><a href="#how">How it works</a></li>
           <li><a href="#features">Features</a></li>
           <li><a href="#demo">Try the demo</a></li>
+          <li><a href="#targets">Targets</a></li>
           <li><a href="#ai">Nosh AI</a></li>
           <li><a href="#pricing">Pricing</a></li>
           <li><a href="#faq">Questions</a></li>
@@ -1460,6 +1568,55 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
     chips[0].focus();
   });
   renderDemo();
+
+  /* ---------- Targets: the plugin's own scaling, run in the page ---------- */
+  (function () {
+    var REF = 2000;
+    var BASE = { calories: 2000, protein: 90, carbs: 275, fat: 60, satfat: 13, fiber: 30, potassium: 4700, calcium: 1250 };
+    var SCALED = ['protein', 'carbs', 'fat', 'satfat', 'fiber'];
+    var UNIT = { calories: 'kcal', protein: 'g', carbs: 'g', fat: 'g', satfat: 'g', fiber: 'g', sodium: 'mg', potassium: 'mg', calcium: 'mg' };
+    var GROUPS = {
+      grains: [6, 8, 'range'], vegetables: [4, 5, 'range'], fruit: [4, 5, 'range'], dairy: [2, 3, 'range'],
+      meat: [0, 6, 'limit'], fats: [2, 3, 'limit'], nuts: [4, 5, 'range'], legumes: [4, 5, 'range'], sweets: [0, 5, 'limit']
+    };
+    var HELD = ['dairy'];
+    var range = document.getElementById('kcalRange');
+    var out = document.getElementById('kcalOut');
+    var segBtns = Array.prototype.slice.call(document.querySelectorAll('.seg [data-sodium]'));
+    var sodium = 2300;
+    var half = function (n) { return Math.round(n * 2) / 2; };
+    var g = function (n) { return n.toLocaleString(undefined, { maximumFractionDigits: 1 }); };
+    function setRow(sel, text) {
+      var row = document.querySelector(sel);
+      if (row) row.querySelector('b').textContent = text;
+    }
+    function render() {
+      var kcal = Math.max(1000, Math.min(4000, parseInt(range.value, 10) || REF));
+      var by = kcal / REF;
+      out.textContent = fmt(kcal, 0);
+      range.style.setProperty('--pct', ((kcal - 1000) / 3000 * 100) + '%');
+      setRow('[data-t="calories"]', fmt(kcal, 0) + ' kcal');
+      SCALED.forEach(function (k) { setRow('[data-t="' + k + '"]', fmt(Math.round(BASE[k] * by), 0) + ' ' + UNIT[k]); });
+      setRow('[data-t="sodium"]', fmt(sodium, 0) + ' mg');
+      Object.keys(GROUPS).forEach(function (k) {
+        var b = GROUPS[k], min = b[0], max = b[1];
+        if (HELD.indexOf(k) < 0) {
+          min = min > 0 ? Math.max(0.5, half(min * by)) : 0;
+          max = max > 0 ? Math.max(0.5, half(max * by)) : 0;
+        }
+        setRow('[data-g="' + k + '"]', b[2] === 'limit' ? '\u2264 ' + g(max) : g(min) + '\u2013' + g(max));
+      });
+    }
+    range.addEventListener('input', render);
+    segBtns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        sodium = parseInt(b.dataset.sodium, 10);
+        segBtns.forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        render();
+      });
+    });
+    render();
+  })();
 
   /* ---------- Nosh AI: pick a feature, the phone shows it ---------- */
   var aiBtns = Array.prototype.slice.call(document.querySelectorAll('.ai-item[data-screen]'));
