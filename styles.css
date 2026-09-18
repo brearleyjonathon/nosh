@@ -731,7 +731,6 @@
  * gives a textarea the width of a single-line input. */
 .nosh-setting-area {
     width: 100%;
-    min-width: 260px;
     resize: vertical;
     font-size: var(--font-ui-smaller);
 }
@@ -854,13 +853,21 @@
  * column is a width to ask for rather than a width to hold, so that a
  * pane too narrow to stand them side by side - a phone, or a window
  * dragged in - has them give room up together, header with rows, rather
- * than run the boxes off the edge. */
+ * than run the boxes off the edge.
+ *
+ * The two tables come to the same width, so Shape, Weight and Show read
+ * as one column apiece from the first nutrient to the last food group. A
+ * nutrient has one number where a group has a minimum and a maximum: it
+ * asks for as much as both of theirs and the gap between, and the box
+ * inside keeps to the digits a daily target needs. */
 
 .nosh-settings .nosh-target-row .setting-item-control {
     flex: 0 0 auto;
     min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 7.5em) minmax(0, 4.5em) minmax(0, 5.5em) 3em;
+    grid-template-columns:
+        minmax(0, 7.5em) minmax(0, 4.5em)
+        minmax(0, calc(9em + var(--size-4-2))) 3em;
     gap: var(--size-4-2);
     align-items: center;
     justify-items: stretch;
@@ -875,6 +882,12 @@
 .nosh-settings .nosh-target-row .setting-item-control input {
     width: 100%;
     min-width: 0;
+}
+
+/* The one box in the wide track, sitting at the head of it rather than
+ * stretched the width of the two it stands over. */
+.nosh-settings .nosh-target-row input.nosh-target-box {
+    max-width: 5.5em;
 }
 
 .nosh-settings .nosh-target-row .setting-item-control .checkbox-container {
@@ -919,13 +932,18 @@
     border-end-end-radius: var(--setting-items-radius, 0);
 }
 
+/* A word takes the same inset as the box under it, or it sits a step to
+ * the left of every value it names. The last column names a toggle, which
+ * is centred in its own track, so the word is too. */
 .nosh-settings .nosh-target-head .nosh-col {
+    padding-left: var(--size-4-2);
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     text-align: left;
 }
 
 .nosh-settings .nosh-target-head .nosh-col:last-child {
+    padding-left: 0;
     text-align: center;
 }
 
@@ -951,6 +969,23 @@
     .nosh-settings .nosh-group-row .setting-item-control {
         grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) 3em;
     }
+}
+
+/* A setting whose control is a paragraph to write rather than a value to
+ * pick. The box goes under the name instead of beside it, where it has
+ * the width of the card. */
+.nosh-settings .nosh-area-row {
+    display: block;
+}
+
+.nosh-settings .nosh-area-row .setting-item-control {
+    padding-top: var(--size-4-2);
+}
+
+/* The figures the diet pattern is scaled from: a number rather than a
+ * sentence, and the width of the target boxes below them. */
+.nosh-settings .nosh-num {
+    width: 5.5em;
 }
 
 /* Occasions ---------------------------------------------------------

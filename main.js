@@ -6856,7 +6856,7 @@ class NoshSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        new Setting(containerEl)
+        const prefs = new Setting(containerEl)
             .setName('Suggestion preferences')
             .setDesc('Added to the What\u2019s for\u2026 prompt in your own words: cuisines '
                      + 'you like, what you will not eat, how adventurous to be, what you '
@@ -6872,6 +6872,7 @@ class NoshSettingTab extends PluginSettingTab {
                 t.inputEl.rows = 3;
                 t.inputEl.addClass('nosh-setting-area');
             });
+        prefs.settingEl.addClass('nosh-area-row');
 
         new Setting(containerEl)
             .setName('Test credentials')
@@ -6901,7 +6902,7 @@ class NoshSettingTab extends PluginSettingTab {
                      'and calcium are amounts to reach and do not.')
             .addText((c) => {
                 c.inputEl.type = 'number';
-                c.inputEl.style.width = '6em';
+                c.inputEl.addClass('nosh-num');
                 /* Kept as typed rather than clamped on every keystroke, which
                  * would turn a half-typed 1,800 into 1,000 under the cursor.
                  * Filling is where the range is enforced, and the box is
@@ -6922,7 +6923,7 @@ class NoshSettingTab extends PluginSettingTab {
                      'is a step on the way down.')
             .addText((c) => {
                 c.inputEl.type = 'number';
-                c.inputEl.style.width = '6em';
+                c.inputEl.addClass('nosh-num');
                 c.setValue(String(this.plugin.settings.dietSodium))
                     .onChange(async (v) => {
                         this.plugin.settings.dietSodium = parseNum(v);
@@ -6985,6 +6986,7 @@ class NoshSettingTab extends PluginSettingTab {
                 .addText((t) => {
                     t.inputEl.type = 'number';
                     t.inputEl.min = '0';
+                    t.inputEl.addClass('nosh-target-box');
                     t.inputEl.setAttr('aria-label', 'Daily target in ' + n.unit);
                     t.setValue(String(this.plugin.settings.targets[n.key]))
                     .onChange(async (v) => {
