@@ -334,6 +334,12 @@ function occasionNow(now) {
  * being assembled out of ingredients. */
 const BUILD_KEY = 'build';
 
+/* What an occasion has held lately sits at the top of its list: how far back
+ * to look, how many to show, and the section key it folds under. */
+const RECENT_DAYS = 30;
+const RECENT_MAX = 8;
+const RECENT_KEY = 'Recent';
+
 /* A meal can be logged two ways: whole, from a note that already totals it
  * up, or piece by piece from ingredients. Which side of the picker a note
  * lands on is read off its tags. */
@@ -754,6 +760,19 @@ function humanMonth(iso) {
 function humanDay(iso) {
     return dateOf(iso).toLocaleDateString(undefined,
         { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/* "Copy yesterday's breakfast" when the day on screen is today and the last
+ * time was yesterday; a weekday within the week; the date beyond it. */
+function copyLabel(cursor, iso, occasion) {
+    const what = occasionLabel(occasion).toLowerCase();
+    const back = Math.round((dateOf(cursor) - dateOf(iso)) / 86400000);
+    if (back === 1 && cursor === todayIso()) return "Copy yesterday's " + what;
+    if (back < 7) {
+        const day = dateOf(iso).toLocaleDateString(undefined, { weekday: 'long' });
+        return 'Copy ' + day + "'s " + what;
+    }
+    return 'Copy ' + what + ' from ' + humanDay(iso);
 }
 
 function humanWeek(days) {
@@ -5681,7 +5700,109 @@ class NoshView extends ItemView {
             const name = r.section || GROUP_OTHER;
             if (!names.includes(name)) names.push(name);
         }
-        return names.map((n) => source.key + '/' + n);
+        const keys = names.map((n) => source.key + '/' + n);
+        if (this.recentRows(source.key).length) keys.unshift(source.key + '/' + RECENT_KEY);
+        return keys;
+    }
+
+    /* --- the last time, and lately ---------------------------------------- */
+
+    /* The days before the one on screen that this occasion was logged on,
+     * newest first, up to a month back; `limit` stops at that many. */
+    pastDays(limit) {
+        const log = this.plugin.settings.log;
+        const out = [];
+        for (let n = 1; n <= RECENT_DAYS; n++) {
+            const iso = addDays(this.cursor, -n);
+            const rows = logRows(log, iso).filter((r) => r.occasion === this.occasion);
+            if (rows.length) out.push({ iso, rows });
+            if (limit && out.length >= limit) break;
+        }
+        return out;
+    }
+
+    /* What this occasion has held lately, out of this tab's notes: the most
+     * recently eaten first, and among one day's foods the most often eaten.
+     * The day on screen is not "lately" - what it holds is already ticked. */
+    recentRows(listKey) {
+        const have = new Set(((this.lists && this.lists[listKey]) || []).map((r) => r.path));
+        const seen = Object.create(null);
+        this.pastDays().forEach((d, i) => {
+            for (const r of d.rows) {
+                if (!have.has(r.path)) continue;
+                if (!seen[r.path]) seen[r.path] = { path: r.path, last: i, times: 0 };
+                seen[r.path].times++;
+            }
+        });
+        return Object.values(seen)
+            .sort((a, b) => a.last - b.last || b.times - a.times)
+            .slice(0, RECENT_MAX)
+            .map((s) => this.byPath[s.path])
+            .filter(Boolean);
+    }
+
+    /* A section like the food groups, folded the same way, with the
+     * occasion's recent foods in it. Returns whether it was drawn. */
+    renderRecent(el, source, listKey) {
+        const rows = this.recentRows(listKey);
+        if (!rows.length) return false;
+
+        const key = source.key + '/' + RECENT_KEY;
+        const open = !this.collapsed[key];
+        const chosen = rows.filter((r) => this.servingsOf(r.path) > 0).length;
+
+        const head = el.createEl('button', { cls: 'nosh-group nosh-group-head' });
+        if (chosen) head.addClass('has-selected');
+        head.createSpan({ cls: 'nosh-group-caret', text: open ? '\u25be' : '\u25b8' });
+        head.addEventListener('click', () => {
+            this.collapsed[key] = open;
+            this.keepScroll(() => this.renderList());
+        });
+        head.createSpan({ cls: 'nosh-group-name', text: RECENT_KEY });
+        head.createSpan({
+            cls: 'nosh-group-count',
+            text: chosen ? chosen + ' of ' + rows.length : String(rows.length),
+        });
+        if (open) for (const r of rows) this.renderItem(el, r);
+        return true;
+    }
+
+    /* The last time this occasion was logged, offered whole while the one on
+     * screen is still empty: most breakfasts are the same breakfast. Foods
+     * whose notes have gone are left out, since there is nothing to tick. */
+    renderCopy(el) {
+        if (Object.keys(this.dayServings).some((p) => this.dayServings[p] > 0)) return;
+        const last = this.pastDays(1)[0];
+        if (!last) return;
+        const rows = last.rows.filter((r) => this.byPath[r.path]);
+        if (!rows.length) return;
+
+        const btn = el.createEl('button', { cls: 'nosh-copy' });
+        btn.createSpan({ cls: 'nosh-copy-name', text: copyLabel(this.cursor, last.iso, this.occasion) });
+        btn.createSpan({
+            cls: 'nosh-copy-meta',
+            text: rows.map((r) => this.byPath[r.path].name +
+                (r.servings === 1 ? '' : ' \u00d7 ' + fmtServings(r.servings))).join(', '),
+        });
+        btn.addEventListener('click', () => this.copyRows(rows));
+    }
+
+    /* Adds rather than replaces: the offer is only made to an empty
+     * occasion, but a second press should not quietly undo the first. */
+    async copyRows(rows) {
+        const log = this.plugin.settings.log;
+        for (const r of rows) {
+            const had = parseNum(((log[this.cursor] || {})[this.occasion] || {})[r.path]);
+            logSet(log, this.cursor, this.occasion, r.path, had + r.servings);
+        }
+        await this.plugin.saveSettings();
+        this.plugin.logChanged(this.cursor);
+        this.keepScroll(() => {
+            this.renderNav();
+            this.renderTotals();
+            this.renderSuggest();
+            this.renderList();
+        });
     }
 
     /* One control for the lot. If anything is still open it folds everything
@@ -5749,14 +5870,28 @@ class NoshView extends ItemView {
             }
         }
 
+        /* Ahead of the library: the last time this occasion was logged, and
+         * what it has held lately. A filter is a search and a build belongs
+         * to no day, so neither shows there. */
+        let recent = false;
+        if (this.source !== BUILD_KEY && !filtering) {
+            this.renderCopy(el);
+            recent = this.renderRecent(el, source, listKey);
+        }
+
         if (!items.length) {
             el.createDiv({ cls: 'nosh-empty', text: this.emptyMessage(source) });
             return;
         }
 
         /* Meals come through in one alphabetical run with no headings, so there
-         * is nothing to fold and nothing to scan past. */
+         * is nothing to fold and nothing to scan past - unless Recent sits
+         * above them, when the run needs a name to be told apart from it. */
         if (!source.sectioned) {
+            if (recent) {
+                const head = el.createDiv({ cls: 'nosh-group' });
+                head.createSpan({ cls: 'nosh-group-name', text: 'All ' + source.label.toLowerCase() });
+            }
             for (const r of items) this.renderItem(el, r);
             return;
         }

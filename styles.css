@@ -767,6 +767,50 @@
     cursor: default;
 }
 
+/* The last time ------------------------------------------------------
+ *
+ * Offered at the top of an empty occasion's list, in the suggestion's
+ * clothes: it is the same offer with a cheaper answer. Two lines, the
+ * second saying what would be copied, cut short rather than wrapped. */
+
+.nosh-tracker .nosh-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    width: 100%;
+    height: auto;
+    margin: 4px 0 6px;
+    padding: 6px 10px;
+    text-align: left;
+    color: var(--text-accent);
+    background: transparent;
+    border: 1px dashed var(--text-accent);
+    box-shadow: none;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+}
+
+.nosh-tracker .nosh-copy:hover {
+    color: var(--text-accent-hover);
+    border-color: var(--text-accent-hover);
+    background: var(--background-modifier-hover);
+    border-style: solid;
+}
+
+.nosh-tracker .nosh-copy-name {
+    font-size: var(--font-ui-smaller);
+}
+
+.nosh-tracker .nosh-copy-meta {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
 /* Occasions ---------------------------------------------------------
  *
  * Which occasion a tick lands in. Sits above the Meals/Ingredients switcher

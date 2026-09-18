@@ -81,6 +81,15 @@ drinks, dessert. Pick when you are eating, then what.
 **The occasion belongs to the eating, not to the note.** A banana is breakfast
 on Tuesday and dessert on Friday, and its note never has to choose.
 
+Most breakfasts are the same breakfast, so each occasion's list starts with
+what it has held lately. **Recent** is a section like the food groups, folded
+the same way: the foods logged in that occasion over the past month, the most
+recently eaten first, up to eight. And while the occasion on screen is still
+empty, a button above the list offers to **copy the last time** — *Copy
+yesterday's breakfast*, or *Copy Tuesday's*, with what that would bring listed
+under it. It adds every serving of it in one press; foods whose notes have
+gone since are left out.
+
 Within an occasion you can tick an existing meal, tick ingredients one at a
 time, or **Build** a meal out of ingredients. A build can be logged as it is —
 its ingredients are recorded separately, which is what a one-off actually is —
