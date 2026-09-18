@@ -140,10 +140,18 @@ function dietGroups(calories) {
 const SUB_MEALS = 'Meals';
 const SUB_INGREDIENTS = 'Ingredients';
 const SUB_REPORTS = 'Reports';
+const SUB_LOG = 'Log';
 
 /* Bumped when the shape of `log` changes, so the migration runs once and
  * knows it has run. */
 const LOG_SCHEMA = 2;
+
+/* One note a day, in a folder of its own, carrying what the day's log
+ * holds. See "The day's log, as a note" below. */
+const LOG_NOTE_PREFIX = 'Nosh log ';
+const LOG_NOTE_RE = new RegExp('^' + LOG_NOTE_PREFIX + '(\\d{4}-\\d{2}-\\d{2})$');
+const LOG_BLOCK_OPEN = '<!-- nosh:log -->';
+const LOG_BLOCK_CLOSE = '<!-- /nosh:log -->';
 
 function noshFolder(settings, sub) {
     /* Typed by a person, so it may carry backslashes, doubled slashes or a
@@ -193,6 +201,7 @@ const DEFAULT_SETTINGS = {
     targets: Object.assign({}, DEFAULT_TARGETS),
     groupTargets: JSON.parse(JSON.stringify(DEFAULT_GROUP_TARGETS)),
     log: {},          // { 'YYYY-MM-DD': { occasion: { notePath: servings } } }
+    logNotes: true,   // and each day of it written out as a note, see readLogNotes
     schema: LOG_SCHEMA,
     weekStart: 1,     // 0 = Sunday, 1 = Monday
     hiddenNutrients: [],
@@ -480,6 +489,152 @@ function migrateLog(saved) {
         if (!Object.keys(out[iso]).length) delete out[iso];
     }
     return out;
+}
+
+/* The day's log, as a note ----------------------------------------------
+ *
+ * data.json is the store the views read, and it is quick, but nothing in a
+ * vault can see into it: not a search, not a backlink, not Dataview, and not
+ * a backup of the notes. So every day with anything logged is also written
+ * as a note in the Log folder - `Nosh log 2026-09-17` - with the log in
+ * its frontmatter and the same list, readable, underneath. The note is the
+ * record and data.json the cache: a log note edited by hand, or arriving
+ * from another device, is read back into the store, and one deleted clears
+ * its day. The list sits between two markers so that anything written
+ * around it by hand survives the next rewrite. */
+
+function logNoteName(iso) { return LOG_NOTE_PREFIX + iso; }
+
+/* The day a log note is for, from its name; '' for any other file. */
+function logNoteDay(file) {
+    if (!file) return '';
+    const base = typeof file.basename === 'string' ? file.basename
+        : String(file.path || '').split('/').pop().replace(/\.md$/i, '');
+    const m = base.match(LOG_NOTE_RE);
+    return m ? m[1] : '';
+}
+
+/* A day's entries in the order the picker shows them - by occasion, then by
+ * name - each with the link that reaches its note. That is the shortest
+ * link Obsidian itself would insert, or the bare name for a note that is no
+ * longer there, so the line still says what was eaten. */
+function logNoteRows(app, day, logPath) {
+    const rank = (o) => {
+        const i = OCCASIONS.indexOf(o);
+        return i === -1 ? OCCASIONS.length : i;
+    };
+    const rows = [];
+    for (const occasion of Object.keys(day || {})) {
+        const bucket = day[occasion] || {};
+        for (const path of Object.keys(bucket)) {
+            const servings = parseNum(bucket[path]);
+            if (servings <= 0) continue;
+            const file = app.vault.getAbstractFileByPath(path);
+            const name = path.split('/').pop().replace(/\.md$/i, '');
+            const link = file && file.extension === 'md'
+                ? app.metadataCache.fileToLinktext(file, logPath) : name;
+            rows.push({ occasion, path, name, link, servings });
+        }
+    }
+    rows.sort((a, b) => rank(a.occasion) - rank(b.occasion) ||
+                        a.name.localeCompare(b.name));
+    return rows;
+}
+
+function logNoteFrontmatter(iso, rows, settings) {
+    const lines = ['---', 'day: ' + iso, rows.length ? 'log:' : 'log: []'];
+    for (const r of rows) {
+        lines.push('  - note: ' + yamlStr('[[' + r.link + ']]'));
+        if (r.occasion) lines.push('    occasion: ' + r.occasion);
+        lines.push('    servings: ' + r.servings);
+    }
+    lines.push('tags:', '  - ' + kindTag(settings, 'log'), '---');
+    return lines.join('\n');
+}
+
+/* The block between the markers: a heading an occasion, a line a food. */
+function logNoteBlock(iso, rows) {
+    const when = dateOf(iso).toLocaleDateString(undefined,
+        { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const lines = [LOG_BLOCK_OPEN, '# ' + when, ''];
+    if (!rows.length) lines.push('Nothing logged.', '');
+    let last = null;
+    for (const r of rows) {
+        if (r.occasion !== last) {
+            if (last !== null) lines.push('');
+            lines.push('## ' + occasionLabel(r.occasion), '');
+            last = r.occasion;
+        }
+        lines.push('- [[' + r.link + (r.link === r.name ? '' : '|' + r.name) + ']]' +
+                   (r.servings === 1 ? '' : ' \u00d7 ' + fmtServings(r.servings)));
+    }
+    if (rows.length) lines.push('');
+    lines.push(LOG_BLOCK_CLOSE);
+    return lines.join('\n');
+}
+
+/* The note's whole text, for a note being written fresh. */
+function logNoteText(iso, rows, settings) {
+    return logNoteFrontmatter(iso, rows, settings) + '\n\n' + logNoteBlock(iso, rows) + '\n';
+}
+
+function spliceLogBlock(text, block) {
+    const a = text.indexOf(LOG_BLOCK_OPEN);
+    const b = a === -1 ? -1 : text.indexOf(LOG_BLOCK_CLOSE, a + LOG_BLOCK_OPEN.length);
+    if (a !== -1 && b !== -1) {
+        return text.slice(0, a) + block + text.slice(b + LOG_BLOCK_CLOSE.length);
+    }
+    return text.replace(/\s*$/, '') + '\n\n' + block + '\n';
+}
+
+/* Whether anything was written into the note by hand: outside the
+ * frontmatter, and outside the block Nosh keeps. */
+function hasOwnWords(text) {
+    let body = String(text || '').replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+    const a = body.indexOf(LOG_BLOCK_OPEN);
+    const b = a === -1 ? -1 : body.indexOf(LOG_BLOCK_CLOSE, a + LOG_BLOCK_OPEN.length);
+    if (a !== -1 && b !== -1) body = body.slice(0, a) + body.slice(b + LOG_BLOCK_CLOSE.length);
+    return body.trim().length > 0;
+}
+
+/* What a log note says, in the shape of a day in the store; null where the
+ * note cannot be read - a frontmatter half-typed, say - since a note that
+ * cannot be read has not said anything. An empty list is a day cleared.
+ * Links resolve from the note; one that reaches nothing is kept by name for
+ * repairLog to find. */
+function parseLogNote(app, file, cache) {
+    const fm = cache && cache.frontmatter;
+    if (!fm || !Array.isArray(fm.log)) return null;
+    const canon = Object.create(null);
+    for (const o of OCCASIONS) canon[o.toLowerCase()] = o;
+
+    const day = {};
+    for (const entry of fm.log) {
+        const c = parseComponents([entry]);
+        if (!c.length) continue;
+        const said = entry && typeof entry === 'object' ? String(entry.occasion || '') : '';
+        const occasion = canon[said.trim().toLowerCase()] || NO_OCCASION;
+        const link = c[0].link;
+        const dest = app.metadataCache.getFirstLinkpathDest(link, file.path);
+        const path = dest ? dest.path : (/\.md$/i.test(link) ? link : link + '.md');
+        if (!day[occasion]) day[occasion] = {};
+        day[occasion][path] = roundServings(parseNum(day[occasion][path]) + c[0].servings);
+    }
+    return day;
+}
+
+/* Two days say the same thing when every entry with any servings matches. */
+function sameDay(a, b) {
+    const norm = (d) => {
+        const out = {};
+        for (const o of Object.keys(d || {}).sort()) {
+            const bucket = d[o] || {};
+            const keys = Object.keys(bucket).filter((p) => parseNum(bucket[p]) > 0).sort();
+            if (keys.length) out[o] = keys.map((p) => p + '=' + roundServings(parseNum(bucket[p])));
+        }
+        return JSON.stringify(out);
+    };
+    return norm(a) === norm(b);
 }
 
 /* A composed meal names what it is made of. Written as a list of objects so
@@ -2220,7 +2375,8 @@ class NoshDraftModal extends Modal {
  *
  * Nosh keeps its numbers in two places: the nutrition itself lives in note
  * frontmatter out in the vault, and what was eaten on which day lives in this
- * plugin's data.json. A report is the join of the two, frozen into a note.
+ * plugin's data.json, mirrored a day at a time into log notes. A report is
+ * the join of the two, frozen into a note.
  */
 
 /* The judgement behind a bar's colour, lifted out of the view so a report
@@ -3459,8 +3615,10 @@ module.exports = class NoshPlugin extends Plugin {
             id: 'clear-today',
             name: 'Clear today',
             callback: async () => {
-                delete this.settings.log[todayIso()];
+                const iso = todayIso();
+                delete this.settings.log[iso];
                 await this.saveSettings();
+                this.logChanged(iso);
                 this.refreshViews();
             },
         });
@@ -3480,13 +3638,21 @@ module.exports = class NoshPlugin extends Plugin {
 
         this.addSettingTab(new NoshSettingTab(this.app, this));
 
-        // Moved notes leave dangling log entries; the cache has to be up first.
-        this.app.workspace.onLayoutReady(() => this.repairLog());
+        /* The log notes are read first, since they are the record; then the
+         * dangling-entry pass. Moved notes leave dangling log entries, and the
+         * cache has to be up for either. */
+        this.app.workspace.onLayoutReady(async () => {
+            const read = await this.readLogNotes();
+            await this.repairLog();
+            if (read) this.refreshViews();
+        });
 
         /* Keep the list in step with the vault, without redrawing it because
-         * somebody typed a word in a note Nosh has never heard of. */
-        this.registerEvent(this.app.metadataCache.on('changed', (file) => {
-            if (this.touches(file)) this.scheduleRefresh();
+         * somebody typed a word in a note Nosh has never heard of. A log
+         * note changing is the day itself changing, and is read back. */
+        this.registerEvent(this.app.metadataCache.on('changed', (file, data, cache) => {
+            if (logNoteDay(file)) this.onLogNoteChanged(file, cache);
+            else if (this.touches(file)) this.scheduleRefresh();
         }));
 
         /* A delete or a rename can strand a log entry, so both ask for the
@@ -3504,7 +3670,8 @@ module.exports = class NoshPlugin extends Plugin {
         }));
 
         this.registerEvent(this.app.vault.on('delete', (file) => {
-            if (this.touches(file)) this.scheduleRefresh(true);
+            if (logNoteDay(file)) this.onLogNoteDeleted(file);
+            else if (this.touches(file)) this.scheduleRefresh(true);
         }));
         this.registerEvent(this.app.vault.on('rename', (file, was) => {
             const knew = this.knownPaths && this.knownPaths.has(was);
@@ -3602,6 +3769,7 @@ module.exports = class NoshPlugin extends Plugin {
      * the fix: settings, targets and the log all come back off disk. */
     async reloadSettings() {
         await this.loadSettings();
+        await this.readLogNotes();
         await this.repairLog();
         this.refreshViews();
     }
@@ -3613,6 +3781,7 @@ module.exports = class NoshPlugin extends Plugin {
     touches(file) {
         if (!file || typeof file.path !== 'string') return false;
         if (!file.path.toLowerCase().endsWith('.md')) return false;
+        if (logNoteDay(file)) return false;
         if (this.knownPaths && this.knownPaths.has(file.path)) return true;
         if (underFolder(file.path, noshFolder(this.settings, ''))) return true;
 
@@ -3643,6 +3812,11 @@ module.exports = class NoshPlugin extends Plugin {
 
     onunload() {
         if (this.refreshTimer) clearTimeout(this.refreshTimer);
+        if (this.logNoteTimer) {
+            clearTimeout(this.logNoteTimer);
+            this.logNoteTimer = null;
+            this.flushLogNotes();
+        }
     }
 
     refreshViews() {
@@ -3689,14 +3863,16 @@ module.exports = class NoshPlugin extends Plugin {
         const settings = this.settings;
         const restrict = settings.restrictToFolder ? noshFolder(settings, '') : '';
         const reports = noshFolder(settings, SUB_REPORTS);
+        const logs = noshFolder(settings, SUB_LOG);
         const ingredients = noshFolder(settings, SUB_INGREDIENTS);
         const out = { meal: [], ingredient: [] };
 
         for (const file of this.app.vault.getMarkdownFiles()) {
             if (restrict && !underFolder(file.path, restrict)) continue;
             /* An exported report is wall-to-wall nutrient numbers and would
-             * read as one enormous meal if it were ever picked up. */
-            if (underFolder(file.path, reports)) continue;
+             * read as one enormous meal if it were ever picked up. A log
+             * note is a day, not a food. */
+            if (underFolder(file.path, reports) || underFolder(file.path, logs)) continue;
 
             const cache = this.app.metadataCache.getFileCache(file);
             if (!cache) continue;
@@ -3880,8 +4056,207 @@ module.exports = class NoshPlugin extends Plugin {
 
         if (changed) {
             await this.saveSettings();
+            /* writeLogNote skips a note that already says the same, so
+             * asking for every day costs only the days that moved. */
+            this.logChanged(Object.keys(this.settings.log));
             this.refreshViews();
         }
+    }
+
+    /* --- the log as notes --------------------------------------------- */
+
+    logNoteFolder() { return noshFolder(this.settings, SUB_LOG); }
+
+    /* The first log notes were filed with the reports. Any still there are
+     * moved into the Log folder, links and all, before the folder is read. */
+    async moveOldLogNotes() {
+        const vault = this.app.vault;
+        const old = vault.getAbstractFileByPath(noshFolder(this.settings, SUB_REPORTS));
+        const kids = old && Array.isArray(old.children) ? old.children.slice() : [];
+        const stray = kids.filter((f) => f.extension === 'md' && logNoteDay(f));
+        if (!stray.length) return;
+        await ensureFolder(vault, this.logNoteFolder());
+        for (const file of stray) {
+            const iso = logNoteDay(file);
+            if (this.logNoteFile(iso)) continue;   // the new folder already has that day
+            this.markLogNote(iso);
+            await this.app.fileManager.renameFile(file, this.logNotePath(iso));
+        }
+    }
+
+    logNotePath(iso) {
+        const folder = this.logNoteFolder();
+        return (folder ? folder + '/' : '') + logNoteName(iso) + '.md';
+    }
+
+    logNoteFile(iso) {
+        const f = this.app.vault.getAbstractFileByPath(this.logNotePath(iso));
+        return f && f.extension === 'md' ? f : null;
+    }
+
+    /* Called wherever the store changes, with the days that did. Writes are
+     * gathered for a moment, so a stepper tapped five times writes once,
+     * and run one after another, so two never race for the same note. */
+    logChanged(isos) {
+        if (!this.settings.logNotes) return;
+        if (!this.dirtyLogDays) this.dirtyLogDays = new Set();
+        for (const iso of [].concat(isos)) if (iso) this.dirtyLogDays.add(iso);
+        if (this.logNoteTimer) clearTimeout(this.logNoteTimer);
+        this.logNoteTimer = setTimeout(() => {
+            this.logNoteTimer = null;
+            this.flushLogNotes();
+        }, 300);
+    }
+
+    flushLogNotes() {
+        const run = async () => {
+            while (this.dirtyLogDays && this.dirtyLogDays.size) {
+                const iso = this.dirtyLogDays.values().next().value;
+                this.dirtyLogDays.delete(iso);
+                try {
+                    await this.writeLogNote(iso);
+                } catch (e) {
+                    new Notice('Nosh: could not write the log note for ' + iso +
+                               ': ' + (e && e.message ? e.message : e), 8000);
+                }
+            }
+        };
+        this.logNoteQueue = (this.logNoteQueue || Promise.resolve()).then(run, run);
+        return this.logNoteQueue;
+    }
+
+    /* Whether a change to this day's note, right now, is one Nosh made
+     * itself. The cache reports a write a beat after it lands, so a day is
+     * left alone while a write is queued and for a moment after. */
+    logNoteQuiet(iso) {
+        if (this.dirtyLogDays && this.dirtyLogDays.has(iso)) return true;
+        const at = (this.logNoteWrote || {})[iso];
+        return !!at && Date.now() - at < 2000;
+    }
+
+    markLogNote(iso) {
+        if (!this.logNoteWrote) this.logNoteWrote = {};
+        this.logNoteWrote[iso] = Date.now();
+    }
+
+    async writeLogNote(iso) {
+        const app = this.app;
+        const vault = app.vault;
+        const day = this.settings.log[iso] || {};
+        const path = this.logNotePath(iso);
+        const rows = logNoteRows(app, day, path);
+        const file = this.logNoteFile(iso);
+        const tag = kindTag(this.settings, 'log');
+
+        if (!rows.length) {
+            if (!file) return;
+            /* A day emptied takes its note with it, unless somebody wrote
+             * something of their own in there. */
+            this.markLogNote(iso);
+            if (!hasOwnWords(await vault.read(file))) {
+                if (typeof app.fileManager.trashFile === 'function') {
+                    await app.fileManager.trashFile(file);
+                } else {
+                    await vault.trash(file, true);
+                }
+                return;
+            }
+        }
+
+        if (!file) {
+            this.markLogNote(iso);
+            await ensureFolder(vault, this.logNoteFolder());
+            await vault.create(path, logNoteText(iso, rows, this.settings));
+            return;
+        }
+
+        /* Already saying the same: a stepper nudged up and back, or a repair
+         * that moved nothing here. */
+        const says = parseLogNote(app, file, app.metadataCache.getFileCache(file));
+        if (says && sameDay(says, day) &&
+            !rows.some((r) => !vault.getAbstractFileByPath(r.path))) return;
+
+        this.markLogNote(iso);
+        await app.fileManager.processFrontMatter(file, (fm) => {
+            fm.day = iso;
+            fm.log = rows.map((r) => {
+                const e = { note: '[[' + r.link + ']]' };
+                if (r.occasion) e.occasion = r.occasion;
+                e.servings = r.servings;
+                return e;
+            });
+            const tags = Array.isArray(fm.tags) ? fm.tags.slice()
+                : fm.tags ? [String(fm.tags)] : [];
+            if (!tags.includes(tag)) tags.push(tag);
+            fm.tags = tags;
+        });
+        this.markLogNote(iso);
+        await vault.process(file, (text) => spliceLogBlock(text, logNoteBlock(iso, rows)));
+        this.markLogNote(iso);
+    }
+
+    /* At load, and when the notes are switched on. What the notes say wins
+     * over what data.json remembers, and any day the store has that no note
+     * does is written out - which is how a log kept before the notes
+     * existed becomes notes. Returns whether the store changed. */
+    async readLogNotes() {
+        if (!this.settings.logNotes) return false;
+        const app = this.app;
+        try {
+            await this.moveOldLogNotes();
+        } catch (e) {
+            new Notice('Nosh: could not move the log notes out of Reports: ' +
+                       (e && e.message ? e.message : e), 8000);
+        }
+        const folder = app.vault.getAbstractFileByPath(this.logNoteFolder());
+        const seen = new Set();
+        let changed = false;
+
+        for (const file of (folder && Array.isArray(folder.children)) ? folder.children : []) {
+            const iso = file.extension === 'md' ? logNoteDay(file) : '';
+            if (!iso) continue;
+            seen.add(iso);
+            const day = parseLogNote(app, file, app.metadataCache.getFileCache(file));
+            if (!day || sameDay(this.settings.log[iso], day)) continue;
+            if (Object.keys(day).length) this.settings.log[iso] = day;
+            else delete this.settings.log[iso];
+            changed = true;
+        }
+
+        const missing = Object.keys(this.settings.log).filter((iso) =>
+            !seen.has(iso) && logRows(this.settings.log, iso).length);
+        if (changed) await this.saveSettings();
+        if (missing.length) {
+            this.logChanged(missing);
+            if (missing.length > 1) {
+                new Notice('Nosh: writing a log note for each of ' + missing.length +
+                           ' days into ' + (this.logNoteFolder() || 'the vault root') + '.');
+            }
+        }
+        return changed;
+    }
+
+    onLogNoteChanged(file, cache) {
+        const iso = logNoteDay(file);
+        if (!iso || !this.settings.logNotes) return;
+        if (!underFolder(file.path, this.logNoteFolder())) return;
+        if (this.logNoteQuiet(iso)) return;
+        const day = parseLogNote(this.app, file, cache || this.app.metadataCache.getFileCache(file));
+        if (!day || sameDay(this.settings.log[iso], day)) return;
+        if (Object.keys(day).length) this.settings.log[iso] = day;
+        else delete this.settings.log[iso];
+        this.saveSettings();
+        this.scheduleRefresh(true);
+    }
+
+    onLogNoteDeleted(file) {
+        const iso = logNoteDay(file);
+        if (!iso || !this.settings.logNotes) return;
+        if (!underFolder(file.path, this.logNoteFolder())) return;
+        if (this.logNoteQuiet(iso) || !this.settings.log[iso]) return;
+        delete this.settings.log[iso];
+        this.saveSettings();
+        this.scheduleRefresh();
     }
 };
 
@@ -4154,10 +4529,13 @@ class NoshView extends ItemView {
 
     async forgetMissing(days) {
         const log = this.plugin.settings.log;
+        const touched = new Set();
         for (const gone of this.missingFor(days)) {
             logSet(log, gone.iso, gone.occasion, gone.path, 0);
+            touched.add(gone.iso);
         }
         await this.plugin.saveSettings();
+        this.plugin.logChanged(Array.from(touched));
         this.refresh();
     }
 
@@ -4554,6 +4932,7 @@ class NoshView extends ItemView {
 
         for (const d of days) delete this.plugin.settings.log[d];
         await this.plugin.saveSettings();
+        this.plugin.logChanged(days);
         this.refresh();
     }
 
@@ -5910,6 +6289,7 @@ class NoshView extends ItemView {
         logSet(log, this.cursor, slot, path, servings);
 
         await this.plugin.saveSettings();
+        this.plugin.logChanged(this.cursor);
         this.keepScroll(() => {
             this.renderNav();
             this.renderTotals();
@@ -5955,7 +6335,7 @@ class NoshSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Nosh folder')
             .setDesc('Where Nosh files what it creates. It makes Meals, Ingredients ' +
-                     'and Reports underneath. A vault-relative path; empty puts them ' +
+                     'Reports and Log underneath. A vault-relative path; empty puts them ' +
                      'at the vault root.')
             .addText((t) => t
                 .setPlaceholder('Nosh')
@@ -5963,6 +6343,22 @@ class NoshSettingTab extends PluginSettingTab {
                 .onChange(async (v) => {
                     this.plugin.settings.noshFolder = v.trim();
                     await this.plugin.saveSettings();
+                    this.plugin.refreshViews();
+                }));
+
+        new Setting(containerEl)
+            .setName('Keep a log note per day')
+            .setDesc('Each day with anything logged is also written as a note in ' +
+                     'Log - "Nosh log 2026-09-17" - with the log in its ' +
+                     'frontmatter, where a search, a backlink or a Dataview query ' +
+                     'can see it. Edit the note and the day follows; delete it and ' +
+                     'the day is cleared.')
+            .addToggle((t) => t
+                .setValue(this.plugin.settings.logNotes !== false)
+                .onChange(async (v) => {
+                    this.plugin.settings.logNotes = v;
+                    await this.plugin.saveSettings();
+                    if (v) await this.plugin.readLogNotes();
                     this.plugin.refreshViews();
                 }));
 

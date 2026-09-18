@@ -49,7 +49,7 @@ written by hand tends to carry. The umbrella tag is configurable.
 
 This means a vault that already keeps recipes somewhere needs no rearranging.
 The **Nosh folder** setting only decides where Nosh *files new notes* — it makes
-`Meals`, `Ingredients` and `Reports` beneath whatever folder you name. If you
+`Meals`, `Ingredients`, `Reports` and `Log` beneath whatever folder you name. If you
 would rather it only looked there, there is a setting for that.
 
 ## Frontmatter
@@ -106,6 +106,39 @@ Its totals are recomputed from those parts every time the vault is read, so
 correcting one ingredient corrects every meal built on it — and every day those
 meals were eaten. The totals are written into frontmatter as well, so the note
 still means something to Dataview, to a reader, and to anyone you share it with.
+
+### The day's log
+
+What you logged lives in the plugin's own store, which is what keeps the
+views quick. It is also written out, a note a day, into a `Log` folder beside
+Meals, Ingredients and Reports:
+
+```yaml
+---
+day: 2026-09-17
+log:
+  - note: "[[Oatmeal]]"
+    occasion: Breakfast
+    servings: 1
+  - note: "[[Banana]]"
+    occasion: Snack
+    servings: 1.5
+tags:
+  - nutrition/log
+---
+```
+
+with the same list, readable, underneath. `Nosh log 2026-09-17` is the
+record and the store is the cache. A search, a backlink, a Dataview query or
+a backup of your notes all see it, and an ingredient note knows the days it
+was eaten. Edit the frontmatter and the day follows; a note arriving from
+another device is read the same way. Delete the note and the day is cleared.
+
+A day emptied in the picker takes its note with it, unless you wrote
+something of your own in there. The list sits between two markers, and
+anything outside them is yours and survives every rewrite. Turning the notes
+on over a log kept before they existed writes one for every day that has
+anything in it. Off in settings if you would rather not have them.
 
 ## The score
 
