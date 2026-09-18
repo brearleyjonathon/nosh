@@ -491,6 +491,12 @@ button { font: inherit; color: inherit; }
 .seg button[aria-pressed="true"] { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-text); }
 .seg button small { display: block; font-weight: 400; font-size: 0.75rem; color: var(--text-3); margin-top: 2px; }
 .tg-panel { display: grid; gap: 22px; }
+.tg-status { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--primary-soft); color: var(--primary-text); font-size: 0.9375rem; }
+.tg-status svg { flex: none; width: 18px; height: 18px; }
+.tg-status b { font-weight: 600; }
+.tg-row { transition: background-color .6s ease; border-radius: 6px; }
+.tg-row.changed { background: var(--primary-soft); transition: none; }
+.tg-row.changed.typed { background: var(--accent-soft); }
 .tg-table { display: grid; }
 .tg-table h3 { font-size: 0.8125rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
 .tg-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--rule); font-size: 0.9375rem; }
@@ -1091,7 +1097,11 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
         </div>
       </div>
 
-      <div class="panel tg-panel reveal" style="--i:2" aria-live="polite" aria-atomic="false">
+      <div class="panel tg-panel reveal" style="--i:2">
+        <div class="tg-status" id="tgStatus" aria-live="polite">
+          <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>
+          <span>Targets filled in for <b class="num" id="tgStatusKcal">2,000</b> kcal and <b class="num" id="tgStatusNa">2,300</b> mg sodium.</span>
+        </div>
         <div class="tg-table" id="tgNutrients">
           <h3>Daily nutrient targets</h3>
           <div class="tg-row follows" data-t="calories"><span>Calories</span><b class="num">2,000 kcal</b></div>
@@ -1586,14 +1596,26 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
     var sodium = 2300;
     var half = function (n) { return Math.round(n * 2) / 2; };
     var g = function (n) { return n.toLocaleString(undefined, { maximumFractionDigits: 1 }); };
+    var statusKcal = document.getElementById('tgStatusKcal');
+    var statusNa = document.getElementById('tgStatusNa');
     function setRow(sel, text) {
       var row = document.querySelector(sel);
-      if (row) row.querySelector('b').textContent = text;
+      if (!row) return;
+      var b = row.querySelector('b');
+      if (b.textContent === text) return;
+      b.textContent = text;
+      if (reduced) return;
+      row.classList.remove('changed');
+      void row.offsetWidth;
+      row.classList.add('changed');
+      requestAnimationFrame(function () { requestAnimationFrame(function () { row.classList.remove('changed'); }); });
     }
     function render() {
       var kcal = Math.max(1000, Math.min(4000, parseInt(range.value, 10) || REF));
       var by = kcal / REF;
       out.textContent = fmt(kcal, 0);
+      statusKcal.textContent = fmt(kcal, 0);
+      statusNa.textContent = fmt(sodium, 0);
       range.style.setProperty('--pct', ((kcal - 1000) / 3000 * 100) + '%');
       setRow('[data-t="calories"]', fmt(kcal, 0) + ' kcal');
       SCALED.forEach(function (k) { setRow('[data-t="' + k + '"]', fmt(Math.round(BASE[k] * by), 0) + ' ' + UNIT[k]); });
