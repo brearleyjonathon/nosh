@@ -11,7 +11,8 @@ Nothing leaves your vault unless you ask it to.
 
 <img width="1280" height="640" alt="social-card" src="https://github.com/user-attachments/assets/e8c896e9-895b-4724-b388-564374928c41" />
 
-Visit the new website: [nosh.heath](nosh.health) 
+
+**Visit the new website:** [nosh.heath](nosh.health) 
 
 ## Disclosures
 
