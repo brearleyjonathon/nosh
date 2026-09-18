@@ -2475,23 +2475,55 @@ function foodRows(byDay) {
 }
 
 function reportTitle(r) {
+    if (r.mode === 'month') return 'Nosh ' + r.days[0].slice(0, 7);
     return 'Nosh ' + r.days[0] +
            (r.mode === 'week' ? ' to ' + r.days[r.days.length - 1] : '');
+}
+
+/* Which foods carried each nutrient, as the lines of a table; nothing at all
+ * when nothing was eaten. The day, the week and the month all carry it. */
+function foodTable(r) {
+    const foods = foodRows(r.byDay);
+    if (!foods.length) return [];
+    const lines = ['', '## By food', ''];
+    lines.push('| Food | Servings | ' +
+               NUTRIENTS.map((n) => n.label + ' (' + n.unit + ')').join(' | ') + ' |');
+    lines.push('|---|---:|' + NUTRIENTS.map(() => '---:').join('|') + '|');
+    const top = {};
+    for (const n of NUTRIENTS) {
+        top[n.key] = Math.max.apply(null, foods.map((f) => f.values[n.key]));
+    }
+    for (const f of foods) {
+        lines.push('| ' + f.name + ' | ' + fmt(f.servings) + ' | ' + NUTRIENTS.map((n) => {
+            const v = f.values[n.key];
+            const lead = foods.length > 1 && v > 0 && v === top[n.key];
+            return lead ? '**' + fmt(v) + '**' : fmt(v);
+        }).join(' | ') + ' |');
+    }
+    lines.push('| *Total* | | ' + NUTRIENTS.map((n) =>
+        '*' + fmt(r.totals[n.key]) + '*').join(' | ') + ' |');
+    return lines;
 }
 
 /* Deliberately carries no nutrient fields and not the meal tag: collectNotes()
  * picks up anything with a calories field, and a report is not a thing you
  * ate. */
-function reportMarkdown(r) {
-    const lines = ['---'];
-    lines.push('date: ' + yamlStr(stamp(r.days[0])));
-    lines.push('nosh_report: ' + r.mode);
-    lines.push('tags:');
-    lines.push('  - nosh-report');
-    lines.push('---');
+function reportHead(r) {
+    return [
+        '---',
+        'date: ' + yamlStr(stamp(r.days[0])),
+        'nosh_report: ' + r.mode,
+        'tags:',
+        '  - nosh-report',
+        '---',
+        '',
+        '# Nosh · ' + r.span,
+    ];
+}
 
-    lines.push('');
-    lines.push('# Nosh · ' + r.span);
+function reportMarkdown(r) {
+    if (r.mode === 'month') return monthReportMarkdown(r);
+    const lines = reportHead(r);
     lines.push('');
     lines.push(r.meals
         ? r.meals + (r.meals === 1 ? ' entry · ' : ' entries · ') + fmt(r.totals.calories) +
@@ -2552,28 +2584,7 @@ function reportMarkdown(r) {
      * straight down to the thing that brought it. The same food eaten twice
      * is one row with its servings added up, since the question is about
      * the food and not the sitting. */
-    const foods = foodRows(r.byDay);
-    if (foods.length) {
-        lines.push('');
-        lines.push('## By food');
-        lines.push('');
-        lines.push('| Food | Servings | ' +
-                   NUTRIENTS.map((n) => n.label + ' (' + n.unit + ')').join(' | ') + ' |');
-        lines.push('|---|---:|' + NUTRIENTS.map(() => '---:').join('|') + '|');
-        const top = {};
-        for (const n of NUTRIENTS) {
-            top[n.key] = Math.max.apply(null, foods.map((f) => f.values[n.key]));
-        }
-        for (const f of foods) {
-            lines.push('| ' + f.name + ' | ' + fmt(f.servings) + ' | ' + NUTRIENTS.map((n) => {
-                const v = f.values[n.key];
-                const lead = foods.length > 1 && v > 0 && v === top[n.key];
-                return lead ? '**' + fmt(v) + '**' : fmt(v);
-            }).join(' | ') + ' |');
-        }
-        lines.push('| *Total* | | ' + NUTRIENTS.map((n) =>
-            '*' + fmt(r.totals[n.key]) + '*').join(' | ') + ' |');
-    }
+    lines.push.apply(lines, foodTable(r));
 
     lines.push('');
     lines.push('## By day');
@@ -2592,6 +2603,147 @@ function reportMarkdown(r) {
                        (e.amount ? ' (' + e.amount + ')' : '') +
                        ' — ' + fmt(e.calories) + ' kcal, ' + fmt(e.sodium) + ' mg sodium');
         }
+    }
+
+    lines.push('');
+    return lines.join('\n');
+}
+
+/* What a group is aiming at, in the words every table uses. */
+function groupTargetText(g) {
+    return g.shape === 'ceiling'
+        ? '≤ ' + fmt(g.max)
+        : (g.min === g.max ? fmt(g.max) : fmt(g.min) + '–' + fmt(g.max));
+}
+
+/* A change with its sign on, because a column of bare numbers does not say
+ * which way they went. */
+function signed(n) {
+    const rounded = Math.round(n * 10) / 10;
+    return rounded > 0 ? '+' + fmt(rounded) : rounded < 0 ? '−' + fmt(-rounded) : '0';
+}
+
+/* A month is not a long week. Its totals are totals against no target, and
+ * the days nobody logged are missing rather than empty, so everything here is
+ * an average over the days that were logged, read against the daily target -
+ * and a weekly group against its weekly one, as so many servings in seven
+ * logged days. What a month can say that a week cannot is which way things
+ * are going: against the month before, and week by week inside itself. */
+function monthReportMarkdown(r) {
+    const lines = reportHead(r);
+    lines.push('');
+    if (!r.meals) {
+        lines.push('Nothing logged.');
+        lines.push('');
+        return lines.join('\n');
+    }
+    lines.push('Logged ' + r.logged + ' of ' + r.elapsed + (r.elapsed === 1 ? ' day' : ' days') +
+               (r.elapsed < r.days.length ? ' so far' : '') + ' · ' +
+               r.meals + (r.meals === 1 ? ' entry · ' : ' entries · ') +
+               fmt(r.totals.calories / r.logged) + ' kcal/day on the days logged');
+
+    const sc = r.score.month;
+    if (sc) {
+        lines.push('');
+        lines.push('Score · month ' + sc.score + ' out of 100' +
+                   (r.score.last ? ' · last month ' + r.score.last.score : ''));
+        const drawn = [];
+        if (sc.reach !== null) drawn.push('reached ' + Math.round(sc.reach * 100) + '% of what to reach');
+        if (sc.excess) drawn.push('worst excess ' + Math.round(sc.excess * 100) + '% over');
+        if (drawn.length) lines.push(drawn.join(' · ').replace(/^./, (c) => c.toUpperCase()));
+        if (sc.worst.length) {
+            lines.push('Costing most: ' + sc.worst.map((b) =>
+                b.label + ' ' + Math.round(b.credit * 100) + '%').join(', '));
+        }
+    }
+
+    /* Progress, as far as numbers can say it. Left out altogether when the
+     * month before has nothing in it, rather than printed as a column of
+     * dashes that reads like a month of eating nothing. */
+    if (r.last) {
+        lines.push('');
+        lines.push('## Against last month');
+        lines.push('');
+        lines.push('| Metric | This month | ' + r.last.span + ' | Change |');
+        lines.push('|---|---:|---:|---:|');
+        if (sc && r.score.last) {
+            lines.push('| Score | ' + sc.score + ' | ' + r.score.last.score +
+                       ' | ' + signed(sc.score - r.score.last.score) + ' |');
+        }
+        lines.push('| Days logged | ' + r.logged + ' | ' + r.last.logged +
+                   ' | ' + signed(r.logged - r.last.logged) + ' |');
+        for (const n of r.nutrients) {
+            lines.push('| ' + n.label + ' (' + n.unit + '/day) | ' + fmt(n.value) +
+                       ' | ' + fmt(n.last) + ' | ' + signed(n.value - n.last) + ' |');
+        }
+        for (const g of r.groups) {
+            lines.push('| ' + g.label + ' (servings/' + (g.period === 'week' ? '7 days' : 'day') +
+                       ') | ' + fmt(g.value) + ' | ' + fmt(g.last) +
+                       ' | ' + signed(g.value - g.last) + ' |');
+        }
+    }
+
+    lines.push('');
+    lines.push('## Nutrients · a logged day, on average');
+    lines.push('');
+    lines.push('| Metric | Average | Target | Share | |');
+    lines.push('|---|---|---|---|---|');
+    for (const n of r.nutrients) {
+        lines.push('| ' + n.label +
+                   ' | ' + fmt(n.value) + ' ' + n.unit +
+                   ' | ' + (n.target ? fmt(n.target) + ' ' + n.unit : '—') +
+                   ' | ' + (n.target ? Math.round(n.pct) + '%' : '—') +
+                   ' | ' + STATE_MARK[n.state] + ' |');
+    }
+
+    lines.push('');
+    lines.push('## Food groups · on average');
+    lines.push('');
+    lines.push('| Group | Servings | Target | Over | |');
+    lines.push('|---|---|---|---|---|');
+    for (const g of r.groups) {
+        lines.push('| ' + g.label +
+                   ' | ' + fmt(g.value) +
+                   ' | ' + groupTargetText(g) +
+                   ' | ' + (g.period === 'week' ? '7 logged days' : 'a logged day') +
+                   ' | ' + STATE_MARK[g.state] + ' |');
+    }
+
+    /* The month from the inside: whether it was getting better as it went.
+     * Whole weeks, scored as the Week tab scores them, so the first and the
+     * last may reach into the months either side. */
+    const weekly = r.groups.filter((g) => g.period === 'week');
+    lines.push('');
+    lines.push('## By week');
+    lines.push('');
+    lines.push('| Week | Days logged | kcal/day | Score |' + weekly.map((g) =>
+        ' ' + g.label + ' (' + groupTargetText(g) + ') |').join(''));
+    lines.push('|---|---:|---:|---:|' + weekly.map(() => '---:|').join(''));
+    for (const w of r.weeks) {
+        lines.push('| ' + w.span + ' | ' + w.logged +
+                   ' | ' + (w.logged ? fmt(w.totals.calories / w.logged) : '—') +
+                   ' | ' + (w.score ? w.score.score : '—') + ' |' +
+                   weekly.map((g) => ' ' + (w.logged ? fmt(w.totals[g.key]) : '—') + ' |').join(''));
+    }
+
+    lines.push.apply(lines, foodTable(r));
+
+    /* A row a day rather than a list of what was eaten: thirty lists is a
+     * scroll, and the day's own report is one click away on the Day tab. */
+    lines.push('');
+    lines.push('## By day');
+    lines.push('');
+    lines.push('| Day | Entries | Score | ' +
+               NUTRIENTS.map((n) => n.label + ' (' + n.unit + ')').join(' | ') + ' |');
+    lines.push('|---|---:|---:|' + NUTRIENTS.map(() => '---:').join('|') + '|');
+    for (const d of r.byDay) {
+        /* Today is still being eaten: its score is paced, its totals are not,
+         * and a reader of either should know which day that is. */
+        lines.push('| ' + d.label + (d.live ? ' (today, so far)' : '') +
+                   ' | ' + d.entries.length +
+                   ' | ' + (d.score ? d.score.score : '—') + ' | ' +
+                   NUTRIENTS.map((n) => d.entries.length ? fmt(d.totals[n.key]) : '—')
+                       .join(' | ') + ' |');
     }
 
     lines.push('');
@@ -2651,8 +2803,91 @@ function aiReportTool() {
         });
 }
 
-async function aiReading(plugin, markdown) {
-    const tool = aiReportTool();
+/* A month is asked a different question. A day or a week is read for what it
+ * shows; a month is long enough to be going somewhere, so it is read for
+ * which way - against the month before, and week by week inside itself - and
+ * for what to change, which a single week is too short to say with a straight
+ * face. */
+const AI_MONTH_SYSTEM = [
+    'You read a month of a DASH diet log and say how it is going and what to',
+    'change. The tables you are given are the whole truth: every figure in your',
+    'answer must come from them, and you may not estimate one that is missing.',
+    '',
+    '- Progress first. Where there is a table against last month, say what moved',
+    '  and whether the move matters. The By week table says whether the month was',
+    '  getting better or worse as it went; the By day table says how steady it was.',
+    '- A day marked "today, so far" is unfinished: it is in the averages, and',
+    '  pulls them down by however much of it is still to be eaten. Do not read it',
+    '  as a short day.',
+    '- Days with nothing logged are missing, not days of eating nothing. Every',
+    '  average is over the days logged. Where few days are logged - this month or',
+    '  the one before - say how far the comparison can be trusted, once.',
+    '- Never restate a figure a table already shows without saying something',
+    '  about it. The reader can see that sodium averages 112%; tell them which',
+    '  weeks and which foods put it there.',
+    '- Rank improvements by what costs the score most - the "Costing most" line',
+    '  already counts the weights this person has set - and keep to the few that',
+    '  would move it. Each one names a food from the By food table: what to eat',
+    '  more often, what to eat less of, what to swap for what. "The miso soup',
+    '  carries a fifth of the month\'s sodium; halve it" beats "watch your sodium".',
+    '- A target marked · is shown for reference and is not being aimed at. Leave',
+    '  it alone.',
+    '- If almost nothing is logged, say so in the headline and stop. Do not read a',
+    '  trend into three days.',
+    '- No preamble, no cheerleading, no restating the month.',
+].join('\n');
+
+function aiMonthTool() {
+    return aiSchema(
+        'write_month_reading',
+        'Record a reading of a month of a DASH log: the progress made, the ways ' +
+        'to improve, and what is worth keeping. Call this once.',
+        {
+            headline: {
+                type: 'string',
+                description: 'One sentence: where this month stands and which way it is heading.',
+            },
+            progress: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Two to four remarks on progress: what changed against last ' +
+                             'month, and how the weeks of this month compare with each other.',
+            },
+            improve: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Two to four ways to improve next month, most valuable first, ' +
+                             'each naming a food from the log and what to do with it.',
+            },
+            working: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'One or two habits or foods that are earning their place.',
+            },
+        });
+}
+
+/* Which prompt, which form, and the headings its answers are filed under. */
+const AI_READINGS = {
+    span: {
+        system: AI_REPORT_SYSTEM, tool: aiReportTool,
+        sections: [['Across the days', 'patterns'], ['Worth watching', 'watch'],
+                   ['Working', 'working']],
+    },
+    month: {
+        system: AI_MONTH_SYSTEM, tool: aiMonthTool,
+        sections: [['Progress', 'progress'], ['Ways to improve', 'improve'],
+                   ['Worth keeping', 'working']],
+    },
+};
+
+function readingKind(mode) {
+    return mode === 'month' ? AI_READINGS.month : AI_READINGS.span;
+}
+
+async function aiReading(plugin, markdown, mode) {
+    const kind = readingKind(mode);
+    const tool = kind.tool();
     const headers = await aiHeaders(plugin.settings);
 
     const res = await aiCall(headers, {
@@ -2660,7 +2895,7 @@ async function aiReading(plugin, markdown) {
         max_tokens: 4096,
         thinking: { type: 'adaptive' },
         output_config: { effort: plugin.settings.aiEffort || 'medium' },
-        system: AI_REPORT_SYSTEM,
+        system: kind.system,
         tools: [tool],
         tool_choice: { type: 'tool', name: tool.name },
         messages: [{ role: 'user', content: markdown }],
@@ -2680,7 +2915,7 @@ async function aiReading(plugin, markdown) {
     return block.input;
 }
 
-function readingMarkdown(reading, model) {
+function readingMarkdown(reading, model, mode) {
     const bullets = (label, items) => {
         const list = Array.isArray(items) ? items.filter(Boolean) : [];
         if (!list.length) return [];
@@ -2691,9 +2926,9 @@ function readingMarkdown(reading, model) {
 
     const lines = ['', '## Reading', ''];
     if (reading.headline) lines.push(String(reading.headline).trim());
-    lines.push.apply(lines, bullets('Across the days', reading.patterns));
-    lines.push.apply(lines, bullets('Worth watching', reading.watch));
-    lines.push.apply(lines, bullets('Working', reading.working));
+    for (const s of readingKind(mode).sections) {
+        lines.push.apply(lines, bullets(s[0], reading[s[1]]));
+    }
     lines.push('');
     /* Whose reading this is, so a note read months later is not mistaken for
      * something measured. */
@@ -3179,7 +3414,7 @@ module.exports = class NoshPlugin extends Plugin {
             const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_DASH)[0];
             if (!leaf || !(leaf.view instanceof NoshView)) {
                 await this.activateView();
-                new Notice('Opened Nosh — pick a day or week, then run this again.');
+                new Notice('Opened Nosh — pick a day, week or month, then run this again.');
                 return;
             }
             try {
@@ -5438,6 +5673,7 @@ class NoshView extends ItemView {
     /* Everything a report needs, gathered once: the totals the bars already
      * read, plus the day-by-day detail they have no room to show. */
     reportData() {
+        if (this.mode === 'month') return this.monthReportData();
         const week = this.mode === 'week';
         const days = this.daysInView();
         const scale = week ? 7 : 1;
@@ -5481,22 +5717,7 @@ class NoshView extends ItemView {
         const byDay = days.map((iso) => ({
             iso: iso,
             label: humanDay(iso),
-            entries: this.entriesFor(iso).map((e) => ({
-                name: e.recipe.name,
-                /* Where it was actually eaten. The note's own meal_type only
-                 * ever said where it was eaten the first time, and a report
-                 * that used it filed a banana under Breakfast whatever the
-                 * sidebar showed. */
-                meal: occasionLabel(e.occasion),
-                amount: e.recipe.amount,
-                servings: e.servings,
-                calories: e.recipe.values.calories * e.servings,
-                sodium: e.recipe.values.sodium_mg * e.servings,
-                /* Every nutrient, scaled to what was eaten, for the table that
-                 * says which foods carried each one. */
-                values: Object.fromEntries(NUTRIENTS.map((n) =>
-                    [n.key, parseNum(e.recipe.values[n.key]) * e.servings])),
-            })),
+            entries: this.reportEntries(iso),
         }));
 
         return {
@@ -5511,23 +5732,131 @@ class NoshView extends ItemView {
         };
     }
 
+    /* One day's entries as a report lists them. */
+    reportEntries(iso) {
+        return this.entriesFor(iso).map((e) => ({
+            name: e.recipe.name,
+            /* Where it was actually eaten. The note's own meal_type only
+             * ever said where it was eaten the first time, and a report
+             * that used it filed a banana under Breakfast whatever the
+             * sidebar showed. */
+            meal: occasionLabel(e.occasion),
+            amount: e.recipe.amount,
+            servings: e.servings,
+            calories: e.recipe.values.calories * e.servings,
+            sodium: e.recipe.values.sodium_mg * e.servings,
+            /* Every nutrient, scaled to what was eaten, for the table that
+             * says which foods carried each one. */
+            values: Object.fromEntries(NUTRIENTS.map((n) =>
+                [n.key, parseNum(e.recipe.values[n.key]) * e.servings])),
+        }));
+    }
+
+    /* The month on screen and the one before it, each boiled down to the
+     * same figures so the two can sit side by side. Everything is an average
+     * over the days logged: a day nobody logged is missing, not a zero, which
+     * is how the score already reads it. A weekly group is given as servings
+     * in seven logged days, so it can be read against its weekly target
+     * however patchy the logging was. */
+    monthReportData() {
+        const settings = this.plugin.settings;
+        const days = monthDays(this.cursor);
+        const today = todayIso();
+
+        const figures = (span, weekly) => {
+            const logged = span.filter((d) => this.entriesFor(d).length);
+            const totalled = this.totalsFor(logged);
+            return {
+                logged: logged.length, meals: totalled.meals, totals: totalled.totals,
+                score: this.spanScore(span, weekly),
+            };
+        };
+        const perDay = (f, key, days) => f && f.logged ? (f.totals[key] / f.logged) * days : 0;
+
+        const now = figures(days, false);
+        const lastDays = monthDays(addMonths(this.cursor, -1));
+        const before = figures(lastDays, false);
+        const last = before.logged ? before : null;
+
+        const nutrients = NUTRIENTS.map((n) => {
+            const target = parseNum(settings.targets[n.key]);
+            const value = perDay(now, n.key, 1);
+            const pct = target > 0 ? (value / target) * 100 : 0;
+            const shape = nutrientShape(n, settings);
+            return {
+                key: n.key, label: n.label, unit: n.unit, dir: shape,
+                value: value, target: target, pct: pct,
+                state: nutrientState(shape, pct),
+                last: perDay(last, n.key, 1),
+            };
+        });
+
+        const groups = FOOD_GROUPS.map((g) => {
+            const t = settings.groupTargets[g.key] || DEFAULT_GROUP_TARGETS[g.key];
+            const over = g.period === 'week' ? 7 : 1;
+            const min = parseNum(t.min);
+            const max = parseNum(t.max);
+            const value = perDay(now, g.key, over);
+            const shape = groupShape(g, settings);
+            return {
+                key: g.key, label: g.label, period: g.period, shape: shape,
+                value: value, min: min, max: max,
+                state: groupState(shape, value, min, max),
+                last: perDay(last, g.key, over),
+            };
+        });
+
+        /* Whole weeks, as the grid draws them, each scored as the Week tab
+         * would score it. */
+        const weeks = [];
+        const lastDay = days[days.length - 1];
+        for (let iso = weekDays(days[0], settings.weekStart)[0]; iso <= lastDay;
+             iso = addDays(iso, 7)) {
+            const span = weekDays(iso, settings.weekStart);
+            const week = Object.assign({ span: humanWeek(span) }, figures(span, true));
+            /* A week that has not started is not a week that was skipped. */
+            if (week.logged || span[0] <= today) weeks.push(week);
+        }
+
+        /* The rest of a month still under way has not happened yet, and a row
+         * of dashes for each day of it would say it had been skipped. */
+        const shown = days.filter((d) => d <= today || this.entriesFor(d).length);
+        const byDay = shown.map((iso) => ({
+            iso: iso,
+            label: humanDay(iso),
+            entries: this.reportEntries(iso),
+            totals: this.totalsFor([iso]).totals,
+            score: this.dayScore(iso),
+            live: iso === today,
+        }));
+
+        return {
+            mode: 'month',
+            span: humanMonth(this.cursor),
+            days: days, elapsed: shown.length, logged: now.logged,
+            meals: now.meals, totals: now.totals,
+            nutrients: nutrients, groups: groups, weeks: weeks, byDay: byDay,
+            last: last && { span: humanMonth(lastDays[0]), logged: last.logged },
+            score: { month: now.score, last: last && last.score },
+        };
+    }
+
     /* The tables are written whatever happens; a reading is an extra section
      * on top. If the API is down you still get the report, and a notice
      * saying why it came without one. */
     async exportReport(withReading) {
-        if (this.mode === 'month') {
-            throw new Error('A report is a day or a week. Pick one and export that.');
-        }
         const settings = this.plugin.settings;
         const r = this.reportData();
         let body = reportMarkdown(r);
 
         const wants = withReading === undefined ? !!settings.aiReading : withReading;
-        if (wants) {
+        /* An empty month is one line saying so, and there is nothing in one
+         * line for anybody to read. */
+        if (wants && (r.mode !== 'month' || r.meals)) {
             new Notice('Reading the log…');
             try {
-                const reading = await aiReading(this.plugin, body);
-                body += readingMarkdown(reading, aiModelId(settings));
+                const reading = await aiReading(this.plugin, body, r.mode);
+                body += readingMarkdown(reading, aiModelId(settings), r.mode);
             } catch (e) {
                 new Notice('Report written without a reading: ' +
                            (e && e.message ? e.message : e), 8000);
@@ -5538,7 +5867,7 @@ class NoshView extends ItemView {
         const folder = noshFolder(settings, SUB_REPORTS);
         await ensureFolder(vault, folder);
 
-        /* One report a day or a week. Exporting the same span again rewrites
+        /* One report a day, a week or a month. Exporting the same span again rewrites
          * the note already there - anything typed into it by hand goes with
          * it - rather than filing "Nosh 2026-09-15 2" beside it. */
         const name = safeName(reportTitle(r));
@@ -5763,7 +6092,8 @@ class NoshSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Read the log in reports')
             .setDesc('Adds a Reading section to an exported report — what the days show, '
-                     + 'what to watch — written from the tables in the report itself. '
+                     + 'what to watch; for a month, the progress made and ways to improve — '
+                     + 'written from the tables in the report itself, which are sent to Claude. '
                      + 'The palette has both commands either way.')
             .addToggle((tg) => tg
                 .setValue(!!this.plugin.settings.aiReading)

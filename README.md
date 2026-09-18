@@ -213,8 +213,8 @@ its day.
 
 ## Reports
 
-Export what is on screen — a day or a week — as a markdown note: the totals, the
-bars, and the day-by-day detail behind them.
+Export what is on screen — a day, a week or a month — as a markdown note: the
+totals, the bars, and the day-by-day detail behind them.
 
 Between the two sits a **By food** table: a row for each food eaten, a column
 for each nutrient, the largest figure in every column in bold. Read the sodium
@@ -222,9 +222,29 @@ column down and it lands on the thing that brought it. A food eaten twice is
 one row with its servings added up, since the question is about the food and
 not the sitting.
 
-There is one report per day or week. Exporting the same span again rewrites
-that note in place, so anything typed into it by hand is replaced along with
-the numbers.
+A **month** is not a long week, and its report is shaped differently. A
+month's totals are totals against no target, and a day nobody logged is
+missing rather than empty, so every figure is an average over the days that
+were logged, read against the daily target. A weekly group is given as
+servings in seven logged days, so it still reads against its weekly target
+however patchy the logging was. What a month can say that a week cannot is
+which way things are going, so it carries two tables of its own:
+
+- **Against last month** — the score, the days logged, and every nutrient and
+  food group, this month beside the one before, with the change. Left out when
+  the month before has nothing in it.
+- **By week** — each week of the month with its days logged, calories a day,
+  score and weekly groups, so the month can be read from the inside. They are
+  whole weeks, scored as the Week tab scores them, so the first and last may
+  reach into the months either side.
+
+By day is a row a day — entries, score, every nutrient — rather than a list of
+what was eaten; the day's own report has that. A month still under way stops
+at today, which is marked as unfinished.
+
+There is one report per day, week or month (`Nosh 2026-09`). Exporting the
+same span again rewrites that note in place, so anything typed into it by hand
+is replaced along with the numbers.
 
 ## Nosh AI (optional)
 
@@ -255,7 +275,12 @@ Off unless you give it credentials. Four things use it:
 - **Ask about this recipe** — open a recipe and interrogate it: what the sodium
   rides on, what would make it go further, what to serve alongside. Command
   palette, or right-click the note.
-- **Readings** — an optional paragraph on an exported report.
+- **Readings** — an optional section on an exported report. A day or a week
+  is read for what its days show and what to watch. A month is read for
+  progress — what moved against last month, whether the weeks were getting
+  better or worse — and for ways to improve, ranked by what costs the score
+  most and each naming a food out of the log. The report's own tables are what
+  is sent, and nothing else.
 
 Asking works on any note that reads as a recipe, not only the ones Nosh wrote:
 an ingredients list, a method, or the frontmatter numbers is enough. The note
