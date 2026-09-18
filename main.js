@@ -2390,6 +2390,74 @@ class NoshDraftModal extends Modal {
     }
 }
 
+/* Sample notes ----------------------------------------------------------
+ *
+ * A vault with nothing tagged shows an empty picker and a page of advice,
+ * which is a poor first minute. These are enough notes to log a day with:
+ * an ingredient in every food group and three meals built from them, in
+ * the same shape the drafter writes. Figures are rounded from USDA
+ * FoodData Central for the stated amount. They are ordinary notes once
+ * written, to keep, correct or delete like any other. */
+
+const SAMPLE_NOTE = 'A sample note from Nosh. Figures are rounded from USDA ' +
+    'FoodData Central for the amount above; check them against what you buy.';
+
+const SAMPLE_INGREDIENTS = [
+    { name: 'Rolled oats', amount: '1/2 cup dry (40 g)', meal_type: 'Breakfast',
+      calories: 150, protein_g: 5, carbs_g: 27, fat_g: 2.5, sat_fat_g: 0.5,
+      fiber_g: 4, sodium_mg: 0, potassium_mg: 150, calcium_mg: 20, serv_grains: 1 },
+    { name: 'Whole wheat bread', amount: '1 slice (32 g)', meal_type: '',
+      calories: 80, protein_g: 4, carbs_g: 14, fat_g: 1.1, sat_fat_g: 0.2,
+      fiber_g: 1.9, sodium_mg: 145, potassium_mg: 70, calcium_mg: 52, serv_grains: 1 },
+    { name: 'Brown rice', amount: '1/2 cup cooked (98 g)', meal_type: '',
+      calories: 109, protein_g: 2.3, carbs_g: 22.9, fat_g: 0.8, sat_fat_g: 0.2,
+      fiber_g: 1.6, sodium_mg: 1, potassium_mg: 42, calcium_mg: 5, serv_grains: 1 },
+    { name: 'Spinach', amount: '1 cup raw (30 g)', meal_type: '',
+      calories: 7, protein_g: 0.9, carbs_g: 1.1, fat_g: 0.1, sat_fat_g: 0,
+      fiber_g: 0.7, sodium_mg: 24, potassium_mg: 167, calcium_mg: 30, serv_vegetables: 1 },
+    { name: 'Broccoli', amount: '1/2 cup cooked (78 g)', meal_type: '',
+      calories: 27, protein_g: 1.9, carbs_g: 5.6, fat_g: 0.3, sat_fat_g: 0.1,
+      fiber_g: 2.6, sodium_mg: 32, potassium_mg: 229, calcium_mg: 31, serv_vegetables: 1 },
+    { name: 'Banana', amount: '1 medium (118 g)', meal_type: 'Snack',
+      calories: 105, protein_g: 1.3, carbs_g: 27, fat_g: 0.4, sat_fat_g: 0.1,
+      fiber_g: 3.1, sodium_mg: 1, potassium_mg: 422, calcium_mg: 6, serv_fruit: 1 },
+    { name: 'Skim milk', amount: '1 cup (245 g)', meal_type: '',
+      calories: 83, protein_g: 8.3, carbs_g: 12.2, fat_g: 0.2, sat_fat_g: 0.1,
+      fiber_g: 0, sodium_mg: 103, potassium_mg: 382, calcium_mg: 299, serv_dairy: 1 },
+    { name: 'Low-fat yogurt', amount: '1 cup plain (245 g)', meal_type: 'Breakfast',
+      calories: 154, protein_g: 12.9, carbs_g: 17.2, fat_g: 3.8, sat_fat_g: 2.5,
+      fiber_g: 0, sodium_mg: 172, potassium_mg: 573, calcium_mg: 448, serv_dairy: 1 },
+    { name: 'Chicken breast', amount: '3 oz cooked (85 g)', meal_type: '',
+      calories: 140, protein_g: 26, carbs_g: 0, fat_g: 3, sat_fat_g: 0.9,
+      fiber_g: 0, sodium_mg: 63, potassium_mg: 220, calcium_mg: 13, serv_meat: 3 },
+    { name: 'Salmon', amount: '3 oz cooked (85 g)', meal_type: 'Dinner',
+      calories: 175, protein_g: 19, carbs_g: 0, fat_g: 10.5, sat_fat_g: 2.1,
+      fiber_g: 0, sodium_mg: 52, potassium_mg: 326, calcium_mg: 13, serv_meat: 3 },
+    { name: 'Lentils', amount: '1/2 cup cooked (99 g)', meal_type: '',
+      calories: 115, protein_g: 9, carbs_g: 20, fat_g: 0.4, sat_fat_g: 0.1,
+      fiber_g: 7.8, sodium_mg: 2, potassium_mg: 365, calcium_mg: 19, serv_legumes: 1 },
+    { name: 'Almonds', amount: '1.5 oz (43 g)', meal_type: 'Snack',
+      calories: 246, protein_g: 9, carbs_g: 9.2, fat_g: 21.4, sat_fat_g: 1.6,
+      fiber_g: 5.3, sodium_mg: 0, potassium_mg: 312, calcium_mg: 114, serv_nuts: 1 },
+    { name: 'Olive oil', amount: '1 tsp (4.5 g)', meal_type: '',
+      calories: 40, protein_g: 0, carbs_g: 0, fat_g: 4.5, sat_fat_g: 0.6,
+      fiber_g: 0, sodium_mg: 0, potassium_mg: 0, calcium_mg: 0, serv_fats: 1 },
+    { name: 'Dark chocolate', amount: '1 oz, 70% (28 g)', meal_type: 'Dessert',
+      calories: 170, protein_g: 2.2, carbs_g: 13, fat_g: 12, sat_fat_g: 7,
+      fiber_g: 3.1, sodium_mg: 6, potassium_mg: 203, calcium_mg: 20, serv_sweets: 1 },
+];
+
+/* Each meal names its parts by ingredient name and servings of the amount
+ * that ingredient's note states. */
+const SAMPLE_MEALS = [
+    { name: 'Oatmeal with banana and almonds', occasion: 'Breakfast',
+      parts: [['Rolled oats', 1], ['Skim milk', 1], ['Banana', 1], ['Almonds', 0.5]] },
+    { name: 'Lentil and spinach bowl', occasion: 'Lunch',
+      parts: [['Lentils', 2], ['Spinach', 2], ['Brown rice', 1], ['Olive oil', 1]] },
+    { name: 'Salmon with rice and broccoli', occasion: 'Dinner',
+      parts: [['Salmon', 1], ['Brown rice', 2], ['Broccoli', 2], ['Olive oil', 1]] },
+];
+
 /* Reports -------------------------------------------------------------
  *
  * Nosh keeps its numbers in two places: the nutrition itself lives in note
@@ -2473,28 +2541,35 @@ function barWeight(settings, key) {
     return isFinite(w) && w > 0 ? w : 1;
 }
 
-/* A word in front of a box in a settings row, since a row of bare number
- * boxes does not say which is the weight and which the target. */
-function controlLabel(inputEl, text, title) {
-    const label = document.createElement('span');
-    label.className = 'nosh-ctl-label';
-    label.textContent = text;
-    if (title) label.setAttribute('title', title);
-    inputEl.before(label);
-    return label;
+/* The target rows are a table: a dropdown and a few number boxes a row,
+ * the same columns all the way down. One header row names the columns,
+ * laid out on the same grid as the rows under it, so a bare number box
+ * is read by the word above it. */
+function targetHeader(containerEl, cols, cls) {
+    const head = containerEl.createDiv({ cls: 'setting-item nosh-target-row nosh-target-head' });
+    if (cls) head.addClass(cls);
+    head.createDiv({ cls: 'setting-item-info' });
+    const ctl = head.createDiv({ cls: 'setting-item-control' });
+    for (const c of cols) ctl.createSpan({ cls: 'nosh-col', text: c });
+}
+
+/* The line under a target's name: what its shape means, and the field it
+ * reads, the field set in code so it is not mistaken for a word. */
+function describeTarget(row, note, key) {
+    row.descEl.empty();
+    row.descEl.appendText(note + ' Field ');
+    row.descEl.createEl('code', { text: key });
+    row.descEl.appendText('.');
 }
 
 /* The box beside a bar's shape in settings. 1 is the default and is not
  * written down; anything that is not a positive number reads as 1. */
 function weightInput(plugin, c, key) {
-    const what = 'Weight in the score: 1 is the default, 2 counts double, 0.5 half';
     c.inputEl.type = 'number';
     c.inputEl.step = '0.25';
     c.inputEl.min = '0';
-    c.inputEl.style.width = '4em';
     c.inputEl.setAttr('aria-label', 'Weight in the score');
-    c.inputEl.setAttr('title', what);
-    controlLabel(c.inputEl, 'weight', what);
+    c.inputEl.setAttr('title', 'Weight in the score: 1 is the default, 2 counts double, 0.5 half');
     c.setValue(String(barWeight(plugin.settings, key))).onChange(async (v) => {
         const w = Number(v);
         if (isFinite(w) && w > 0 && w !== 1) plugin.settings.weights[key] = w;
@@ -3644,6 +3719,12 @@ module.exports = class NoshPlugin extends Plugin {
         });
 
         this.addCommand({
+            id: 'add-sample-notes',
+            name: 'Add sample notes',
+            callback: () => this.addSampleNotes(),
+        });
+
+        this.addCommand({
             id: 'clear-today',
             name: 'Clear today',
             callback: async () => {
@@ -4096,6 +4177,58 @@ module.exports = class NoshPlugin extends Plugin {
             this.logChanged(Object.keys(this.settings.log));
             this.refreshViews();
         }
+    }
+
+    /* --- sample notes --------------------------------------------------- */
+
+    /* Writes the sample ingredients and meals into the Nosh folder. A note
+     * that is already there by name is left alone, so running it twice
+     * adds nothing and a corrected sample is not put back. */
+    async addSampleNotes() {
+        const app = this.app;
+        const vault = app.vault;
+        const settings = this.settings;
+        const iso = todayIso();
+        const ingredients = noshFolder(settings, SUB_INGREDIENTS);
+        const meals = noshFolder(settings, SUB_MEALS);
+        const pathOf = (folder, name) => (folder ? folder + '/' : '') + safeName(name) + '.md';
+
+        let wrote = 0;
+        try {
+            await ensureFolder(vault, ingredients);
+            await ensureFolder(vault, meals);
+
+            const byName = Object.create(null);
+            for (const s of SAMPLE_INGREDIENTS) {
+                const draft = Object.assign({ note: SAMPLE_NOTE }, s);
+                const path = pathOf(ingredients, s.name);
+                if (!vault.getAbstractFileByPath(path)) {
+                    await vault.create(path, aiIngredientNote(draft, iso, settings));
+                    wrote++;
+                }
+                const values = {};
+                for (const n of NUTRIENTS) values[n.key] = parseNum(s[n.key]);
+                for (const g of FOOD_GROUPS) values[g.key] = parseNum(s[g.key]);
+                byName[s.name] = { name: s.name, amount: s.amount, values };
+            }
+
+            for (const m of SAMPLE_MEALS) {
+                const path = pathOf(meals, m.name);
+                if (vault.getAbstractFileByPath(path)) continue;
+                const parts = m.parts.map((p) => ({ recipe: byName[p[0]], servings: p[1] }));
+                await vault.create(path, composedMealNote(m.name, parts, m.occasion, iso, settings));
+                wrote++;
+            }
+        } catch (e) {
+            new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+            return wrote;
+        }
+
+        new Notice(wrote
+            ? 'Nosh: ' + wrote + ' sample notes written under ' + (noshFolder(settings, '') || 'the vault root') + '.'
+            : 'Nosh: the sample notes are already there.');
+        this.scheduleRefresh();
+        return wrote;
     }
 
     /* --- the log as notes --------------------------------------------- */
@@ -6534,6 +6667,20 @@ class NoshSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
+            .setName('Sample notes')
+            .setDesc('An ingredient in every food group and three meals built ' +
+                     'from them, written into the folder above as ordinary ' +
+                     'notes. Enough to log a day with, and to see what a note ' +
+                     'looks like. Also a command.')
+            .addButton((b) => b
+                .setButtonText('Add')
+                .onClick(async () => {
+                    b.setDisabled(true);
+                    await this.plugin.addSampleNotes();
+                    b.setDisabled(false);
+                }));
+
+        new Setting(containerEl)
             .setName('Keep a log note per day')
             .setDesc('Each day with anything logged is also written as a note in ' +
                      'Log - "Nosh log 2026-09-17" - with the log in its ' +
@@ -6795,16 +6942,14 @@ class NoshSettingTab extends PluginSettingTab {
                   'target by seven.',
         });
 
+        targetHeader(containerEl, ['Shape', 'Weight', 'Target', 'Show']);
         for (const n of NUTRIENTS) {
             const hidden = (this.plugin.settings.hiddenNutrients || []).includes(n.key);
             const shape = nutrientShape(n, this.plugin.settings);
-            const desc = (of) => nutrientShapeNote(of) + ' Reads the ' + n.key +
-                                 ' frontmatter field.';
 
             /* Held so the dropdown can rewrite the line under the name. */
             const row = new Setting(containerEl)
                 .setName(n.label + ' (' + n.unit + ')')
-                .setDesc(desc(shape))
                 .addDropdown((d) => d
                     .addOption('floor', 'Floor')
                     .addOption('ceiling', 'Ceiling')
@@ -6817,16 +6962,13 @@ class NoshSettingTab extends PluginSettingTab {
                         else this.plugin.settings.nutrientDirs[n.key] = v;
                         await this.plugin.saveSettings();
                         this.plugin.refreshViews();
-                        row.setDesc(desc(nutrientShape(n, this.plugin.settings)));
+                        describeTarget(row, nutrientShapeNote(nutrientShape(n, this.plugin.settings)), n.key);
                     }))
                 .addText((c) => weightInput(this.plugin, c, n.key))
                 .addText((t) => {
                     t.inputEl.type = 'number';
                     t.inputEl.min = '0';
-                    /* Five digits is the widest a daily target gets. */
-                    t.inputEl.style.width = '5.5em';
-                    t.inputEl.setAttr('aria-label', 'Daily target');
-                    controlLabel(t.inputEl, 'target', 'Daily target, in ' + n.unit);
+                    t.inputEl.setAttr('aria-label', 'Daily target in ' + n.unit);
                     t.setValue(String(this.plugin.settings.targets[n.key]))
                     .onChange(async (v) => {
                         this.plugin.settings.targets[n.key] = parseNum(v);
@@ -6844,6 +6986,8 @@ class NoshSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                         this.plugin.refreshViews();
                     }));
+            row.settingEl.addClass('nosh-target-row');
+            describeTarget(row, nutrientShapeNote(shape), n.key);
         }
 
         new Setting(containerEl).setName('Food group servings').setHeading();
@@ -6856,6 +7000,7 @@ class NoshSettingTab extends PluginSettingTab {
                   'already weekly.',
         });
 
+        targetHeader(containerEl, ['Shape', 'Weight', 'Min', 'Max', 'Show'], 'nosh-group-row');
         for (const g of FOOD_GROUPS) {
             const hidden = (this.plugin.settings.hiddenGroups || []).includes(g.key);
             const t = this.plugin.settings.groupTargets[g.key];
@@ -6865,13 +7010,10 @@ class NoshSettingTab extends PluginSettingTab {
              * both are a pair of boxes - and the minimum on a ceiling looks
              * like it does something. */
             const shape = groupShape(g, this.plugin.settings);
-            const desc = (of) => shapeNote(of) + ' Reads the ' + g.key +
-                                 ' frontmatter field.';
 
             /* Held so the dropdown can rewrite the line under the name. */
             const row = new Setting(containerEl)
                 .setName(g.label + ' (' + per + ')')
-                .setDesc(desc(shape))
                 .addDropdown((d) => d
                     .addOption('floor', 'Floor')
                     .addOption('range', 'Range')
@@ -6885,14 +7027,13 @@ class NoshSettingTab extends PluginSettingTab {
                         else this.plugin.settings.groupDirs[g.key] = v;
                         await this.plugin.saveSettings();
                         this.plugin.refreshViews();
-                        row.setDesc(desc(groupShape(g, this.plugin.settings)));
+                        describeTarget(row, shapeNote(groupShape(g, this.plugin.settings)), g.key);
                     }))
                 .addText((c) => weightInput(this.plugin, c, g.key))
                 .addText((c) => {
                     c.inputEl.type = 'number';
-                    c.inputEl.style.width = '4em';
+                    c.inputEl.min = '0';
                     c.inputEl.setAttr('aria-label', 'Minimum servings');
-                    controlLabel(c.inputEl, 'min', 'Minimum servings');
                     c.setValue(String(t.min)).onChange(async (v) => {
                         this.plugin.settings.groupTargets[g.key].min = parseNum(v);
                         await this.plugin.saveSettings();
@@ -6901,9 +7042,8 @@ class NoshSettingTab extends PluginSettingTab {
                 })
                 .addText((c) => {
                     c.inputEl.type = 'number';
-                    c.inputEl.style.width = '4em';
+                    c.inputEl.min = '0';
                     c.inputEl.setAttr('aria-label', 'Maximum servings');
-                    controlLabel(c.inputEl, 'max', 'Maximum servings');
                     c.setValue(String(t.max)).onChange(async (v) => {
                         this.plugin.settings.groupTargets[g.key].max = parseNum(v);
                         await this.plugin.saveSettings();
@@ -6920,6 +7060,9 @@ class NoshSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                         this.plugin.refreshViews();
                     }));
+            row.settingEl.addClass('nosh-target-row');
+            row.settingEl.addClass('nosh-group-row');
+            describeTarget(row, shapeNote(shape), g.key);
         }
 
         new Setting(containerEl)

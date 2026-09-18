@@ -813,18 +813,57 @@
 
 /* Settings ----------------------------------------------------------
  *
- * A target row is a dropdown and two or three number boxes, and a bare
- * number box does not say what it holds. Each carries a word in front. */
+ * The target rows are a table. Each row's controls sit on a fixed grid,
+ * the same columns all the way down, and one header row on the same grid
+ * names them, so a number box is read by the word above it rather than
+ * by a tooltip. The control block is content-sized rather than flexible,
+ * or the columns would drift with the length of each row's name. */
 
-.nosh-settings .nosh-ctl-label {
-    margin-left: 8px;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-    white-space: nowrap;
+.nosh-settings .nosh-target-row .setting-item-control {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 7.5em 4.5em 5.5em 3em;
+    gap: var(--size-4-2);
+    align-items: center;
+    justify-items: stretch;
 }
 
-.nosh-settings .nosh-ctl-label:first-child {
-    margin-left: 0;
+.nosh-settings .nosh-group-row .setting-item-control {
+    grid-template-columns: 7.5em 4.5em 4.5em 4.5em 3em;
+}
+
+.nosh-settings .nosh-target-row .setting-item-control select,
+.nosh-settings .nosh-target-row .setting-item-control input {
+    width: 100%;
+    min-width: 0;
+}
+
+.nosh-settings .nosh-target-row .setting-item-control .checkbox-container {
+    justify-self: center;
+}
+
+.nosh-settings .nosh-target-head {
+    padding-top: 0;
+    padding-bottom: 4px;
+    border-top: none;
+}
+
+.nosh-settings .nosh-target-head + .setting-item {
+    border-top: none;
+}
+
+.nosh-settings .nosh-target-head .nosh-col {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    text-align: left;
+}
+
+.nosh-settings .nosh-target-head .nosh-col:last-child {
+    text-align: center;
+}
+
+.nosh-settings .nosh-target-row .setting-item-description code {
+    font-size: var(--font-ui-smaller);
 }
 
 /* Occasions ---------------------------------------------------------
