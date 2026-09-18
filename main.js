@@ -3693,6 +3693,9 @@ module.exports = class NoshPlugin extends Plugin {
             else if (this.touches(file)) this.scheduleRefresh(true);
         }));
         this.registerEvent(this.app.vault.on('rename', (file, was) => {
+            /* A log note moved keeps being the day; the next write follows it. */
+            const iso = logNoteDay(file);
+            if (iso && (this.logNoteAt || {})[iso] === was) this.noteLogNoteAt(iso, file.path);
             const knew = this.knownPaths && this.knownPaths.has(was);
             if (knew || this.touches(file)) this.scheduleRefresh(true);
         }));
@@ -4108,9 +4111,29 @@ module.exports = class NoshPlugin extends Plugin {
         return (folder ? folder + '/' : '') + logNoteName(iso) + '.md';
     }
 
+    /* The day's note: wherever it was last seen - a log note is read by its
+     * tag from anywhere in the vault - or else in the Log folder. */
     logNoteFile(iso) {
-        const f = this.app.vault.getAbstractFileByPath(this.logNotePath(iso));
+        const vault = this.app.vault;
+        const known = (this.logNoteAt || {})[iso];
+        let f = known ? vault.getAbstractFileByPath(known) : null;
+        if (!f || f.extension !== 'md') f = vault.getAbstractFileByPath(this.logNotePath(iso));
         return f && f.extension === 'md' ? f : null;
+    }
+
+    /* A file is a log note by its name and either its place or its tag, so
+     * one moved out of Log - into a journal folder, say - is still the day. */
+    isLogNote(file, cache) {
+        if (!file || !logNoteDay(file)) return false;
+        if (underFolder(file.path, this.logNoteFolder())) return true;
+        const want = kindTag(this.settings, 'log').toLowerCase();
+        const tags = cache ? (getAllTags(cache) || []) : [];
+        return tags.some((t) => String(t).replace(/^#/, '').toLowerCase() === want);
+    }
+
+    noteLogNoteAt(iso, path) {
+        if (!this.logNoteAt) this.logNoteAt = {};
+        this.logNoteAt[iso] = path;
     }
 
     /* Called wherever the store changes, with the days that did. Writes are
@@ -4162,9 +4185,9 @@ module.exports = class NoshPlugin extends Plugin {
         const app = this.app;
         const vault = app.vault;
         const day = this.settings.log[iso] || {};
-        const path = this.logNotePath(iso);
-        const rows = logNoteRows(app, day, path);
         const file = this.logNoteFile(iso);
+        const path = file ? file.path : this.logNotePath(iso);
+        const rows = logNoteRows(app, day, path);
         const tag = kindTag(this.settings, 'log');
 
         if (!rows.length) {
@@ -4186,6 +4209,7 @@ module.exports = class NoshPlugin extends Plugin {
             this.markLogNote(iso);
             await ensureFolder(vault, this.logNoteFolder());
             await vault.create(path, logNoteText(iso, rows, this.settings));
+            this.noteLogNoteAt(iso, path);
             return;
         }
 
@@ -4227,15 +4251,22 @@ module.exports = class NoshPlugin extends Plugin {
             new Notice('Nosh: could not move the log notes out of Reports: ' +
                        (e && e.message ? e.message : e), 8000);
         }
-        const folder = app.vault.getAbstractFileByPath(this.logNoteFolder());
         const seen = new Set();
         let changed = false;
 
-        for (const file of (folder && Array.isArray(folder.children)) ? folder.children : []) {
-            const iso = file.extension === 'md' ? logNoteDay(file) : '';
-            if (!iso) continue;
+        /* Every note named like a log note that sits in Log or carries the
+         * tag. Where a day has both, the one in Log is the day. */
+        const inLog = (f) => underFolder(f.path, this.logNoteFolder());
+        const files = app.vault.getMarkdownFiles().filter((f) => logNoteDay(f))
+            .sort((a, b) => (inLog(b) ? 1 : 0) - (inLog(a) ? 1 : 0));
+        this.logNoteAt = {};
+        for (const file of files) {
+            const iso = logNoteDay(file);
+            const cache = app.metadataCache.getFileCache(file);
+            if (seen.has(iso) || !this.isLogNote(file, cache)) continue;
             seen.add(iso);
-            const day = parseLogNote(app, file, app.metadataCache.getFileCache(file));
+            this.logNoteAt[iso] = file.path;
+            const day = parseLogNote(app, file, cache);
             if (!day || sameDay(this.settings.log[iso], day)) continue;
             if (Object.keys(day).length) this.settings.log[iso] = day;
             else delete this.settings.log[iso];
@@ -4258,9 +4289,14 @@ module.exports = class NoshPlugin extends Plugin {
     onLogNoteChanged(file, cache) {
         const iso = logNoteDay(file);
         if (!iso || !this.settings.logNotes) return;
-        if (!underFolder(file.path, this.logNoteFolder())) return;
+        cache = cache || this.app.metadataCache.getFileCache(file);
+        if (!this.isLogNote(file, cache)) return;
+        /* A second note for a day that already has one is not the day. */
+        const at = (this.logNoteAt || {})[iso];
+        if (at && at !== file.path && this.app.vault.getAbstractFileByPath(at)) return;
+        this.noteLogNoteAt(iso, file.path);
         if (this.logNoteQuiet(iso)) return;
-        const day = parseLogNote(this.app, file, cache || this.app.metadataCache.getFileCache(file));
+        const day = parseLogNote(this.app, file, cache);
         if (!day || sameDay(this.settings.log[iso], day)) return;
         if (Object.keys(day).length) this.settings.log[iso] = day;
         else delete this.settings.log[iso];
@@ -4271,7 +4307,9 @@ module.exports = class NoshPlugin extends Plugin {
     onLogNoteDeleted(file) {
         const iso = logNoteDay(file);
         if (!iso || !this.settings.logNotes) return;
-        if (!underFolder(file.path, this.logNoteFolder())) return;
+        const at = (this.logNoteAt || {})[iso];
+        if (at ? at !== file.path : !underFolder(file.path, this.logNoteFolder())) return;
+        delete this.logNoteAt[iso];
         if (this.logNoteQuiet(iso) || !this.settings.log[iso]) return;
         delete this.settings.log[iso];
         this.saveSettings();
@@ -6487,7 +6525,8 @@ class NoshSettingTab extends PluginSettingTab {
                      'Log - "Nosh log 2026-09-17" - with the log in its ' +
                      'frontmatter, where a search, a backlink or a Dataview query ' +
                      'can see it. Edit the note and the day follows; delete it and ' +
-                     'the day is cleared.')
+                     'the day is cleared. Moved elsewhere, it is still the day so ' +
+                     'long as it keeps its tag.')
             .addToggle((t) => t
                 .setValue(this.plugin.settings.logNotes !== false)
                 .onChange(async (v) => {

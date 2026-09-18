@@ -149,6 +149,19 @@ anything outside them is yours and survives every rewrite. Turning the notes
 on over a log kept before they existed writes one for every day that has
 anything in it. Off in settings if you would rather not have them.
 
+The tag is what makes it a log note, not the folder. Move one into a journal
+folder and it is still the day, read and rewritten there, so long as it keeps
+`nutrition/log` and its name. That also means the notes answer to the tools
+the rest of your vault uses. With Dataview installed, every day a banana was
+eaten is one query:
+
+```dataview
+TABLE log
+FROM #nutrition/log
+WHERE contains(string(log), "Banana")
+SORT file.name DESC
+```
+
 ## The score
 
 Under the meal count sits a **composite score** out of 100, with a bar, for
