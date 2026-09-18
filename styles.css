@@ -811,6 +811,22 @@
     font-size: var(--font-ui-smaller);
 }
 
+/* Settings ----------------------------------------------------------
+ *
+ * A target row is a dropdown and two or three number boxes, and a bare
+ * number box does not say what it holds. Each carries a word in front. */
+
+.nosh-settings .nosh-ctl-label {
+    margin-left: 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    white-space: nowrap;
+}
+
+.nosh-settings .nosh-ctl-label:first-child {
+    margin-left: 0;
+}
+
 /* Occasions ---------------------------------------------------------
  *
  * Which occasion a tick lands in. Sits above the Meals/Ingredients switcher

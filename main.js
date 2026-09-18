@@ -2473,15 +2473,28 @@ function barWeight(settings, key) {
     return isFinite(w) && w > 0 ? w : 1;
 }
 
+/* A word in front of a box in a settings row, since a row of bare number
+ * boxes does not say which is the weight and which the target. */
+function controlLabel(inputEl, text, title) {
+    const label = document.createElement('span');
+    label.className = 'nosh-ctl-label';
+    label.textContent = text;
+    if (title) label.setAttribute('title', title);
+    inputEl.before(label);
+    return label;
+}
+
 /* The box beside a bar's shape in settings. 1 is the default and is not
  * written down; anything that is not a positive number reads as 1. */
 function weightInput(plugin, c, key) {
+    const what = 'Weight in the score: 1 is the default, 2 counts double, 0.5 half';
     c.inputEl.type = 'number';
     c.inputEl.step = '0.25';
     c.inputEl.min = '0';
     c.inputEl.style.width = '4em';
     c.inputEl.setAttr('aria-label', 'Weight in the score');
-    c.inputEl.setAttr('title', 'Weight in the score: 1 is the default, 2 counts double, 0.5 half');
+    c.inputEl.setAttr('title', what);
+    controlLabel(c.inputEl, 'weight', what);
     c.setValue(String(barWeight(plugin.settings, key))).onChange(async (v) => {
         const w = Number(v);
         if (isFinite(w) && w > 0 && w !== 1) plugin.settings.weights[key] = w;
@@ -6492,6 +6505,7 @@ class NoshSettingTab extends PluginSettingTab {
     display() {
         const { containerEl } = this;
         containerEl.empty();
+        containerEl.addClass('nosh-settings');
 
         new Setting(containerEl)
             .setName('Meal tag')
@@ -6774,9 +6788,11 @@ class NoshSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName('Daily nutrient targets').setHeading();
         containerEl.createDiv({
             cls: 'setting-item-description',
-            text: 'Shape, weight in the score, target, and whether the bar ' +
-                  'shows. A weight of 1 is the default; 2 counts double, 0.5 ' +
-                  'half. The Week tab multiplies each target by seven.',
+            text: 'For each nutrient: its shape, its weight in the score, ' +
+                  'its daily target, and whether the bar shows. The weight ' +
+                  'only matters to the score: 1 is the default, 2 makes a ' +
+                  'bar count double, 0.5 half. The Week tab multiplies each ' +
+                  'target by seven.',
         });
 
         for (const n of NUTRIENTS) {
@@ -6804,13 +6820,16 @@ class NoshSettingTab extends PluginSettingTab {
                         row.setDesc(desc(nutrientShape(n, this.plugin.settings)));
                     }))
                 .addText((c) => weightInput(this.plugin, c, n.key))
-                .addText((t) => t
-                    .setValue(String(this.plugin.settings.targets[n.key]))
+                .addText((t) => {
+                    t.inputEl.setAttr('aria-label', 'Daily target');
+                    controlLabel(t.inputEl, 'target', 'Daily target, in ' + n.unit);
+                    t.setValue(String(this.plugin.settings.targets[n.key]))
                     .onChange(async (v) => {
                         this.plugin.settings.targets[n.key] = parseNum(v);
                         await this.plugin.saveSettings();
                         this.plugin.refreshViews();
-                    }))
+                    });
+                })
                 .addToggle((tg) => tg
                     .setTooltip('Show this bar')
                     .setValue(!hidden)
@@ -6826,8 +6845,9 @@ class NoshSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName('Food group servings').setHeading();
         containerEl.createDiv({
             cls: 'setting-item-description',
-            text: 'Shape, weight in the score, then minimum and maximum ' +
-                  'servings for each DASH food group. Per-day groups are ' +
+            text: 'For each DASH food group: its shape, its weight in the ' +
+                  'score (1 unless you say otherwise), then its minimum and ' +
+                  'maximum servings. Per-day groups are ' +
                   'multiplied by seven in the Week tab; per-week groups are ' +
                   'already weekly.',
         });
@@ -6868,6 +6888,7 @@ class NoshSettingTab extends PluginSettingTab {
                     c.inputEl.type = 'number';
                     c.inputEl.style.width = '4em';
                     c.inputEl.setAttr('aria-label', 'Minimum servings');
+                    controlLabel(c.inputEl, 'min', 'Minimum servings');
                     c.setValue(String(t.min)).onChange(async (v) => {
                         this.plugin.settings.groupTargets[g.key].min = parseNum(v);
                         await this.plugin.saveSettings();
@@ -6878,6 +6899,7 @@ class NoshSettingTab extends PluginSettingTab {
                     c.inputEl.type = 'number';
                     c.inputEl.style.width = '4em';
                     c.inputEl.setAttr('aria-label', 'Maximum servings');
+                    controlLabel(c.inputEl, 'max', 'Maximum servings');
                     c.setValue(String(t.max)).onChange(async (v) => {
                         this.plugin.settings.groupTargets[g.key].max = parseNum(v);
                         await this.plugin.saveSettings();
