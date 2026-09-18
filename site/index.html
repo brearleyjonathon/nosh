@@ -460,13 +460,6 @@ button { font: inherit; color: inherit; }
   .demo-grid { grid-template-columns: 1fr; }
 }
 
-/* ---------- Testimonials ---------- */
-.quotes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.quote { border: 1px solid var(--rule); border-radius: var(--radius); padding: 28px; display: grid; gap: 18px; align-content: space-between; }
-.quote blockquote { margin: 0; font-size: 1.125rem; line-height: 1.5; }
-.quote figcaption { color: var(--text-2); font-size: 0.9375rem; }
-.quote figcaption b { color: var(--text); font-weight: 600; font-family: var(--font-head); }
-@media (max-width: 860px) { .quotes { grid-template-columns: 1fr; } }
 
 /* ---------- Pricing ---------- */
 .pricing { background: var(--bg-2); border-block: 1px solid var(--rule); }
@@ -920,31 +913,6 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
         </div>
         <div class="groups" id="demoGroups"><span class="lbl">Food groups</span><span class="gchip none">none yet</span></div>
       </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ TESTIMONIALS ============ -->
-<!-- PLACEHOLDER: these quotes are illustrative. Replace with real ones before publishing. -->
-<section class="section" aria-labelledby="quotes-title">
-  <div class="wrap">
-    <div class="section-head">
-      <div class="eyebrow reveal">From people using it</div>
-      <h2 id="quotes-title" class="reveal" style="--i:1">Tracking that fits where the recipes already live.</h2>
-    </div>
-    <div class="quotes">
-      <figure class="quote reveal" style="--i:0">
-        <blockquote>"I had stopped opening every other tracker inside a week. This one is in the app I already have open, next to the recipe."</blockquote>
-        <figcaption><b>Priya</b> · keeps four years of recipes in Obsidian</figcaption>
-      </figure>
-      <figure class="quote reveal" style="--i:1">
-        <blockquote>"The sodium column in the weekly report pointed at the bread, not the dinner I had been blaming."</blockquote>
-        <figcaption><b>Tom</b> · tracking sodium on a 1,500 mg target</figcaption>
-      </figure>
-      <figure class="quote reveal" style="--i:2">
-        <blockquote>"Copy yesterday's breakfast is most of my mornings. Logging takes less time than the kettle."</blockquote>
-        <figcaption><b>Mara</b> · logs from her phone</figcaption>
-      </figure>
     </div>
   </div>
 </section>
