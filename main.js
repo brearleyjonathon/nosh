@@ -6821,6 +6821,10 @@ class NoshSettingTab extends PluginSettingTab {
                     }))
                 .addText((c) => weightInput(this.plugin, c, n.key))
                 .addText((t) => {
+                    t.inputEl.type = 'number';
+                    t.inputEl.min = '0';
+                    /* Five digits is the widest a daily target gets. */
+                    t.inputEl.style.width = '5.5em';
                     t.inputEl.setAttr('aria-label', 'Daily target');
                     controlLabel(t.inputEl, 'target', 'Daily target, in ' + n.unit);
                     t.setValue(String(this.plugin.settings.targets[n.key]))
