@@ -228,8 +228,14 @@ button { font: inherit; color: inherit; }
 .food-leaf svg { animation-duration: 9s; animation-delay: -3s; }
 .food-oat { width: 88px; top: 12%; right: 0; }
 .food-oat svg { animation-duration: 7.5s; animation-delay: -1.5s; }
-.food-almond { width: 64px; bottom: 16%; right: 4%; }
-.food-almond svg { animation-duration: 6.5s; animation-delay: -4s; }
+.food-raspberry { width: 58px; top: 40%; left: -1%; }
+.food-raspberry svg { animation-duration: 6.5s; animation-delay: -2.5s; }
+.food-nuts { width: 84px; top: 50%; right: -1%; }
+.food-nuts svg { animation-duration: 8.5s; animation-delay: -5s; }
+.food-squirrel { width: 150px; bottom: -3%; right: -5%; z-index: 3; }
+.food-squirrel svg { animation-duration: 9s; animation-delay: -1s; }
+.tail-sway { transform-box: view-box; transform-origin: 92px 108px; animation: tail 4.5s ease-in-out infinite; }
+@keyframes tail { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
 @keyframes float {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-7px) rotate(-1.5deg); }
@@ -244,7 +250,9 @@ button { font: inherit; color: inherit; }
   .food-berries { top: 0; left: 0; width: 72px; }
   .food-leaf { bottom: 4%; left: 0; width: 92px; }
   .food-oat { top: 4%; right: 0; width: 66px; }
-  .food-almond { bottom: 10%; right: 2%; width: 50px; }
+  .food-raspberry { top: 42%; left: 2%; width: 44px; }
+  .food-nuts { top: 48%; right: 0; width: 60px; }
+  .food-squirrel { bottom: -3%; right: -4%; width: 108px; }
   .stats { gap: 20px; }
   .stat b { font-size: 1.5rem; }
 }
@@ -461,6 +469,40 @@ button { font: inherit; color: inherit; }
 }
 
 
+/* ---------- Nosh AI ---------- */
+.ai-grid { display: grid; grid-template-columns: auto 1fr; gap: clamp(28px, 6vw, 80px); align-items: center; }
+.ai-media { display: grid; place-items: center; }
+.ai-media .phone { --phone-w: 280px; }
+.ai-list { display: grid; gap: 14px; }
+.ai-item { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 20px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--bg); }
+.ai-item .ic { width: 44px; height: 44px; border-radius: 12px; background: var(--primary-soft); color: var(--primary-text); display: grid; place-items: center; }
+.ai-item .ic svg { width: 22px; height: 22px; }
+.ai-item h3 { font-size: 1.0625rem; }
+.ai-item p { margin-top: 6px; color: var(--text-2); font-size: 0.9375rem; }
+.ai-facts { margin-top: clamp(28px, 4vw, 44px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.ai-fact { display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--rule); color: var(--text-2); font-size: 0.9375rem; }
+.ai-fact svg { flex: none; width: 20px; height: 20px; margin-top: 2px; color: var(--accent-text); }
+.ai-fact b { color: var(--text); font-family: var(--font-head); font-weight: 600; display: block; margin-bottom: 2px; }
+/* Phone: the draft card */
+.s-photo { border-radius: 8px; background: var(--screen-panel); aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; }
+.s-photo svg { width: 56%; height: auto; }
+.s-card { border: 1px solid var(--screen-track); border-radius: 8px; padding: 0.6em 0.7em; display: grid; gap: 0.35em; }
+.s-card-title { font-family: var(--font-head); font-weight: 600; }
+.s-card-title small { display: block; font-family: var(--font-body); font-weight: 400; color: var(--screen-text-2); font-size: 0.85em; }
+.s-line { display: flex; justify-content: space-between; align-items: center; gap: 0.5em; font-size: 0.92em; }
+.s-line .port { border: 1px solid var(--screen-track); border-radius: 5px; padding: 0.05em 0.5em; color: var(--screen-text-2); font-size: 0.9em; white-space: nowrap; }
+.s-line .port.edit { border-color: var(--primary); color: var(--primary-text); }
+.s-totals { border-top: 1px solid var(--screen-track); padding-top: 0.4em; color: var(--screen-text-2); font-size: 0.85em; }
+.s-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.s-btns span { text-align: center; padding: 0.45em; border-radius: 6px; background: var(--screen-panel); color: var(--screen-text-2); font-size: 0.9em; }
+.s-btns .on { background: var(--primary); color: #1c1b1f; font-weight: 500; }
+@media (max-width: 860px) {
+  .ai-grid { grid-template-columns: 1fr; }
+  .ai-media { justify-items: start; }
+  .ai-media .phone { --phone-w: 230px; }
+  .ai-facts { grid-template-columns: 1fr; }
+}
+
 /* ---------- Pricing ---------- */
 .pricing { background: var(--bg-2); border-block: 1px solid var(--rule); }
 .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 900px; }
@@ -622,10 +664,57 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
           </g>
         </svg>
       </div>
-      <div class="food food-almond" data-depth="0.08" aria-hidden="true">
-        <svg viewBox="0 0 64 80">
-          <path d="M32 4c16 12 24 30 20 48-3 14-12 24-20 24S15 66 12 52C8 34 16 16 32 4z" fill="#cfc7d8"/>
-          <path d="M32 12c6 12 8 28 6 44" fill="none" stroke="#a89bb8" stroke-width="2" stroke-linecap="round"/>
+      <div class="food food-raspberry" data-depth="0.05" aria-hidden="true">
+        <svg viewBox="0 0 70 84">
+          <path d="M35 4v12" stroke="#5f8f00" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M35 16c-8-6-16-4-20 2 8 2 14 2 20-2zM35 16c8-6 16-4 20 2-8 2-14 2-20-2zM35 16c-2-8 2-14 8-16-2 6-4 12-8 16z" fill="#8fce00"/>
+          <g fill="#9d78bb">
+            <circle cx="35" cy="30" r="9"/><circle cx="24" cy="44" r="9"/><circle cx="46" cy="44" r="9"/>
+            <circle cx="35" cy="56" r="9"/><circle cx="27" cy="68" r="8"/><circle cx="43" cy="68" r="8"/>
+          </g>
+          <g fill="#b28ecc">
+            <circle cx="35" cy="42" r="8"/><circle cx="16" cy="56" r="7"/><circle cx="54" cy="56" r="7"/>
+            <circle cx="35" cy="76" r="6"/>
+          </g>
+          <g fill="#e6dbef" opacity=".7">
+            <circle cx="32" cy="27" r="2.5"/><circle cx="21" cy="41" r="2.5"/><circle cx="43" cy="41" r="2.5"/><circle cx="32" cy="53" r="2.5"/>
+          </g>
+        </svg>
+      </div>
+      <div class="food food-nuts" data-depth="0.09" aria-hidden="true">
+        <svg viewBox="0 0 90 72">
+          <circle cx="30" cy="46" r="21" fill="#cfc7d8"/>
+          <path d="M9 42c0-14 42-14 42 0-6 4-36 4-42 0z" fill="#a89bb8"/>
+          <path d="M30 26v-8" stroke="#5f8f00" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="64" cy="50" r="17" fill="#d8d2e0"/>
+          <path d="M47 47c0-11 34-11 34 0-5 3-29 3-34 0z" fill="#a89bb8"/>
+          <path d="M70 18c6-10 16-12 20-8-4 8-12 12-20 8z" fill="#8fce00"/>
+          <path d="M70 18c4-4 10-6 16-6" stroke="#5f8f00" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="food food-squirrel" data-depth="0.03" aria-hidden="true">
+        <svg viewBox="0 0 140 140">
+          <g class="tail-sway">
+            <path d="M92 108c28-8 40-38 30-66-6-18-26-24-32-8-4 12 10 22 14 38 2 12-4 26-12 36z" fill="#b28ecc"/>
+            <path d="M96 100c18-8 26-30 18-52" fill="none" stroke="#8f6bb0" stroke-width="5" stroke-linecap="round"/>
+          </g>
+          <ellipse cx="66" cy="94" rx="32" ry="28" fill="#cfc7d8"/>
+          <ellipse cx="58" cy="100" rx="18" ry="17" fill="#ece7f0"/>
+          <ellipse cx="54" cy="121" rx="12" ry="5" fill="#bfb4cc"/>
+          <ellipse cx="82" cy="122" rx="12" ry="5" fill="#bfb4cc"/>
+          <ellipse cx="36" cy="38" rx="6" ry="10" fill="#cfc7d8" transform="rotate(-15 36 38)"/>
+          <ellipse cx="36" cy="40" rx="3" ry="6" fill="#ece7f0" transform="rotate(-15 36 40)"/>
+          <ellipse cx="58" cy="37" rx="6" ry="10" fill="#bfb4cc" transform="rotate(15 58 37)"/>
+          <circle cx="48" cy="58" r="22" fill="#cfc7d8"/>
+          <circle cx="36" cy="67" r="4.5" fill="#b28ecc" opacity=".35"/>
+          <circle cx="40" cy="56" r="3.2" fill="#3d2f4d"/>
+          <circle cx="41.2" cy="54.8" r="1" fill="#fff"/>
+          <circle cx="27" cy="62" r="2.6" fill="#3d2f4d"/>
+          <path d="M29 66c2 2 5 2 7 0" fill="none" stroke="#3d2f4d" stroke-width="1.4" stroke-linecap="round"/>
+          <ellipse cx="46" cy="86" rx="8" ry="12" fill="#d8d2e0" stroke="#a89bb8" stroke-width="1.5" transform="rotate(20 46 86)"/>
+          <path d="M44 78c3 6 4 12 3 18" fill="none" stroke="#a89bb8" stroke-width="1.2" stroke-linecap="round" transform="rotate(20 46 86)"/>
+          <circle cx="40" cy="92" r="5" fill="#cfc7d8"/>
+          <circle cx="53" cy="90" r="5" fill="#cfc7d8"/>
         </svg>
       </div>
 
@@ -917,6 +1006,71 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
   </div>
 </section>
 
+<!-- ============ NOSH AI ============ -->
+<section class="section" id="ai" aria-labelledby="ai-title">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow reveal">Nosh AI · optional</div>
+      <h2 id="ai-title" class="reveal" style="--i:1">Four things that need a model. Off until you say so.</h2>
+      <p class="reveal" style="--i:2">Give Nosh an Anthropic API key and four more things switch on. Each sends only what it needs, only when you press the button that asks for it, and only to the Anthropic API.</p>
+    </div>
+    <div class="ai-grid">
+      <div class="ai-media reveal">
+        <div class="phone" aria-hidden="true">
+          <div class="screen">
+            <div class="s-status"><span>12:48</span><span>●●●</span></div>
+            <div class="s-photo">
+              <svg viewBox="0 0 120 70">
+                <ellipse cx="60" cy="40" rx="50" ry="22" fill="#cfc7d8"/>
+                <ellipse cx="60" cy="34" rx="42" ry="16" fill="#ece7f0"/>
+                <circle cx="44" cy="30" r="5" fill="#8f6bb0"/><circle cx="58" cy="26" r="5" fill="#b28ecc"/><circle cx="72" cy="31" r="5" fill="#9d78bb"/><circle cx="64" cy="36" r="4" fill="#8f6bb0"/>
+                <ellipse cx="82" cy="36" rx="5" ry="3" fill="#d8d2e0" stroke="#a89bb8" stroke-width="1"/>
+                <ellipse cx="36" cy="38" rx="5" ry="3" fill="#d8d2e0" stroke="#a89bb8" stroke-width="1"/>
+              </svg>
+            </div>
+            <div class="s-card">
+              <div class="s-card-title">Oatmeal with blueberries<small>Estimated from a photo · one bowl</small></div>
+              <div class="s-line"><span>Rolled oats</span><span class="port num">½ cup dry</span></div>
+              <div class="s-line"><span>Blueberries</span><span class="port num edit">¾ cup</span></div>
+              <div class="s-line"><span>Greek yogurt</span><span class="port num">½ cup</span></div>
+              <div class="s-line"><span>Almonds</span><span class="port num">½ oz</span></div>
+              <div class="s-totals num">360 kcal · 20 g protein · 8 g fibre · 41 mg sodium<br>Grains 1 · Fruit 1.5 · Dairy 0.5 · Nuts ⅓</div>
+              <div class="s-totals">Assumed a 12 oz bowl, three-quarters full. Change a portion and the numbers follow.</div>
+            </div>
+            <div class="s-btns"><span>Discard</span><span class="on">Save as meal</span></div>
+            <div class="s-group">Input</div>
+            <div class="s-copy">What's for dinner?</div>
+            <div class="s-fade"></div>
+          </div>
+        </div>
+      </div>
+      <div class="ai-list">
+        <article class="ai-item reveal" style="--i:0">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg></div>
+          <div><h3>Draft a note from words or a photo</h3><p>Describe a meal in plain words, or photograph a label or a plate. A label is read rather than guessed at. The draft comes back as ingredients with portions you can correct, and the nutrients are recomputed from the parts.</p></div>
+        </article>
+        <article class="ai-item reveal" style="--i:1">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18M5 11a7 7 0 0 1 14 0M4 15h16l-1 4H5z"/></svg></div>
+          <div><h3>What's for dinner?</h3><p>Takes what the day still has room for and suggests a meal that fits, with a method. It knows which meals are still to come, and it asks how many you are cooking for and what needs using up before it starts.</p></div>
+        </article>
+        <article class="ai-item reveal" style="--i:2">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/><path d="M9.5 10.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 17h.01"/></svg></div>
+          <div><h3>Ask about this recipe</h3><p>Open any recipe in your vault, including ones Nosh did not write, and ask what the sodium rides on or what to serve alongside. Its own figures are used rather than re-estimated. Save the exchange to the note if it was worth keeping.</p></div>
+        </article>
+        <article class="ai-item reveal" style="--i:3">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></div>
+          <div><h3>A reading on a report</h3><p>A day or a week is read for what its days show and what to watch. A month is read for what moved against the month before, with ways to improve ranked by what costs the score most, each naming a food out of your log.</p></div>
+        </article>
+      </div>
+    </div>
+    <div class="ai-facts">
+      <div class="ai-fact reveal" style="--i:0"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="14" height="10" rx="2"/><path d="M6 8V6a4 4 0 0 1 8 0v2"/></svg><div><b>Off until you give it a key</b>Without a credential none of this exists, and the plugin never touches the network.</div></div>
+      <div class="ai-fact reveal" style="--i:1"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M6 9l4 4 4-4M4 17h12"/></svg><div><b>Sent only when you press the button</b>A draft, a note you are asking about, or a photo goes over when you ask, and nothing else ever does.</div></div>
+      <div class="ai-fact reveal" style="--i:2"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 6v8M8 8h3a1.5 1.5 0 0 1 0 3H8h3a1.5 1.5 0 0 1 0 3H8"/></svg><div><b>Billed to your own account</b>Requests run against the Anthropic developer platform at API rates. There is no account with us and no markup.</div></div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ PRICING ============ -->
 <section class="section pricing" id="pricing" aria-labelledby="pricing-title">
   <div class="wrap">
@@ -1033,6 +1187,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
           <li><a href="#how">How it works</a></li>
           <li><a href="#features">Features</a></li>
           <li><a href="#demo">Try the demo</a></li>
+          <li><a href="#ai">Nosh AI</a></li>
           <li><a href="#pricing">Pricing</a></li>
           <li><a href="#faq">Questions</a></li>
         </ul>
