@@ -826,23 +826,49 @@
 
 /* Settings ----------------------------------------------------------
  *
- * The target rows are a table. Each row's controls sit on a fixed grid,
+ * Obsidian 1.13 draws each setting as a card and insets its text from the
+ * card's edge. Anything written straight into the pane - a note between
+ * two settings, the words naming a column - has to be given the same
+ * inset or it hangs off the left of everything around it. Older builds
+ * lay their settings out flush instead, and --setting-items-padding-x is
+ * what tells the two apart: absent, the inset is nothing; present, it is
+ * the padding a card carries. */
+
+.nosh-settings {
+    --nosh-inset: min(var(--setting-items-padding-x, 0px), var(--size-4-4));
+}
+
+/* A paragraph written into the pane rather than into a setting: a note
+ * about the settings around it. Set to the same text column, with room
+ * above and below, so it reads as prose rather than as a stray row. */
+.nosh-settings .nosh-note {
+    padding: 0 var(--nosh-inset);
+    margin: var(--size-4-1) 0 var(--size-4-3);
+}
+
+/* The target rows are a table. Each row's controls sit on a fixed grid,
  * the same columns all the way down, and one header row on the same grid
  * names them, so a number box is read by the word above it rather than
  * by a tooltip. The control block is content-sized rather than flexible,
- * or the columns would drift with the length of each row's name. */
+ * or the columns would drift with the length of each row's name; but each
+ * column is a width to ask for rather than a width to hold, so that a
+ * pane too narrow to stand them side by side - a phone, or a window
+ * dragged in - has them give room up together, header with rows, rather
+ * than run the boxes off the edge. */
 
 .nosh-settings .nosh-target-row .setting-item-control {
     flex: 0 0 auto;
+    min-width: 0;
     display: grid;
-    grid-template-columns: 7.5em 4.5em 5.5em 3em;
+    grid-template-columns: minmax(0, 7.5em) minmax(0, 4.5em) minmax(0, 5.5em) 3em;
     gap: var(--size-4-2);
     align-items: center;
     justify-items: stretch;
 }
 
 .nosh-settings .nosh-group-row .setting-item-control {
-    grid-template-columns: 7.5em 4.5em 4.5em 4.5em 3em;
+    grid-template-columns:
+        minmax(0, 7.5em) minmax(0, 4.5em) minmax(0, 4.5em) minmax(0, 4.5em) 3em;
 }
 
 .nosh-settings .nosh-target-row .setting-item-control select,
@@ -855,14 +881,42 @@
     justify-self: center;
 }
 
+/* The words naming the columns are neither a row of the table nor a
+ * setting of their own: bare text on the row's grid, sitting on top of
+ * the first row rather than floating above the table in a card. */
 .nosh-settings .nosh-target-head {
-    padding-top: 0;
-    padding-bottom: 4px;
-    border-top: none;
+    margin-bottom: 0;
+    padding: 0 var(--nosh-inset) var(--size-4-1);
+    background: none;
+    border: none;
+    border-radius: 0;
+}
+
+/* A table is one card, not a card a row with eight pixels between them:
+ * the gaps close, a hairline divides the rows, and only the ends of the
+ * run are rounded. A row carries a name, a line under it and a set of
+ * boxes, so it is packed tighter than a setting standing on its own. */
+.nosh-settings .nosh-target-row:not(.nosh-target-head) {
+    margin-bottom: 0;
+    border-radius: 0;
+    padding-top: var(--size-4-3);
+    padding-bottom: var(--size-4-3);
+}
+
+.nosh-settings .nosh-target-row + .nosh-target-row {
+    border-top: var(--border-width, 1px) solid var(--background-modifier-border);
 }
 
 .nosh-settings .nosh-target-head + .setting-item {
     border-top: none;
+    border-start-start-radius: var(--setting-items-radius, 0);
+    border-start-end-radius: var(--setting-items-radius, 0);
+}
+
+.nosh-settings .nosh-target-row:not(:has(+ .nosh-target-row)) {
+    margin-bottom: var(--size-4-2);
+    border-end-start-radius: var(--setting-items-radius, 0);
+    border-end-end-radius: var(--setting-items-radius, 0);
 }
 
 .nosh-settings .nosh-target-head .nosh-col {
@@ -877,6 +931,26 @@
 
 .nosh-settings .nosh-target-row .setting-item-description code {
     font-size: var(--font-ui-smaller);
+}
+
+/* A pane narrow enough for Obsidian to stack a setting - a phone, or a
+ * window dragged in - puts the boxes under the name, where a word sitting
+ * above the table no longer names the column beneath it. The boxes keep
+ * their own labels; these go. What room there is then goes by share
+ * rather than by the em widths above, so the shape keeps a word of its
+ * name while the numbers, which are a digit or two, take less. */
+@container (max-width: 400px) {
+    .nosh-settings .nosh-target-head {
+        display: none;
+    }
+
+    .nosh-settings .nosh-target-row .setting-item-control {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 3em;
+    }
+
+    .nosh-settings .nosh-group-row .setting-item-control {
+        grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) 3em;
+    }
 }
 
 /* Occasions ---------------------------------------------------------

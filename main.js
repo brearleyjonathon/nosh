@@ -6735,7 +6735,7 @@ class NoshSettingTab extends PluginSettingTab {
                 }));
 
         containerEl.createDiv({
-            cls: 'setting-item-description',
+            cls: 'setting-item-description nosh-note',
             text: 'A note is a meal or an ingredient by its tags \u2014 #' + (this.plugin.settings.tag || 'nutrition') +
                   '/meal or #' + (this.plugin.settings.tag || 'nutrition') + '/ingredient. Meals fold into a section per ' +
                   'occasion, read from a meal_type field. Ingredients fold by food ' +
@@ -6756,11 +6756,10 @@ class NoshSettingTab extends PluginSettingTab {
                     this.plugin.refreshViews();
                 }));
 
-        new Setting(containerEl).setName('AI').setHeading();
-        containerEl.createDiv({
-            cls: 'setting-item-description',
-            text: 'What you type, the note you are asking about, and any photograph you take go to the Anthropic API. Nothing is sent until you ask for something.',
-        });
+        new Setting(containerEl).setName('AI').setHeading()
+            .setDesc('What you type, the note you are asking about, and any '
+                     + 'photograph you take go to the Anthropic API. Nothing is '
+                     + 'sent until you ask for something.');
 
         new Setting(containerEl)
             .setName('Credentials')
@@ -6890,14 +6889,11 @@ class NoshSettingTab extends PluginSettingTab {
                     b.setDisabled(false).setButtonText('Test');
                 }));
 
-        new Setting(containerEl).setName('Diet pattern').setHeading();
-        containerEl.createDiv({
-            cls: 'setting-item-description',
-            text: 'Fills in every target below from one calorie figure, scaled ' +
-                  'from the DASH 2,000 kcal reference. It lands near the ' +
-                  'published pattern for a calorie level rather than on it, and ' +
-                  'nothing here stops you editing a row afterwards.',
-        });
+        new Setting(containerEl).setName('Diet pattern').setHeading()
+            .setDesc('Fills in every target below from one calorie figure, scaled ' +
+                     'from the DASH 2,000 kcal reference. It lands near the ' +
+                     'published pattern for a calorie level rather than on it, and ' +
+                     'nothing here stops you editing a row afterwards.');
 
         new Setting(containerEl)
             .setName('Calories a day')
@@ -6956,15 +6952,12 @@ class NoshSettingTab extends PluginSettingTab {
                                fmt(settings.dietSodium) + ' mg sodium.');
                 }));
 
-        new Setting(containerEl).setName('Daily nutrient targets').setHeading();
-        containerEl.createDiv({
-            cls: 'setting-item-description',
-            text: 'For each nutrient: its shape, its weight in the score, ' +
-                  'its daily target, and whether the bar shows. The weight ' +
-                  'only matters to the score: 1 is the default, 2 makes a ' +
-                  'bar count double, 0.5 half. The Week tab multiplies each ' +
-                  'target by seven.',
-        });
+        new Setting(containerEl).setName('Daily nutrient targets').setHeading()
+            .setDesc('For each nutrient: its shape, its weight in the score, ' +
+                     'its daily target, and whether the bar shows. The weight ' +
+                     'only matters to the score: 1 is the default, 2 makes a ' +
+                     'bar count double, 0.5 half. The Week tab multiplies each ' +
+                     'target by seven.');
 
         targetHeader(containerEl, ['Shape', 'Weight', 'Target', 'Show']);
         for (const n of NUTRIENTS) {
@@ -7014,15 +7007,12 @@ class NoshSettingTab extends PluginSettingTab {
             describeTarget(row, nutrientShapeNote(shape), n.key);
         }
 
-        new Setting(containerEl).setName('Food group servings').setHeading();
-        containerEl.createDiv({
-            cls: 'setting-item-description',
-            text: 'For each DASH food group: its shape, its weight in the ' +
-                  'score (1 unless you say otherwise), then its minimum and ' +
-                  'maximum servings. Per-day groups are ' +
-                  'multiplied by seven in the Week tab; per-week groups are ' +
-                  'already weekly.',
-        });
+        new Setting(containerEl).setName('Food group servings').setHeading()
+            .setDesc('For each DASH food group: its shape, its weight in the ' +
+                     'score (1 unless you say otherwise), then its minimum and ' +
+                     'maximum servings. Per-day groups are ' +
+                     'multiplied by seven in the Week tab; per-week groups are ' +
+                     'already weekly.');
 
         targetHeader(containerEl, ['Shape', 'Weight', 'Min', 'Max', 'Show'], 'nosh-group-row');
         for (const g of FOOD_GROUPS) {
