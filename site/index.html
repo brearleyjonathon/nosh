@@ -474,11 +474,25 @@ button { font: inherit; color: inherit; }
 .ai-media { display: grid; place-items: center; }
 .ai-media .phone { --phone-w: 280px; }
 .ai-list { display: grid; gap: 14px; }
-.ai-item { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 20px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--bg); }
-.ai-item .ic { width: 44px; height: 44px; border-radius: 12px; background: var(--primary-soft); color: var(--primary-text); display: grid; place-items: center; }
+.ai-item { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 20px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--bg); width: 100%; text-align: left; cursor: pointer; transition: border-color .2s, background-color .2s; }
+.ai-item:hover { border-color: var(--text-3); }
+.ai-item[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-soft); }
+.ai-item .ic { width: 44px; height: 44px; border-radius: 12px; background: var(--primary-soft); color: var(--primary-text); display: grid; place-items: center; transition: background-color .2s, color .2s; }
+.ai-item[aria-pressed="true"] .ic { background: var(--primary); color: #1c1b1f; }
 .ai-item .ic svg { width: 22px; height: 22px; }
-.ai-item h3 { font-size: 1.0625rem; }
+.ai-item .ai-h { display: block; font-family: var(--font-head); font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.01em; line-height: 1.2; }
 .ai-item p { margin-top: 6px; color: var(--text-2); font-size: 0.9375rem; }
+.ai-hint { margin-top: 12px; font-size: 0.875rem; color: var(--text-3); }
+.ai-screen { display: none; flex-direction: column; gap: 0.7em; }
+.ai-screen.on { display: flex; animation: screenIn .4s var(--ease-out); }
+@keyframes screenIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.s-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.s-chips span { padding: 0.15em 0.6em; border-radius: 999px; background: var(--screen-panel); color: var(--screen-text-2); font-size: 0.85em; }
+.s-msg { padding: 0.5em 0.7em; border-radius: 10px; background: var(--screen-panel); font-size: 0.9em; line-height: 1.4; max-width: 92%; }
+.s-msg.me { align-self: flex-end; background: var(--primary); color: #1c1b1f; }
+.s-msg em { display: block; color: var(--screen-text-2); font-style: normal; font-size: 0.9em; margin-top: 0.3em; }
+.s-read { font-size: 0.88em; line-height: 1.4; color: var(--screen-text-2); }
+.s-read b { display: block; color: var(--screen-text); font-family: var(--font-head); font-weight: 600; }
 .ai-facts { margin-top: clamp(28px, 4vw, 44px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .ai-fact { display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--rule); color: var(--text-2); font-size: 0.9375rem; }
 .ai-fact svg { flex: none; width: 20px; height: 20px; margin-top: 2px; color: var(--accent-text); }
@@ -1019,6 +1033,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
         <div class="phone" aria-hidden="true">
           <div class="screen">
             <div class="s-status"><span>12:48</span><span>●●●</span></div>
+            <div class="ai-screen on" id="ai-screen-0">
             <div class="s-photo">
               <svg viewBox="0 0 120 70">
                 <ellipse cx="60" cy="40" rx="50" ry="22" fill="#cfc7d8"/>
@@ -1038,29 +1053,64 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
               <div class="s-totals">Assumed a 12 oz bowl, three-quarters full. Change a portion and the numbers follow.</div>
             </div>
             <div class="s-btns"><span>Discard</span><span class="on">Save as meal</span></div>
-            <div class="s-group">Input</div>
-            <div class="s-copy">What's for dinner?</div>
+            </div>
+
+            <div class="ai-screen" id="ai-screen-1">
+              <div class="s-group">Input</div>
+              <div class="s-tabs"><span>Breakfast <em>3</em></span><span>Lunch <em>2</em></span><span class="on">Dinner</span><span>Snacks &amp; drinks</span></div>
+              <div class="s-copy">What's for dinner?</div>
+              <div class="s-chips"><span>For 2</span><span>Weeknight</span><span>Use up: napa cabbage</span></div>
+              <div class="s-card">
+                <div class="s-card-title">Miso chicken and tofu napa nabe<small>Fits what is left: 760 kcal, 900 mg sodium, 3 servings of vegetables</small></div>
+                <div class="s-line"><span>Per portion</span><span class="port num">390 kcal · 34 g protein</span></div>
+                <div class="s-line"><span>Sodium</span><span class="port num">550 mg</span></div>
+                <div class="s-line"><span>Vegetables</span><span class="port num">3.2 servings</span></div>
+                <div class="s-totals">1. Simmer the dashi with the miso and sake.<br>2. Cabbage, shiitake and tofu, then the chicken.<br>3. Ginger and green onion off the heat.</div>
+              </div>
+              <div class="s-btns"><span>Another</span><span class="on">Save as meal</span></div>
+            </div>
+
+            <div class="ai-screen" id="ai-screen-2">
+              <div class="s-note-title">Miso-glazed salmon with rice and broccoli</div>
+              <div class="s-meta">Ask about this recipe</div>
+              <div class="s-msg me">What does the sodium ride on?</div>
+              <div class="s-msg">Most of the 540 mg is the miso in the glaze, about 420 mg. The salmon is 52 mg and the rice and broccoli under 70 mg together. Halve the miso and add lemon and the plate lands near 330 mg.<em>Glaze figure is an estimate. The rest is from the note.</em></div>
+              <div class="s-msg me">What would make it go further?</div>
+              <div class="s-msg">A second cup of broccoli: 27 kcal, 2.6 g fibre and a vegetable serving.</div>
+              <div class="s-btns"><span>Save to note</span><span class="on">Ask</span></div>
+            </div>
+
+            <div class="ai-screen" id="ai-screen-3">
+              <div class="s-note-title">Nosh 2026-09-17</div>
+              <div class="s-meta num">Day report · 5 meals · score 94</div>
+              <div class="s-sub open">Reading</div>
+              <div class="s-read"><b>Worth watching</b>Carbs at 128% came mostly from the baguette and the muesli. Sodium is fine at 60%, but two-thirds of it is the lunch salad's dressing.</div>
+              <div class="s-read"><b>Working</b>Fibre reached 122% without effort. Lentils and the second banana carried it, with potassium along at 102%.</div>
+              <div class="s-read"><b>Next</b>Swap the baguette for the whole wheat bread already in your notes and carbs land inside the target.</div>
+              <div class="s-meta">Read from the report's own tables. The numbers are the log; the interpretation is not.</div>
+            </div>
             <div class="s-fade"></div>
           </div>
         </div>
       </div>
-      <div class="ai-list">
-        <article class="ai-item reveal" style="--i:0">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg></div>
-          <div><h3>Draft a note from words or a photo</h3><p>Describe a meal in plain words, or photograph a label or a plate. A label is read rather than guessed at. The draft comes back as ingredients with portions you can correct, and the nutrients are recomputed from the parts.</p></div>
-        </article>
-        <article class="ai-item reveal" style="--i:1">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18M5 11a7 7 0 0 1 14 0M4 15h16l-1 4H5z"/></svg></div>
-          <div><h3>What's for dinner?</h3><p>Takes what the day still has room for and suggests a meal that fits, with a method. It knows which meals are still to come, and it asks how many you are cooking for and what needs using up before it starts.</p></div>
-        </article>
-        <article class="ai-item reveal" style="--i:2">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/><path d="M9.5 10.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 17h.01"/></svg></div>
-          <div><h3>Ask about this recipe</h3><p>Open any recipe in your vault, including ones Nosh did not write, and ask what the sodium rides on or what to serve alongside. Its own figures are used rather than re-estimated. Save the exchange to the note if it was worth keeping.</p></div>
-        </article>
-        <article class="ai-item reveal" style="--i:3">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></div>
-          <div><h3>A reading on a report</h3><p>A day or a week is read for what its days show and what to watch. A month is read for what moved against the month before, with ways to improve ranked by what costs the score most, each naming a food out of your log.</p></div>
-        </article>
+      <div class="ai-list" role="group" aria-label="Nosh AI features. Choose one to show it on the phone.">
+        <button class="ai-item reveal" style="--i:0" type="button" aria-pressed="true" data-screen="ai-screen-0">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg></span>
+          <span><span class="ai-h">Draft a note from words or a photo</span><p>Describe a meal in plain words, or photograph a label or a plate. A label is read rather than guessed at. The draft comes back as ingredients with portions you can correct, and the nutrients are recomputed from the parts.</p></span>
+        </button>
+        <button class="ai-item reveal" style="--i:1" type="button" aria-pressed="false" data-screen="ai-screen-1">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18M5 11a7 7 0 0 1 14 0M4 15h16l-1 4H5z"/></svg></span>
+          <span><span class="ai-h">What's for dinner?</span><p>Takes what the day still has room for and suggests a meal that fits, with a method. It knows which meals are still to come, and it asks how many you are cooking for and what needs using up before it starts.</p></span>
+        </button>
+        <button class="ai-item reveal" style="--i:2" type="button" aria-pressed="false" data-screen="ai-screen-2">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/><path d="M9.5 10.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 17h.01"/></svg></span>
+          <span><span class="ai-h">Ask about this recipe</span><p>Open any recipe in your vault, including ones Nosh did not write, and ask what the sodium rides on or what to serve alongside. Its own figures are used rather than re-estimated. Save the exchange to the note if it was worth keeping.</p></span>
+        </button>
+        <button class="ai-item reveal" style="--i:3" type="button" aria-pressed="false" data-screen="ai-screen-3">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></span>
+          <span><span class="ai-h">A reading on a report</span><p>A day or a week is read for what its days show and what to watch. A month is read for what moved against the month before, with ways to improve ranked by what costs the score most, each naming a food out of your log.</p></span>
+        </button>
+        <p class="ai-hint">Choose one and the phone shows it.</p>
       </div>
     </div>
     <div class="ai-facts">
@@ -1410,6 +1460,23 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
     chips[0].focus();
   });
   renderDemo();
+
+  /* ---------- Nosh AI: pick a feature, the phone shows it ---------- */
+  var aiBtns = Array.prototype.slice.call(document.querySelectorAll('.ai-item[data-screen]'));
+  var aiScreens = Array.prototype.slice.call(document.querySelectorAll('.ai-screen'));
+  function selectAi(i) {
+    aiBtns.forEach(function (b, j) { b.setAttribute('aria-pressed', j === i ? 'true' : 'false'); });
+    aiScreens.forEach(function (sc, j) { sc.classList.toggle('on', j === i); });
+  }
+  aiBtns.forEach(function (b, i) {
+    b.addEventListener('click', function () { selectAi(i); });
+    b.addEventListener('keydown', function (e) {
+      var j = null;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') j = (i + 1) % aiBtns.length;
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') j = (i - 1 + aiBtns.length) % aiBtns.length;
+      if (j !== null) { e.preventDefault(); selectAi(j); aiBtns[j].focus(); }
+    });
+  });
 
   /* ---------- FAQ accordion ---------- */
   var faqBtns = Array.prototype.slice.call(document.querySelectorAll('.faq-btn'));
