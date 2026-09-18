@@ -266,18 +266,18 @@ button { font: inherit; color: inherit; }
 .food { position: absolute; z-index: 3; will-change: transform; pointer-events: none; }
 .riso-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 .food svg { display: block; width: 100%; height: auto; overflow: visible; animation: float 7s ease-in-out infinite; }
-.food-berries { width: 104px; top: 3%; left: calc(50% - 210px); }
+.food-berries { width: 104px; top: calc(50% - 307px); left: calc(50% - 210px); }
 .food-berries svg { animation-duration: 8s; }
-.food-leaf { width: 136px; bottom: 5%; left: calc(50% - 222px); }
-.food-leaf svg { animation-duration: 9s; animation-delay: -3s; }
-.food-oat { width: 92px; top: 8%; right: calc(50% - 198px); }
+.food-nuts { width: 96px; top: calc(50% - 243px); left: calc(50% - 240px); }
+.food-nuts svg { animation-duration: 8.5s; animation-delay: -2s; }
+.food-oat { width: 92px; top: calc(50% - 187px); right: calc(50% - 196px); }
 .food-oat svg { animation-duration: 7.5s; animation-delay: -1.5s; }
-.food-raspberry { width: 68px; top: 41%; left: calc(50% - 186px); }
+.food-raspberry { width: 68px; top: calc(50% - 49px); left: calc(50% - 188px); }
 .food-raspberry svg { animation-duration: 6.5s; animation-delay: -2.5s; }
-.food-nuts { width: 96px; top: 50%; right: calc(50% - 202px); }
-.food-nuts svg { animation-duration: 8.5s; animation-delay: -5s; }
-.food-squirrel { width: 150px; bottom: -2%; right: calc(50% - 230px); }
+.food-squirrel { width: 150px; top: calc(50% + 51px); right: calc(50% - 228px); }
 .food-squirrel svg { animation-duration: 9s; animation-delay: -1s; }
+.food-leaf { width: 136px; top: calc(50% + 178px); left: calc(50% - 220px); }
+.food-leaf svg { animation-duration: 9s; animation-delay: -3s; }
 .tail-sway { transform-box: view-box; transform-origin: 96px 116px; animation: tail 4.5s ease-in-out infinite; }
 @keyframes tail { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
 @keyframes float {
@@ -291,12 +291,12 @@ button { font: inherit; color: inherit; }
   .hero .wrap { grid-template-columns: 1fr; }
   .hero-media { min-height: 0; margin-top: 8px; }
   .hero-media .phone { --phone-w: 260px; }
-  .food-berries { top: 0; left: calc(50% - 174px); width: 78px; }
-  .food-leaf { bottom: 3%; left: calc(50% - 182px); width: 100px; }
-  .food-oat { top: 4%; right: calc(50% - 164px); width: 68px; }
-  .food-raspberry { top: 42%; left: calc(50% - 156px); width: 50px; }
-  .food-nuts { top: 48%; right: calc(50% - 164px); width: 68px; }
-  .food-squirrel { bottom: -2%; right: calc(50% - 188px); width: 108px; }
+  .food-berries { top: calc(50% - 265px); left: calc(50% - 174px); width: 78px; }
+  .food-nuts { top: calc(50% - 210px); left: calc(50% - 196px); width: 72px; }
+  .food-oat { top: calc(50% - 161px); right: calc(50% - 162px); width: 68px; }
+  .food-raspberry { top: calc(50% - 42px); left: calc(50% - 156px); width: 50px; }
+  .food-squirrel { top: calc(50% + 45px); right: calc(50% - 186px); width: 108px; }
+  .food-leaf { top: calc(50% + 155px); left: calc(50% - 180px); width: 100px; }
   .stats { gap: 20px; }
   .stat b { font-size: 1.5rem; }
 }
@@ -822,7 +822,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
           </g>
         </svg>
       </div>
-      <div class="food food-nuts" data-depth="0.09" aria-hidden="true">
+      <div class="food food-nuts" data-depth="0.06" aria-hidden="true">
         <svg viewBox="0 0 100 84">
           <g filter="url(#riso)">
             <path d="M11.9 18.6L34.1 16.2L48.2 19.9L68.9 16.6L87.1 16.3L84.7 32.3L91.9 45.9L89.3 55.4L87.3 66.4L71.3 68.0L47.9 74.8L29.4 74.8L13.2 72.6L13.3 53.8L14.1 41.6L11.1 27.3Z" fill="var(--art-wash)"/>
