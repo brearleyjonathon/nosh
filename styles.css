@@ -951,23 +951,59 @@
     font-size: var(--font-ui-smaller);
 }
 
-/* A pane narrow enough for Obsidian to stack a setting - a phone, or a
- * window dragged in - puts the boxes under the name, where a word sitting
- * above the table no longer names the column beneath it. The boxes keep
- * their own labels; these go. What room there is then goes by share
- * rather than by the em widths above, so the shape keeps a word of its
- * name while the numbers, which are a digit or two, take less. */
-@container (max-width: 400px) {
+/* A pane narrow enough to stack a setting - a phone, or a window dragged
+ * in - puts the boxes under the name, where a word sitting above the table
+ * no longer names the column beneath it. The boxes keep their own labels;
+ * these go.
+ *
+ * Obsidian stacks a narrow setting itself, but the rule that does it
+ * passes over anything carrying mod-toggle, and addToggle puts that class
+ * on every row here for the Show column. So these are stacked here
+ * instead, and the boxes are laid out for the room that leaves rather
+ * than for the em widths above: the shape takes the first line, since
+ * Reference is a word and not a digit, and the numbers and the toggle
+ * share the second. Across a phone the whole set will not fit on one
+ * line - a shape, a weight, a minimum, a maximum and a switch in the
+ * width of a card - and made to, each is too narrow to read. */
+@container (max-width: 500px) {
     .nosh-settings .nosh-target-head {
         display: none;
     }
 
+    .nosh-settings .nosh-target-row {
+        flex-direction: column;
+    }
+
+    .nosh-settings .nosh-target-row .setting-item-info {
+        align-self: flex-start;
+        margin-inline-end: 0;
+    }
+
+    /* The width of the line is what the tracks divide up now. A fr is a
+     * share of the room there is, and a grid sized to its own contents has
+     * none to share out: the tracks come back as wide as the boxes asked
+     * for, and a row meant to fit a phone ends up a thousand pixels
+     * across. Taking the line's width gives them something to divide, and
+     * shrinking is what lets the line hold them. */
     .nosh-settings .nosh-target-row .setting-item-control {
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 3em;
+        flex: 1 1 auto;
+        width: 100%;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 3em;
     }
 
     .nosh-settings .nosh-group-row .setting-item-control {
-        grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) 3em;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) 3em;
+    }
+
+    /* The shape, over the line the rest of the row shares. */
+    .nosh-settings .nosh-target-row .setting-item-control > select {
+        grid-column: 1 / -1;
+    }
+
+    /* Stacked, the target box has its track to itself rather than standing
+     * over the two a group splits it into, so it fills it like the rest. */
+    .nosh-settings .nosh-target-row input.nosh-target-box {
+        max-width: none;
     }
 }
 
