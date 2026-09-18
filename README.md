@@ -166,15 +166,17 @@ SORT file.name DESC
 
 ## The score
 
-Under the meal count sits a composite score out of 100, with a bar, for the
-span on screen: the day's in Day view, the week's in Week, the month's in
+Under the meal count sits a composite score out of 100, drawn as a ring, for
+the span on screen: the day's in Day view, the week's in Week, the month's in
 Month. Today and the week are never blended. *Am I on track right now* and
 *did the pattern hold* are different questions, and the tab is how you ask
 one rather than the other. The heading folds it away like the bars.
 
-The bar is the number, filled from the left: a day at 73 is a bar
-three-quarters full. It is coloured as the number is and no finer, because
-the bars below already say which way each thing went.
+The ring is the number, wound clockwise from twelve o'clock with the number
+itself in the hole: a day at 73 is an arc not quite three-quarters round.
+Beside it stands the name of the span and the one thing worth saying about
+it. The ring is coloured as the number is and no finer, because the bars
+below already say which way each thing went.
 
 Each is the weighted average of how far every bar you have showing is from
 its target. A floor pays out in proportion to how much of the minimum is
@@ -197,8 +199,10 @@ some of it at breakfast is not a breach.
 
 The week is judged bar by bar over the days that have anything logged, so a
 day you did not log is missing rather than a zero, with the weekly groups read
-against the week. Tap the line for the three bars costing most. The Month
-tab scores the month the same way, over its per-day bars alone.
+against the week. The line beside the ring names the three bars costing most
+already, or says how far through the day's calories you are while they are
+still coming in; tap it for what each of those bars paid. The Month tab
+scores the month the same way, over its per-day bars alone.
 
 ### The arithmetic
 

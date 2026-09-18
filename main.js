@@ -5256,38 +5256,62 @@ class NoshView extends ItemView {
         row.setAttr('title', 'The weighted average of every bar you have ' +
                              'showing, calories only when over; today the ' +
                              'floors are judged on pace with the calories. ' +
-                             'Tap for what is costing most.');
-        const put = (label, got) => {
-            if (!got) return;
-            const part = row.createDiv({ cls: 'nosh-score-part' });
-            const top = part.createDiv({ cls: 'nosh-score-top' });
-            top.createSpan({ cls: 'nosh-score-label', text: label });
-            const num = top.createSpan({ cls: 'nosh-score-num', text: String(got.score) });
-            num.setAttr('data-state', scoreState(got.score));
+                             'Tap for what each bar is paying.');
 
-            /* The bar is the number, filled from the left and coloured as the
-             * number is - nothing finer, because the bars below already say
-             * which way each thing went. */
-            const bar = part.createDiv({ cls: 'nosh-score-bar' });
-            const fill = bar.createDiv({ cls: 'nosh-score-fill' });
-            fill.style.width = got.score + '%';
-            fill.setAttr('data-state', scoreState(got.score));
+        /* The ring is the number: a day at 73 is an arc not quite
+         * three-quarters round, drawn from twelve o'clock. It is coloured as
+         * the number is and no finer, because the bars below already say
+         * which way each thing went. */
+        const state = scoreState(got.score);
+        const dial = row.createDiv({ cls: 'nosh-score-dial' });
+        const SVG = 'http://www.w3.org/2000/svg';
+        const svg = dial.appendChild(document.createElementNS(SVG, 'svg'));
+        svg.setAttribute('viewBox', '0 0 84 84');
+        svg.setAttribute('aria-hidden', 'true');
+        const circle = (cls) => {
+            const c = svg.appendChild(document.createElementNS(SVG, 'circle'));
+            c.setAttribute('class', cls);
+            c.setAttribute('cx', '42');
+            c.setAttribute('cy', '42');
+            c.setAttribute('r', '34');
+            return c;
         };
-        put(mode === 'month' ? 'Month' : mode === 'week' ? 'Week'
-            : this.cursor === todayIso() ? 'Today' : 'Day', got);
+        circle('nosh-score-track');
+        /* 2πr at r = 34: the whole ring dashed, then wound back by what the
+         * score is short of 100, so a 0 draws nothing at all. */
+        const ROUND = 213.6;
+        const arc = circle('nosh-score-arc');
+        arc.setAttribute('stroke-dasharray', String(ROUND));
+        arc.setAttribute('stroke-dashoffset',
+                         (ROUND * (1 - Math.min(100, got.score) / 100)).toFixed(1));
+        arc.setAttribute('data-state', state);
+        dial.createDiv({ cls: 'nosh-score-num', text: String(got.score) })
+            .setAttr('data-state', state);
 
-        /* What pulled it down, on request. */
-        if (this.scoreOpen) {
-            const why = row.createDiv({ cls: 'nosh-score-why' });
-            /* Today says so, because a floor at 60% mid-morning is behind
-             * pace rather than short, and the words should say which. */
-            const paced = got.pace === undefined ? ''
-                : 'On pace, ' + Math.round(got.pace * 100) + '% of calories in. ';
-            why.setText(paced + (got.worst.length
-                ? 'Costing most: ' + got.worst.map((b) =>
-                    b.label + ' ' + Math.round(b.credit * 100) + '%').join(' · ')
-                : 'Every bar met.'));
-        }
+        const copy = row.createDiv({ cls: 'nosh-score-copy' });
+        copy.createDiv({
+            cls: 'nosh-score-label',
+            text: mode === 'month' ? 'Month' : mode === 'week' ? 'Week'
+                : this.cursor === todayIso() ? 'Today' : 'Day',
+        });
+
+        /* Today says so, because a floor at 60% mid-morning is behind pace
+         * rather than short, and the words should say which. */
+        const paced = got.pace === undefined ? ''
+            : 'On pace at ' + Math.round(got.pace * 100) + "% of the day's calories";
+        /* Shut, the line is whichever headline the span has earned; open, it
+         * names the bars and what each one paid. */
+        const worst = got.worst.length
+            ? 'Costing most: ' + (this.scoreOpen
+                ? got.worst.map((b) => b.label + ' ' +
+                    Math.round(b.credit * 100) + '%').join(' · ')
+                : got.worst.map((b) => b.label).join(', '))
+            : 'Every bar met.';
+        copy.createDiv({
+            cls: 'nosh-score-why',
+            text: this.scoreOpen ? (paced ? paced + '. ' : '') + worst
+                                 : (paced || worst),
+        });
         row.addEventListener('click', () => {
             this.scoreOpen = !this.scoreOpen;
             this.keepScroll(() => this.renderTotals());
