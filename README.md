@@ -393,6 +393,17 @@ Nosh is not yet in the community plugin list. Until it is:
   them in `<vault>/.obsidian/plugins/nosh/`, and enable Nosh under
   **Settings → Community plugins**.
 
+## Try it
+
+A vault with nothing tagged shows an empty picker. The **Add** button under
+Sample notes in settings, or the *Add sample notes* command, writes an
+ingredient in every food group and three meals built from them into the Nosh
+folder, enough to log a day with and to see what a note looks like. The
+figures are rounded from USDA FoodData Central for the amount each note
+states, and each note says so. They are ordinary notes once written: keep
+them, correct them or delete them like any other. Running it again adds
+nothing, and a sample you have corrected is left as you left it.
+
 ## Companion skills
 
 Nosh reads notes; it does not mind who wrote them. The `skills/` folder holds
