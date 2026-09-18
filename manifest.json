@@ -1,7 +1,7 @@
 {
   "id": "nosh",
   "name": "Nosh",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "minAppVersion": "1.5.0",
   "description": "Log meals and ingredients from your own notes and watch them add up against DASH targets — nutrients, food-group servings, and a suggestion for what to eat next.",
   "author": "Jonathon Brearley",
