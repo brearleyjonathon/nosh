@@ -61,8 +61,9 @@ written by hand tends to carry. The umbrella tag is configurable.
 Folders play no part in this, so a vault that already keeps recipes somewhere
 needs no rearranging. The Nosh folder setting only decides where Nosh files
 new notes. It makes `Meals`, `Ingredients`, `Reports` and `Log` beneath
-whatever folder you name. If you would rather it only looked there, there is
-a setting for that.
+whatever folder you name, and keeps [the targets note](#the-targets) at the
+top of it. If you would rather it only looked there, there is a setting for
+that.
 
 ## Frontmatter
 
@@ -174,6 +175,65 @@ FROM #nutrition/log
 WHERE contains(string(log), "Banana")
 SORT file.name DESC
 ```
+
+### The targets
+
+The targets are kept the same way, in a note called `Nosh targets` in the
+Nosh folder:
+
+```yaml
+---
+nosh: targets
+diet_calories: 1750
+diet_sodium: 1500
+targets:
+  calories: 1750
+  protein_g: 130
+  fiber_g: 35
+  sodium_mg: 1500
+servings:
+  serv_vegetables:
+    min: 5
+    max: 6
+shapes:
+  calories: floor
+weights:
+  protein_g: 2
+hidden:
+  - carbs_g
+tags:
+  - nutrition/targets
+---
+```
+
+with both tables, readable, underneath. Every figure in settings is in there:
+the nine nutrient targets, the food-group ranges, which bars are floors,
+ceilings, ranges or reference, what each weighs in the score, which are
+hidden, and the calorie and sodium pattern the Fill button works from.
+
+This exists because `data.json` is one file that Nosh rewrites whole every
+time you log something, and it is read once, when Obsidian starts. A second
+device sitting open all afternoon holds a morning copy of that file in memory
+and writes it back the next time anything is logged, over targets you set on
+the phone at lunchtime. What you set is then gone and the bars are back on
+the 2,000 kcal reference pattern, which is the shape that bug takes: the log
+survives it, because the log notes are the record for the log, and the
+targets do not, because nothing was the record for them.
+
+So the note is. It is read at startup and the figures in it win over what
+`data.json` remembers. Edit it by hand and the targets follow, on that device
+and on every other one the vault reaches. Delete it and nothing is lost: a
+day with nothing logged in it is a real thing to say, which is why deleting a
+log note clears the day, but a diet with no targets at all is not, so the
+figures stay and the note is written again from them.
+
+A vault still on the shipped pattern gets no note until there is something of
+its own to keep, so installing Nosh does not put one in your vault by itself.
+The first target you change writes it. As with the log notes, the note
+answers to its tag, so it can be moved out of the Nosh folder and is still
+the targets; the table below the frontmatter is a rendering of what is above
+it and is rewritten with it; and there is a setting to turn the whole thing
+off, under **Keep the targets in a note**.
 
 ## The score
 

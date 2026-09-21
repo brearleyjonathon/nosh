@@ -153,6 +153,17 @@ const LOG_NOTE_RE = new RegExp('^' + LOG_NOTE_PREFIX + '(\\d{4}-\\d{2}-\\d{2})$'
 const LOG_BLOCK_OPEN = '<!-- nosh:log -->';
 const LOG_BLOCK_CLOSE = '<!-- /nosh:log -->';
 
+/* The targets, in a note of their own beside the Log folder. data.json is
+ * rewritten whole every time anything is logged, so a desk left open all
+ * afternoon writes a morning copy of itself over whatever a phone set in the
+ * meantime, and the targets are what goes back to the reference pattern.
+ * This note is the record for them, the way a log note is the record for its
+ * day: read at load, rewritten when a target changes, and read again when it
+ * arrives from another device. */
+const TARGETS_NOTE_NAME = 'Nosh targets';
+const TARGETS_BLOCK_OPEN = '<!-- nosh:targets -->';
+const TARGETS_BLOCK_CLOSE = '<!-- /nosh:targets -->';
+
 function noshFolder(settings, sub) {
     /* Typed by a person, so it may carry backslashes, doubled slashes or a
      * leading one. normalizePath settles all of that the way Obsidian does. */
@@ -202,6 +213,10 @@ const DEFAULT_SETTINGS = {
     groupTargets: JSON.parse(JSON.stringify(DEFAULT_GROUP_TARGETS)),
     log: {},          // { 'YYYY-MM-DD': { occasion: { notePath: servings } } }
     logNotes: true,   // and each day of it written out as a note, see readLogNotes
+    /* The targets written out as a note too, see readTargetsNote. On by
+     * default: without it they live only in data.json, which every device
+     * overwrites whole. */
+    targetNotes: true,
     schema: LOG_SCHEMA,
     weekStart: 1,     // 0 = Sunday, 1 = Monday
     hiddenNutrients: [],
@@ -584,22 +599,25 @@ function logNoteText(iso, rows, settings) {
     return logNoteFrontmatter(iso, rows, settings) + '\n\n' + logNoteBlock(iso, rows) + '\n';
 }
 
-function spliceLogBlock(text, block) {
-    const a = text.indexOf(LOG_BLOCK_OPEN);
-    const b = a === -1 ? -1 : text.indexOf(LOG_BLOCK_CLOSE, a + LOG_BLOCK_OPEN.length);
+/* The block Nosh keeps, put back between its markers, wherever in the note
+ * they are. A note that has lost them - or has never had them - takes the
+ * block at the end. Both kinds of note are written this way. */
+function spliceBlock(text, block, open, close) {
+    const a = text.indexOf(open);
+    const b = a === -1 ? -1 : text.indexOf(close, a + open.length);
     if (a !== -1 && b !== -1) {
-        return text.slice(0, a) + block + text.slice(b + LOG_BLOCK_CLOSE.length);
+        return text.slice(0, a) + block + text.slice(b + close.length);
     }
     return text.replace(/\s*$/, '') + '\n\n' + block + '\n';
 }
 
 /* Whether anything was written into the note by hand: outside the
  * frontmatter, and outside the block Nosh keeps. */
-function hasOwnWords(text) {
+function hasOwnWords(text, open, close) {
     let body = String(text || '').replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
-    const a = body.indexOf(LOG_BLOCK_OPEN);
-    const b = a === -1 ? -1 : body.indexOf(LOG_BLOCK_CLOSE, a + LOG_BLOCK_OPEN.length);
-    if (a !== -1 && b !== -1) body = body.slice(0, a) + body.slice(b + LOG_BLOCK_CLOSE.length);
+    const a = body.indexOf(open);
+    const b = a === -1 ? -1 : body.indexOf(close, a + open.length);
+    if (a !== -1 && b !== -1) body = body.slice(0, a) + body.slice(b + close.length);
     return body.trim().length > 0;
 }
 
@@ -2532,6 +2550,251 @@ function nutrientShapeNote(shape) {
     return 'Shown for reference: drawn grey, never judged, not in the score.';
 }
 
+/* --- the targets, as a note ------------------------------------------- */
+
+/* What data.json holds about the targets and nothing else, so the whole lot
+ * can be compared, written to a note, or read back off one in a single
+ * gesture. */
+const TARGET_FIELDS = ['targets', 'groupTargets', 'nutrientDirs', 'groupDirs',
+                       'weights', 'hiddenNutrients', 'hiddenGroups',
+                       'dietCalories', 'dietSodium'];
+
+/* Everything the targets are made of, taken off a raw object - data.json, or
+ * a targets note's frontmatter - and put through the same rules whichever it
+ * came from. The rules are the ones the settings pane enforces: a target is a
+ * number, a shape is one of the words that means something, a weight is a
+ * positive number worth writing down, and a hidden bar is a bar that exists.
+ * Written in constant order, so two of these compare as strings. */
+function normalizeTargets(raw) {
+    const said = raw || {};
+    const out = {};
+
+    out.targets = {};
+    for (const n of NUTRIENTS) {
+        const v = (said.targets || {})[n.key];
+        out.targets[n.key] = v === undefined ? DEFAULT_TARGETS[n.key] : parseNum(v);
+    }
+
+    out.groupTargets = {};
+    for (const g of FOOD_GROUPS) {
+        const fallback = DEFAULT_GROUP_TARGETS[g.key];
+        const stored = (said.groupTargets || {})[g.key] || {};
+        out.groupTargets[g.key] = {
+            min: stored.min === undefined ? fallback.min : parseNum(stored.min),
+            max: stored.max === undefined ? fallback.max : parseNum(stored.max),
+        };
+    }
+
+    /* Only the three answers that mean anything, only for bars that still
+     * exist, and only where the answer is not the one the constant would have
+     * given anyway. A hand-edited file cannot leave a bar judged by a word
+     * nothing understands. */
+    const gDirs = said.groupDirs || {};
+    out.groupDirs = {};
+    for (const g of FOOD_GROUPS) {
+        const word = gDirs[g.key];
+        if (GROUP_SHAPES.includes(word) && word !== defaultShape(g)) {
+            out.groupDirs[g.key] = word;
+        }
+    }
+    const nDirs = said.nutrientDirs || {};
+    out.nutrientDirs = {};
+    for (const n of NUTRIENTS) {
+        const word = nDirs[n.key];
+        if (NUTRIENT_SHAPES.includes(word) && word !== defaultNutrientShape(n)) {
+            out.nutrientDirs[n.key] = word;
+        }
+    }
+
+    /* A weight is a positive number on a bar that exists, and 1 is not worth
+     * keeping: the plain average needs nothing written down. */
+    const weights = said.weights || {};
+    out.weights = {};
+    for (const bar of NUTRIENTS.concat(FOOD_GROUPS)) {
+        const w = Number(weights[bar.key]);
+        if (isFinite(w) && w > 0 && w !== 1) out.weights[bar.key] = w;
+    }
+
+    const hiddenOf = (list, bars) => {
+        const want = new Set([].concat(list || []).map((k) => String(k)));
+        return bars.filter((b) => want.has(b.key)).map((b) => b.key);
+    };
+    out.hiddenNutrients = hiddenOf(said.hiddenNutrients, NUTRIENTS);
+    out.hiddenGroups = hiddenOf(said.hiddenGroups, FOOD_GROUPS);
+
+    out.dietCalories = dietScale(said.dietCalories).kcal;
+    /* A word where a number belongs - a hand edit, or a vault written by
+     * something that named the two levels - reads as what it names. */
+    out.dietSodium = said.dietSodium === 'lower' ? SODIUM_LOWER
+        : said.dietSodium === 'standard' ? SODIUM_STANDARD
+        : dietSodium(said.dietSodium);
+
+    return out;
+}
+
+/* The targets a settings object is carrying, through the same rules. */
+function targetsOf(settings) {
+    const raw = {};
+    for (const key of TARGET_FIELDS) raw[key] = (settings || {})[key];
+    return normalizeTargets(raw);
+}
+
+/* Two sets of targets say the same thing when every field, read through
+ * those rules, comes out identical. saveSettings runs this on every banana
+ * logged, which is what keeps the note from being rewritten by one. */
+function sameTargets(a, b) {
+    const norm = (t) => {
+        const block = normalizeTargets(t);
+        return JSON.stringify(TARGET_FIELDS.map((k) => block[k]));
+    };
+    return norm(a) === norm(b);
+}
+
+/* Shapes for both kinds of bar in one map, since a key belongs to one or the
+ * other and never both. Only the ones that differ from DASH are written: a
+ * bar that agrees with it follows the constant, including if a later version
+ * moves it. */
+function targetShapes(block) {
+    const out = {};
+    for (const n of NUTRIENTS) {
+        if (block.nutrientDirs[n.key]) out[n.key] = block.nutrientDirs[n.key];
+    }
+    for (const g of FOOD_GROUPS) {
+        if (block.groupDirs[g.key]) out[g.key] = block.groupDirs[g.key];
+    }
+    return out;
+}
+
+/* Whether a file is named the way the targets note is. Its name is the first
+ * of the two questions that make it the targets note; where it sits, or what
+ * it is tagged, is the other. */
+function isTargetsNoteName(file) {
+    if (!file) return false;
+    const base = typeof file.basename === 'string' ? file.basename
+        : String(file.path || '').split('/').pop().replace(/\.md$/i, '');
+    return base === TARGETS_NOTE_NAME;
+}
+
+function targetsNoteFrontmatter(settings) {
+    const block = targetsOf(settings);
+    const lines = ['---', 'nosh: targets'];
+    lines.push('diet_calories: ' + block.dietCalories);
+    lines.push('diet_sodium: ' + block.dietSodium);
+
+    lines.push('targets:');
+    for (const n of NUTRIENTS) lines.push('  ' + n.key + ': ' + block.targets[n.key]);
+
+    lines.push('servings:');
+    for (const g of FOOD_GROUPS) {
+        lines.push('  ' + g.key + ':');
+        lines.push('    min: ' + block.groupTargets[g.key].min);
+        lines.push('    max: ' + block.groupTargets[g.key].max);
+    }
+
+    const shapes = targetShapes(block);
+    const keys = Object.keys(shapes);
+    lines.push(keys.length ? 'shapes:' : 'shapes: {}');
+    for (const key of keys) lines.push('  ' + key + ': ' + shapes[key]);
+
+    const weighed = Object.keys(block.weights);
+    lines.push(weighed.length ? 'weights:' : 'weights: {}');
+    for (const key of weighed) lines.push('  ' + key + ': ' + block.weights[key]);
+
+    const hidden = block.hiddenNutrients.concat(block.hiddenGroups);
+    lines.push(hidden.length ? 'hidden:' : 'hidden: []');
+    for (const key of hidden) lines.push('  - ' + key);
+
+    lines.push('tags:', '  - ' + kindTag(settings, 'targets'), '---');
+    return lines.join('\n');
+}
+
+/* The block between the markers: the two tables the settings pane shows, for
+ * a reader rather than for Nosh. Everything here is written again from the
+ * frontmatter on the next change, so it is a rendering and not a record. */
+function targetsNoteBlock(settings) {
+    const block = targetsOf(settings);
+    const word = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    const shown = (list, key) => (list.includes(key) ? 'no' : 'yes');
+
+    const lines = [TARGETS_BLOCK_OPEN, '# Targets', ''];
+    lines.push('A ' + fmt(block.dietCalories) + ' kcal pattern at ' +
+               fmt(block.dietSodium) + ' mg of sodium a day. The frontmatter ' +
+               'above is what Nosh reads; edit a number there and the bars ' +
+               'follow it, on this device and on every other one.', '');
+
+    lines.push('## Nutrients a day', '');
+    lines.push('| Nutrient | Target | Shape | Weight | Shown |');
+    lines.push('| --- | --- | --- | --- | --- |');
+    for (const n of NUTRIENTS) {
+        lines.push('| ' + n.label +
+                   ' | ' + fmt(block.targets[n.key]) + ' ' + n.unit +
+                   ' | ' + word(nutrientShape(n, block)) +
+                   ' | ' + fmt(barWeight(block, n.key)) +
+                   ' | ' + shown(block.hiddenNutrients, n.key) + ' |');
+    }
+    lines.push('');
+
+    lines.push('## Food group servings', '');
+    lines.push('| Group | Min | Max | Shape | Weight | Shown |');
+    lines.push('| --- | --- | --- | --- | --- | --- |');
+    for (const g of FOOD_GROUPS) {
+        const t = block.groupTargets[g.key];
+        lines.push('| ' + g.label + ' (' + (g.period === 'week' ? 'per week' : 'per day') + ')' +
+                   ' | ' + fmt(t.min) + ' | ' + fmt(t.max) +
+                   ' | ' + word(groupShape(g, block)) +
+                   ' | ' + fmt(barWeight(block, g.key)) +
+                   ' | ' + shown(block.hiddenGroups, g.key) + ' |');
+    }
+    lines.push('');
+    lines.push(TARGETS_BLOCK_CLOSE);
+    return lines.join('\n');
+}
+
+/* The note's whole text, for a note being written fresh. */
+function targetsNoteText(settings) {
+    return targetsNoteFrontmatter(settings) + '\n\n' + targetsNoteBlock(settings) + '\n';
+}
+
+/* What a targets note says, in the shape the settings keep; null where the
+ * note says nothing Nosh recognises - a frontmatter half-typed, or somebody
+ * else's note that happens to share the name - since a note that cannot be
+ * read has not said anything. A field the note leaves out reads as the
+ * shipped value, exactly as a field missing from data.json does, because the
+ * note is the record and not a patch on top of one. */
+function parseTargetsNote(cache) {
+    const fm = cache && cache.frontmatter;
+    if (!fm || typeof fm !== 'object') return null;
+
+    const fields = ['targets', 'servings', 'shapes', 'weights', 'hidden',
+                    'diet_calories', 'diet_sodium'];
+    if (!fields.some((k) => fm[k] !== undefined)) return null;
+
+    const map = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+    const raw = {
+        targets: map(fm.targets),
+        groupTargets: map(fm.servings),
+        weights: map(fm.weights),
+        nutrientDirs: {},
+        groupDirs: {},
+        dietCalories: fm.diet_calories,
+        dietSodium: fm.diet_sodium,
+    };
+
+    const shapes = map(fm.shapes);
+    for (const n of NUTRIENTS) {
+        if (shapes[n.key] !== undefined) raw.nutrientDirs[n.key] = String(shapes[n.key]);
+    }
+    for (const g of FOOD_GROUPS) {
+        if (shapes[g.key] !== undefined) raw.groupDirs[g.key] = String(shapes[g.key]);
+    }
+
+    const hidden = [].concat(fm.hidden || []).map((k) => String(k));
+    raw.hiddenNutrients = hidden;
+    raw.hiddenGroups = hidden;
+
+    return normalizeTargets(raw);
+}
+
 /* --- the score -------------------------------------------------------- */
 
 /* How much a bar counts for in the score. 1 unless the settings say so, and
@@ -3749,22 +4012,33 @@ module.exports = class NoshPlugin extends Plugin {
             },
         });
 
-        this.addSettingTab(new NoshSettingTab(this.app, this));
+        /* Held, so targets arriving from another device can redraw the pane
+         * if it happens to be open on the figures they replace. */
+        this.settingTab = new NoshSettingTab(this.app, this);
+        this.addSettingTab(this.settingTab);
 
-        /* The log notes are read first, since they are the record; then the
+        /* The notes are read first, since they are the record; then the
          * dangling-entry pass. Moved notes leave dangling log entries, and the
-         * cache has to be up for either. */
+         * cache has to be up for any of it. */
         this.app.workspace.onLayoutReady(async () => {
+            let moved = false;
+            try {
+                moved = await this.readTargetsNote();
+            } catch (e) {
+                new Notice('Nosh: could not read the targets note: ' +
+                           (e && e.message ? e.message : e), 8000);
+            }
             const read = await this.readLogNotes();
             await this.repairLog();
-            if (read) this.refreshViews();
+            if (read || moved) this.refreshViews();
         });
 
         /* Keep the list in step with the vault, without redrawing it because
          * somebody typed a word in a note Nosh has never heard of. A log
          * note changing is the day itself changing, and is read back. */
         this.registerEvent(this.app.metadataCache.on('changed', (file, data, cache) => {
-            if (logNoteDay(file)) this.onLogNoteChanged(file, cache);
+            if (isTargetsNoteName(file)) this.onTargetsNoteChanged(file, cache);
+            else if (logNoteDay(file)) this.onLogNoteChanged(file, cache);
             else if (this.touches(file)) this.scheduleRefresh();
         }));
 
@@ -3783,13 +4057,23 @@ module.exports = class NoshPlugin extends Plugin {
         }));
 
         this.registerEvent(this.app.vault.on('delete', (file) => {
-            if (logNoteDay(file)) this.onLogNoteDeleted(file);
+            if (isTargetsNoteName(file)) this.onTargetsNoteDeleted(file);
+            else if (logNoteDay(file)) this.onLogNoteDeleted(file);
             else if (this.touches(file)) this.scheduleRefresh(true);
         }));
         this.registerEvent(this.app.vault.on('rename', (file, was) => {
             /* A log note moved keeps being the day; the next write follows it. */
             const iso = logNoteDay(file);
             if (iso && (this.logNoteAt || {})[iso] === was) this.noteLogNoteAt(iso, file.path);
+            /* The targets note moved is still the targets, so long as it is
+             * still called that. Renamed to something else it is somebody's
+             * own note now, and a fresh one is written. */
+            if (this.targetsNoteAt === was) {
+                this.targetsNoteAt = isTargetsNoteName(file) ? file.path : null;
+                if (!this.targetsNoteAt) this.targetsChanged();
+            } else if (isTargetsNoteName(file)) {
+                this.onTargetsNoteChanged(file);
+            }
             const knew = this.knownPaths && this.knownPaths.has(was);
             if (knew || this.touches(file)) this.scheduleRefresh(true);
         }));
@@ -3798,9 +4082,10 @@ module.exports = class NoshPlugin extends Plugin {
     async loadSettings() {
         const saved = (await this.loadData()) || {};
         this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
-        this.settings.targets = Object.assign({}, DEFAULT_TARGETS, saved.targets);
-        this.settings.hiddenNutrients = saved.hiddenNutrients || [];
-        this.settings.hiddenGroups = saved.hiddenGroups || [];
+        /* Targets, ranges, shapes, weights and what is hidden, all of it
+         * through the one set of rules, so data.json and the targets note
+         * cannot disagree about what a stored value means. */
+        Object.assign(this.settings, normalizeTargets(saved));
         this.settings.foldedTotals = Object.assign({}, saved.foldedTotals);
         this.settings.weekStart = saved.weekStart === 0 ? 0 : 1;
 
@@ -3818,52 +4103,6 @@ module.exports = class NoshPlugin extends Plugin {
             delete this.settings[dead];
         }
 
-        this.settings.groupTargets = {};
-        for (const g of FOOD_GROUPS) {
-            const fallback = DEFAULT_GROUP_TARGETS[g.key];
-            const stored = (saved.groupTargets || {})[g.key] || {};
-            this.settings.groupTargets[g.key] = {
-                min: stored.min === undefined ? fallback.min : parseNum(stored.min),
-                max: stored.max === undefined ? fallback.max : parseNum(stored.max),
-            };
-        }
-
-        this.settings.dietCalories = dietScale(saved.dietCalories).kcal;
-        /* A word where a number belongs - a hand edit, or a vault written by
-         * something that named the two levels - reads as what it names. */
-        this.settings.dietSodium = saved.dietSodium === 'lower' ? SODIUM_LOWER
-            : saved.dietSodium === 'standard' ? SODIUM_STANDARD
-            : dietSodium(saved.dietSodium);
-
-        /* Only the three answers that mean anything, only for groups that
-         * still exist, and only where the answer is not the one the constant
-         * would have given anyway. A hand-edited data.json cannot leave a bar
-         * judged by a word nothing understands. */
-        const dirs = saved.groupDirs || {};
-        this.settings.groupDirs = {};
-        for (const g of FOOD_GROUPS) {
-            const said = dirs[g.key];
-            if (GROUP_SHAPES.includes(said) && said !== defaultShape(g)) {
-                this.settings.groupDirs[g.key] = said;
-            }
-        }
-        const nDirs = saved.nutrientDirs || {};
-        this.settings.nutrientDirs = {};
-        for (const n of NUTRIENTS) {
-            const said = nDirs[n.key];
-            if (NUTRIENT_SHAPES.includes(said) && said !== defaultNutrientShape(n)) {
-                this.settings.nutrientDirs[n.key] = said;
-            }
-        }
-        /* A weight is a positive number on a bar that exists, and 1 is not
-         * worth keeping: the plain average needs nothing written down. */
-        const weights = saved.weights || {};
-        this.settings.weights = {};
-        for (const bar of NUTRIENTS.concat(FOOD_GROUPS)) {
-            const w = Number(weights[bar.key]);
-            if (isFinite(w) && w > 0 && w !== 1) this.settings.weights[bar.key] = w;
-        }
-
         /* Before day/week tracking the log was a single flat selection with no
          * date. Carry it onto today rather than dropping it. */
         const raw = Object.assign({}, saved.log);
@@ -3873,10 +4112,18 @@ module.exports = class NoshPlugin extends Plugin {
         this.settings.log = migrateLog(raw);
         this.settings.schema = LOG_SCHEMA;
         delete this.settings.selection;
+
+        /* What the targets note is taken to be saying until one is read. */
+        this.targetsSaid = targetsOf(this.settings);
     }
 
     async saveSettings() {
         await this.saveData(this.settings);
+        /* A target changed is a change to the note, whoever changed it - a
+         * box in settings, the Fill button, a note off another device. A
+         * banana logged is not, and there is one saveSettings for both, so
+         * what is in hand is compared with what the note last said. */
+        if (!sameTargets(this.targetsSaid, this.settings)) this.targetsChanged();
     }
 
     /* data.json is read once, at load. A vault that syncs from a phone while
@@ -3885,6 +4132,7 @@ module.exports = class NoshPlugin extends Plugin {
      * the fix: settings, targets and the log all come back off disk. */
     async reloadSettings() {
         await this.loadSettings();
+        await this.readTargetsNote();
         await this.readLogNotes();
         await this.repairLog();
         this.refreshViews();
@@ -3897,7 +4145,7 @@ module.exports = class NoshPlugin extends Plugin {
     touches(file) {
         if (!file || typeof file.path !== 'string') return false;
         if (!file.path.toLowerCase().endsWith('.md')) return false;
-        if (logNoteDay(file)) return false;
+        if (logNoteDay(file) || isTargetsNoteName(file)) return false;
         if (this.knownPaths && this.knownPaths.has(file.path)) return true;
         if (underFolder(file.path, noshFolder(this.settings, ''))) return true;
 
@@ -3932,6 +4180,11 @@ module.exports = class NoshPlugin extends Plugin {
             clearTimeout(this.logNoteTimer);
             this.logNoteTimer = null;
             this.flushLogNotes();
+        }
+        if (this.targetsTimer) {
+            clearTimeout(this.targetsTimer);
+            this.targetsTimer = null;
+            this.flushTargetsNote();
         }
     }
 
@@ -3989,6 +4242,8 @@ module.exports = class NoshPlugin extends Plugin {
              * read as one enormous meal if it were ever picked up. A log
              * note is a day, not a food. */
             if (underFolder(file.path, reports) || underFolder(file.path, logs)) continue;
+            /* The targets note is the plan, not a food. */
+            if (isTargetsNoteName(file)) continue;
 
             const cache = this.app.metadataCache.getFileCache(file);
             if (!cache) continue;
@@ -4341,7 +4596,7 @@ module.exports = class NoshPlugin extends Plugin {
             /* A day emptied takes its note with it, unless somebody wrote
              * something of their own in there. */
             this.markLogNote(iso);
-            if (!hasOwnWords(await vault.read(file))) {
+            if (!hasOwnWords(await vault.read(file), LOG_BLOCK_OPEN, LOG_BLOCK_CLOSE)) {
                 if (typeof app.fileManager.trashFile === 'function') {
                     await app.fileManager.trashFile(file);
                 } else {
@@ -4380,7 +4635,8 @@ module.exports = class NoshPlugin extends Plugin {
             fm.tags = tags;
         });
         this.markLogNote(iso);
-        await vault.process(file, (text) => spliceLogBlock(text, logNoteBlock(iso, rows)));
+        await vault.process(file, (text) => spliceBlock(text, logNoteBlock(iso, rows),
+                                                         LOG_BLOCK_OPEN, LOG_BLOCK_CLOSE));
         this.markLogNote(iso);
     }
 
@@ -4448,6 +4704,238 @@ module.exports = class NoshPlugin extends Plugin {
         else delete this.settings.log[iso];
         this.saveSettings();
         this.scheduleRefresh(true);
+    }
+
+    /* --- the targets as a note ---------------------------------------- */
+
+    targetsNotePath() {
+        const folder = noshFolder(this.settings, '');
+        return (folder ? folder + '/' : '') + TARGETS_NOTE_NAME + '.md';
+    }
+
+    /* The note: wherever it was last seen - a targets note is read by its tag
+     * from anywhere in the vault - or else in the Nosh folder. */
+    targetsNoteFile() {
+        const vault = this.app.vault;
+        let f = this.targetsNoteAt ? vault.getAbstractFileByPath(this.targetsNoteAt) : null;
+        if (!f || f.extension !== 'md') f = vault.getAbstractFileByPath(this.targetsNotePath());
+        return f && f.extension === 'md' ? f : null;
+    }
+
+    /* A file is the targets note by its name and either its place or its tag,
+     * so one moved out of the Nosh folder - into a Health folder, say - is
+     * still the targets. */
+    isTargetsNote(file, cache) {
+        if (!isTargetsNoteName(file)) return false;
+        if (underFolder(file.path, noshFolder(this.settings, ''))) return true;
+        const want = kindTag(this.settings, 'targets').toLowerCase();
+        const tags = cache ? (getAllTags(cache) || []) : [];
+        return tags.some((t) => String(t).replace(/^#/, '').toLowerCase() === want);
+    }
+
+    /* What a note said, taken as the targets. The record of what the note
+     * says is read back off the settings rather than kept as the object just
+     * handed to them: Object.assign gives the settings the very objects it is
+     * made of, and a target then edited in place - which is what every box in
+     * the settings pane does - would quietly edit both, leaving saveSettings
+     * comparing a thing with itself and the note never written. */
+    takeTargets(said) {
+        Object.assign(this.settings, said);
+        this.targetsSaid = targetsOf(this.settings);
+    }
+
+    /* Called from saveSettings wherever the targets moved. Writes are
+     * gathered for a moment, so a figure typed digit by digit writes once,
+     * and run one after another, so two never race for the note. */
+    targetsChanged() {
+        if (!this.settings.targetNotes) return;
+        if (this.targetsTimer) clearTimeout(this.targetsTimer);
+        this.targetsTimer = setTimeout(() => {
+            this.targetsTimer = null;
+            this.flushTargetsNote();
+        }, 300);
+    }
+
+    flushTargetsNote() {
+        const run = async () => {
+            try {
+                await this.writeTargetsNote();
+            } catch (e) {
+                new Notice('Nosh: could not write the targets note: ' +
+                           (e && e.message ? e.message : e), 8000);
+            }
+        };
+        this.targetsQueue = (this.targetsQueue || Promise.resolve()).then(run, run);
+        return this.targetsQueue;
+    }
+
+    /* Whether a change to the note, right now, is one Nosh made itself. The
+     * cache reports a write a beat after it lands, so the note is left alone
+     * while a write is queued and for a moment after. */
+    targetsQuiet() {
+        if (this.targetsTimer) return true;
+        const at = this.targetsWrote || 0;
+        return !!at && Date.now() - at < 2000;
+    }
+
+    markTargetsNote() { this.targetsWrote = Date.now(); }
+
+    async writeTargetsNote() {
+        if (!this.settings.targetNotes) return;
+        const app = this.app;
+        const vault = app.vault;
+        const file = this.targetsNoteFile();
+
+        if (!file) {
+            this.targetsSaid = targetsOf(this.settings);
+            this.markTargetsNote();
+            await ensureFolder(vault, noshFolder(this.settings, ''));
+            const path = this.targetsNotePath();
+            await vault.create(path, targetsNoteText(this.settings));
+            this.targetsNoteAt = path;
+            return;
+        }
+
+        const says = parseTargetsNote(app.metadataCache.getFileCache(file));
+
+        /* The note has moved since Nosh last read it, and moved somewhere
+         * other than where this write was going: another device, or a hand
+         * edit landing in the moment between a change and this write. The
+         * note is the record, so it wins and this write is dropped. Losing a
+         * figure typed here a fraction of a second ago is the smaller of the
+         * two, since the other is writing over somebody else's evening. */
+        if (says && !sameTargets(says, this.targetsSaid) &&
+            !sameTargets(says, this.settings)) {
+            this.takeTargets(says);
+            await this.saveSettings();
+            this.refreshViews();
+            if (this.settingTab) this.settingTab.refresh();
+            return;
+        }
+
+        /* Recorded before the write rather than after it: what goes into the
+         * note is what is in hand now, and a change arriving mid-write is a
+         * change against this, not against what was there before. */
+        this.targetsSaid = targetsOf(this.settings);
+
+        /* Already saying the same, frontmatter and table both: a figure
+         * nudged up and back, or a note just read that nothing has moved
+         * since. The table is asked as well as the frontmatter, so a figure
+         * changed by hand above brings the table under it up to date rather
+         * than leaving the two contradicting each other. */
+        const body = targetsNoteBlock(this.settings);
+        if (says && sameTargets(says, this.settings) &&
+            (await vault.cachedRead(file)).includes(body)) return;
+
+        this.markTargetsNote();
+        await app.fileManager.processFrontMatter(file, (fm) => {
+            const block = targetsOf(this.settings);
+            fm.nosh = 'targets';
+            fm.diet_calories = block.dietCalories;
+            fm.diet_sodium = block.dietSodium;
+            fm.targets = Object.assign({}, block.targets);
+            fm.servings = {};
+            for (const g of FOOD_GROUPS) {
+                fm.servings[g.key] = {
+                    min: block.groupTargets[g.key].min,
+                    max: block.groupTargets[g.key].max,
+                };
+            }
+            fm.shapes = targetShapes(block);
+            fm.weights = Object.assign({}, block.weights);
+            fm.hidden = block.hiddenNutrients.concat(block.hiddenGroups);
+            const tag = kindTag(this.settings, 'targets');
+            const tags = Array.isArray(fm.tags) ? fm.tags.slice()
+                : fm.tags ? [String(fm.tags)] : [];
+            if (!tags.includes(tag)) tags.push(tag);
+            fm.tags = tags;
+        });
+        this.markTargetsNote();
+        await vault.process(file, (text) => spliceBlock(text, body,
+                                                        TARGETS_BLOCK_OPEN, TARGETS_BLOCK_CLOSE));
+        this.markTargetsNote();
+    }
+
+    /* At load, and when the note is switched on. What the note says wins over
+     * what data.json remembers, which is the whole point of it: data.json is
+     * the copy every device rewrites whole, and the one that loses a target
+     * set somewhere else. Where there is no note, one is written from what
+     * data.json has, so nothing is lost by the change. Returns whether the
+     * settings moved. */
+    async readTargetsNote() {
+        if (!this.settings.targetNotes) return false;
+        const app = this.app;
+
+        /* Named like the targets note, and either in the Nosh folder or
+         * carrying the tag. Where there are somehow two, the one in the
+         * folder is the targets. */
+        const inFolder = (f) => underFolder(f.path, noshFolder(this.settings, ''));
+        const file = app.vault.getMarkdownFiles()
+            .filter((f) => isTargetsNoteName(f))
+            .sort((a, b) => (inFolder(b) ? 1 : 0) - (inFolder(a) ? 1 : 0))
+            .find((f) => this.isTargetsNote(f, app.metadataCache.getFileCache(f)));
+
+        if (!file) {
+            this.targetsNoteAt = null;
+            this.targetsSaid = targetsOf(this.settings);
+            /* Written straight away where data.json is carrying targets
+             * somebody has set - those are the ones at risk, and they are
+             * what this note exists to hold. A vault still on the reference
+             * pattern has nothing to lose yet and gets no note until it does,
+             * so installing Nosh does not put one in a vault by itself. */
+            if (!sameTargets(this.settings, DEFAULT_SETTINGS)) await this.flushTargetsNote();
+            return false;
+        }
+
+        this.targetsNoteAt = file.path;
+        const said = parseTargetsNote(app.metadataCache.getFileCache(file));
+        if (!said || sameTargets(said, this.settings)) {
+            this.targetsSaid = targetsOf(this.settings);
+            return false;
+        }
+        this.takeTargets(said);
+        /* Taken before the save, so the save does not read as a change and
+         * write the note straight back out again. */
+        await this.saveSettings();
+        /* saveSettings sees nothing to do - the note is where the figures
+         * came from - but the table under the frontmatter may have been left
+         * behind by whoever typed them. */
+        this.targetsChanged();
+        return true;
+    }
+
+    onTargetsNoteChanged(file, cache) {
+        if (!this.settings.targetNotes) return;
+        cache = cache || this.app.metadataCache.getFileCache(file);
+        if (!this.isTargetsNote(file, cache)) return;
+        /* A second note named the same is not the targets. */
+        const at = this.targetsNoteAt;
+        if (at && at !== file.path && this.app.vault.getAbstractFileByPath(at)) return;
+        this.targetsNoteAt = file.path;
+        if (this.targetsQuiet()) return;
+        const said = parseTargetsNote(cache);
+        if (!said || sameTargets(said, this.settings)) return;
+        this.takeTargets(said);
+        this.saveSettings();
+        this.targetsChanged();
+        this.refreshViews();
+        /* The settings pane, if somebody has it open, is showing the figures
+         * that have just been replaced. */
+        if (this.settingTab) this.settingTab.refresh();
+    }
+
+    /* A targets note deleted is not a diet cleared. A day with nothing logged
+     * in it is a real thing to say, which is why deleting a log note clears
+     * the day; a day with no targets at all is not, so the figures stay where
+     * they are and the note is written again from them. */
+    onTargetsNoteDeleted(file) {
+        if (!this.settings.targetNotes) return;
+        /* Only the one Nosh was reading. A note of the same name that was
+         * never the targets - somebody's own, kept outside the folder and
+         * untagged - is theirs to delete without a new one appearing. */
+        if (this.targetsNoteAt !== file.path) return;
+        this.targetsNoteAt = null;
+        this.targetsChanged();
     }
 
     onLogNoteDeleted(file) {
@@ -6659,6 +7147,14 @@ class NoshSettingTab extends PluginSettingTab {
         scroller.scrollTop = at;
     }
 
+    /* Only worth doing while the pane is actually on screen - Obsidian empties
+     * the container when it is closed, and display() runs again anyway the
+     * next time it is opened. */
+    refresh() {
+        const el = this.containerEl;
+        if (el && el.isConnected && el.childElementCount) this.redraw();
+    }
+
     display() {
         const { containerEl } = this;
         containerEl.empty();
@@ -6719,6 +7215,28 @@ class NoshSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     if (v) await this.plugin.readLogNotes();
                     this.plugin.refreshViews();
+                }));
+
+        new Setting(containerEl)
+            .setName('Keep the targets in a note')
+            .setDesc('Every target, range, shape and weight below is also written ' +
+                     'to "' + TARGETS_NOTE_NAME + '" in the Nosh folder, and read ' +
+                     'back from it when Obsidian starts. data.json is rewritten ' +
+                     'whole every time you log something, so a second device left ' +
+                     'open can put an old copy of it over targets you have just ' +
+                     'set; the note is what stops that, and it syncs wherever the ' +
+                     'rest of your notes do. Edit the note and the targets follow. ' +
+                     'Delete it and it is written again from what Nosh has.')
+            .addToggle((t) => t
+                .setValue(this.plugin.settings.targetNotes !== false)
+                .onChange(async (v) => {
+                    this.plugin.settings.targetNotes = v;
+                    await this.plugin.saveSettings();
+                    if (!v) return;
+                    if (await this.plugin.readTargetsNote()) {
+                        this.plugin.refreshViews();
+                        this.redraw();
+                    }
                 }));
 
         new Setting(containerEl)
