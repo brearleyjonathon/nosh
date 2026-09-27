@@ -27,18 +27,22 @@ With them on:
 - Account and cost. Nosh AI needs an account on the Anthropic developer
   platform, and every request is billed to it at API rates. A claude.ai
   subscription cannot be used; [Credentials](#credentials) explains why.
-- A local program. If you choose the `ant` CLI as the way in, Nosh runs
-  `ant auth print-credentials --access-token` on your computer to borrow a
-  short-lived token. Desktop only, fixed arguments, nothing else is run.
 - Links to claude.ai. A meal note drafted with a method carries a *Cook this
   with Claude* link. Opening it takes the recipe to claude.ai in your browser,
   in the address of the page. Nothing happens until you click it.
-- Where the credential lives. An API key is kept in plain text in `data.json`
-  in the plugin folder, which is inside your vault. See
-  [Credentials](#credentials).
+- Where the credential lives. Your API key is kept in Obsidian's keychain, on
+  the device and outside the vault. On Obsidian older than 1.11.4, which has
+  no keychain, it is kept in plain text in `data.json` in the plugin folder,
+  inside your vault. See [Credentials](#credentials).
+- The notes Nosh looks at. To find your foods, your log notes and the targets
+  note, Nosh goes through the list of Markdown notes in the vault and reads
+  the tags and frontmatter Obsidian already has for each. It reads a note's
+  text only when the note is one Nosh works with, or one you point it at. The
+  *Only look in the Nosh folder* setting narrows the search for foods to that
+  folder.
 
 There are no accounts with the author, no payments and no ads, and no files
-are read or written outside the vault.
+are read or written outside the vault. Nosh runs no other programs.
 
 # UI
 The project is based in the Obsidian sidebar in desktop and mobile. 
@@ -427,23 +431,23 @@ wants something cheap; inventing one runs once a day and is the harder job.
 
 ### Credentials
 
-Nosh AI runs against the Anthropic developer platform, the same place an
-API key comes from, and every request is billed to that account. Two ways
-to hand it a credential:
+Nosh AI runs against the Anthropic developer platform, and every request is
+billed to that account. It takes an API key from
+[platform.claude.com](https://platform.claude.com), which works everywhere,
+phone included.
 
-- An API key, from [platform.claude.com](https://platform.claude.com),
-  stored in `data.json` inside your vault. Works everywhere, phone included,
-  and is the way in for most people.
-- The `ant` CLI (desktop only) reads a profile you have already logged into
-  with `ant auth login`. That login is to the developer platform rather than
-  to claude.ai. The credential never touches the vault. Prefer this where you
-  can.
+The key goes in Obsidian's keychain (Obsidian 1.11.4 and later): in Nosh
+settings, pick a key already stored there or add a new one. The keychain is
+on the device rather than in the vault, so the key does not sync or get
+committed with your notes, and each device you use Nosh AI on needs it once.
+A key an earlier version of Nosh kept in `data.json` moves to the keychain
+the first time Nosh loads, and is taken out of `data.json`.
 
-> On the API key: `data.json` is a plain file in your vault. Anything that
-> reads your vault can read it, including other plugins, whatever you sync
-> with, and any repository you commit the vault to. Do not commit it, and
-> prefer the `ant` profile on a machine that has one. This repository ignores
-> `data.json` for exactly that reason.
+> On older Obsidian: with no keychain, the key is kept in `data.json`, a
+> plain file in your vault. Anything that reads your vault can read it,
+> including other plugins, whatever you sync with, and any repository you
+> commit the vault to. Do not commit it. This repository ignores `data.json`
+> for exactly that reason.
 
 Why there is no "sign in with Claude": some plugins borrow the login that
 Claude Code or the Claude app keeps on your machine, so a Pro or Max

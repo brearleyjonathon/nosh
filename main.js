@@ -2,7 +2,7 @@
 
 const { Plugin, ItemView, PluginSettingTab, Setting, Modal, Menu, Notice,
         setIcon, getAllTags, MarkdownRenderer, Component,
-        normalizePath } = require('obsidian');
+        normalizePath, SecretComponent } = require('obsidian');
 
 const VIEW_TYPE_DASH = 'nosh-view';
 
@@ -232,8 +232,8 @@ const DEFAULT_SETTINGS = {
      * several shortfalls through what little headroom is left - so it starts
      * on Opus. Cleared, it falls back on aiModel. */
     aiSuggestModel: 'claude-opus-5',
-    aiAuth: 'ant',        // 'ant' reads the CLI profile, 'key' uses aiApiKey
-    aiApiKey: '',
+    aiKeySecret: '',      // the name of the key in Obsidian's keychain
+    aiApiKey: '',         // the key itself, only where there is no keychain
     aiEffort: 'medium',
     /* Free text, appended to the What's for... prompt. Nothing here is
      * validated or parsed: it is handed to Claude as written, which is the
@@ -1330,73 +1330,33 @@ function pickPhoto() {
 }
 /* --- auth ----------------------------------------------------------- */
 
-/* Two ways in. An API key is the portable one, and the only one a phone can
- * use, but it lives in data.json, which is inside the vault and syncs
- * wherever the vault syncs. The ant profile keeps the credential out of the
- * vault entirely, at the cost of needing a desktop and the CLI. */
+/* An API key, kept in Obsidian's keychain from 1.11.4 on. The keychain is on
+ * the device rather than in the vault, so the key does not travel with the
+ * vault to wherever it syncs or is committed, and it works on a phone. The
+ * setting holds only the key's name there. An older app has no keychain, and
+ * the key falls back to data.json, which is inside the vault. */
 
-let antToken = null;   // { value, until } - the CLI shells out, so hold it briefly
+const KEY_SECRET = 'nosh-anthropic-api-key';   // the name Nosh files a moved key under
 
-async function antAccessToken() {
-    if (antToken && Date.now() < antToken.until) return antToken.value;
-
-    let execFile;
-    try {
-        ({ execFile } = require('child_process'));
-    } catch (e) {
-        throw new Error('The ant CLI needs desktop Obsidian. Switch Nosh AI to an API key to draft here.');
-    }
-
-    const stdout = await new Promise((resolve, reject) => {
-        execFile('ant', ['auth', 'print-credentials', '--access-token'], {
-            windowsHide: true,
-            timeout: 20000,
-            /* Windows installs ant as a .cmd shim, which execFile will not run
-             * without a shell. The arguments are fixed, so nothing reaches
-             * that shell which we did not write. */
-            shell: process.platform === 'win32',
-        }, (err, out, errOut) => {
-            if (!err) return resolve(String(out));
-            const said = String(errOut || '').trim() || String(err.message || '').trim();
-            if (/ENOENT|not recognized|not found/i.test(said)) {
-                return reject(new Error('ant is not on the PATH. Install it and run "ant auth login", ' +
-                                        'or switch Nosh AI to an API key.'));
-            }
-            reject(new Error(said || 'ant could not produce a token.'));
-        });
-    });
-
-    /* --access-token prints the bare token. Without the flag the CLI prints
-     * JSON, which would otherwise sail through as a nonsense bearer. */
-    const value = stdout.trim();
-    if (!value || /[\s{]/.test(value)) {
-        throw new Error('ant returned no usable token. Run "ant auth login" and try again.');
-    }
-
-    antToken = { value, until: Date.now() + 5 * 60 * 1000 };
-    return value;
+function keychain(app) {
+    return (app && app.secretStorage && SecretComponent) ? app.secretStorage : null;
 }
 
-function forgetAntToken() { antToken = null; }
+function apiKey(plugin) {
+    const chain = keychain(plugin.app);
+    const s = plugin.settings;
+    const key = chain && s.aiKeySecret ? chain.getSecret(s.aiKeySecret) : s.aiApiKey;
+    return String(key || '').trim();
+}
 
-async function aiHeaders(settings) {
-    const headers = {
+async function aiHeaders(plugin) {
+    const key = apiKey(plugin);
+    if (!key) throw new Error('No API key set. Add one in Nosh settings.');
+    return {
         'content-type': 'application/json',
         'anthropic-version': '2023-06-01',
+        'x-api-key': key,
     };
-
-    if (settings.aiAuth === 'key') {
-        const key = (settings.aiApiKey || '').trim();
-        if (!key) throw new Error('No API key set. Add one in Nosh settings, or switch to the ant CLI.');
-        headers['x-api-key'] = key;
-        return headers;
-    }
-
-    /* An OAuth token is a bearer, not an x-api-key, and the beta header is
-     * what tells the API to accept it as one. */
-    headers['authorization'] = 'Bearer ' + (await antAccessToken());
-    headers['anthropic-beta'] = 'oauth-2025-04-20';
-    return headers;
 }
 
 /* --- portions ------------------------------------------------------- */
@@ -1619,7 +1579,7 @@ async function aiCall(headers, payload) {
 async function aiDraft(plugin, kind, description, photo) {
     const spec = AI_KINDS[kind] || AI_KINDS.ingredients;
     const tool = spec.tool();
-    const headers = await aiHeaders(plugin.settings);
+    const headers = await aiHeaders(plugin);
 
     /* A string where there is no picture, because that is what every call
      * before this one sent, and the picture goes first: it is the thing
@@ -1647,8 +1607,6 @@ async function aiDraft(plugin, kind, description, photo) {
     const body = res.body;
 
     if (res.status !== 200) {
-        // A stale bearer should not poison the next attempt.
-        if (res.status === 401) forgetAntToken();
         const said = body && body.error && body.error.message;
         throw new Error(said || ('The API answered ' + res.status + '.'));
     }
@@ -1673,7 +1631,7 @@ async function aiDraft(plugin, kind, description, photo) {
 /* A cheap request that exercises the credential path and nothing else, so
  * settings can answer "does this work" without inventing a note. */
 async function aiPing(plugin) {
-    const headers = await aiHeaders(plugin.settings);
+    const headers = await aiHeaders(plugin);
     const res = await aiCall(headers, {
         model: aiModelId(plugin.settings),
         max_tokens: 16,
@@ -1681,7 +1639,6 @@ async function aiPing(plugin) {
     });
 
     if (res.status === 200) return;
-    if (res.status === 401) forgetAntToken();
     const said = res.body && res.body.error && res.body.error.message;
     throw new Error(said || ('The API answered ' + res.status + '.'));
 }
@@ -3414,7 +3371,7 @@ function readingKind(mode) {
 async function aiReading(plugin, markdown, mode) {
     const kind = readingKind(mode);
     const tool = kind.tool();
-    const headers = await aiHeaders(plugin.settings);
+    const headers = await aiHeaders(plugin);
 
     const res = await aiCall(headers, {
         model: aiModelId(plugin.settings),
@@ -3430,7 +3387,6 @@ async function aiReading(plugin, markdown, mode) {
     const body = res.body;
 
     if (res.status !== 200) {
-        if (res.status === 401) forgetAntToken();
         const said = body && body.error && body.error.message;
         throw new Error(said || ('The API answered ' + res.status + '.'));
     }
@@ -3694,7 +3650,7 @@ function probePrompt(recipe, settings) {
  * recipe has no shape to fill in ahead of hearing it, and an answer squeezed
  * into fields would be the wrong answer neatly. */
 async function aiAsk(plugin, system, messages) {
-    const headers = await aiHeaders(plugin.settings);
+    const headers = await aiHeaders(plugin);
 
     const res = await aiCall(headers, {
         /* The harder of the two models, for the same reason a suggestion
@@ -3711,7 +3667,6 @@ async function aiAsk(plugin, system, messages) {
     const body = res.body;
 
     if (res.status !== 200) {
-        if (res.status === 401) forgetAntToken();
         const said = body && body.error && body.error.message;
         throw new Error(said || ('The API answered ' + res.status + '.'));
     }
@@ -4112,6 +4067,26 @@ module.exports = class NoshPlugin extends Plugin {
         this.settings.log = migrateLog(raw);
         this.settings.schema = LOG_SCHEMA;
         delete this.settings.selection;
+
+        /* The ant CLI is gone, and with it the choice of way in. A key left
+         * in data.json moves to the keychain where there is one, and comes
+         * out of data.json straight away, since keeping it out of the vault
+         * is the reason for moving it. */
+        delete this.settings.aiAuth;
+        const chain = keychain(this.app);
+        if (chain && this.settings.aiApiKey) {
+            try {
+                /* A key already picked from the keychain is the one meant,
+                 * and is not written over by an old copy. */
+                const name = this.settings.aiKeySecret || KEY_SECRET;
+                if (!chain.getSecret(name)) chain.setSecret(name, this.settings.aiApiKey);
+                this.settings.aiKeySecret = name;
+                this.settings.aiApiKey = '';
+                await this.saveData(this.settings);
+            } catch (e) {
+                // Still in data.json, and still working. Next load tries again.
+            }
+        }
 
         /* What the targets note is taken to be saying until one is read. */
         this.targetsSaid = targetsOf(this.settings);
@@ -7279,31 +7254,26 @@ class NoshSettingTab extends PluginSettingTab {
                      + 'photograph you take go to the Anthropic API. Nothing is '
                      + 'sent until you ask for something.');
 
-        new Setting(containerEl)
-            .setName('Credentials')
-            .setDesc('The ant CLI keeps the credential out of the vault, but wants a desktop '
-                     + 'and a prior "ant auth login". An API key works everywhere, mobile '
-                     + 'included, and is kept in this plugin\u2019s data.json \u2014 which is '
-                     + 'inside the vault, and syncs wherever the vault syncs.')
-            .addDropdown((d) => d
-                .addOption('ant', 'ant CLI profile')
-                .addOption('key', 'API key')
-                .setValue(this.plugin.settings.aiAuth)
-                .onChange(async (v) => {
-                    this.plugin.settings.aiAuth = v;
-                    await this.plugin.saveSettings();
-                    /* Rebuilds, because the API key box appears and goes
-                     * with the answer. */
-                    this.redraw();
-                }));
-
-        if (this.plugin.settings.aiAuth === 'key') {
+        if (keychain(this.app)) {
+            new Setting(containerEl)
+                .setName('API key')
+                .setDesc('An Anthropic API key, kept in Obsidian’s keychain on this '
+                         + 'device rather than in the vault. Pick one already there or add '
+                         + 'a new one. Each device you use Nosh AI on needs it once.')
+                .addComponent((el) => new SecretComponent(this.app, el)
+                    .setValue(this.plugin.settings.aiKeySecret)
+                    .onChange(async (v) => {
+                        this.plugin.settings.aiKeySecret = v || '';
+                        await this.plugin.saveSettings();
+                    }));
+        } else {
             new Setting(containerEl)
                 .setName('API key')
                 .setDesc('Kept in plain text in this plugin’s data.json, inside your '
                          + 'vault. Anything that reads the vault can read it — other '
                          + 'plugins, whatever you sync with, any repository you commit the '
-                         + 'vault to. Prefer the ant profile on a machine that has one.')
+                         + 'vault to. Obsidian 1.11.4 and later keep it in a keychain '
+                         + 'outside the vault instead.')
                 .addText((t) => {
                     t.inputEl.type = 'password';
                     t.setPlaceholder('sk-ant-\u2026')
@@ -7394,7 +7364,7 @@ class NoshSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Test credentials')
-            .setDesc('One short request, to find out whether the way in works.')
+            .setDesc('One short request, to find out whether the key works.')
             .addButton((b) => b
                 .setButtonText('Test')
                 .onClick(async () => {
