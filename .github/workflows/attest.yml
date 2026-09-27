@@ -1,0 +1,51 @@
+# Signs the files attached to a release, so anyone can check they came from
+# this repo at that tag:
+#
+#   gh attestation verify main.js -R brearleyjonathon/nosh
+#
+# Nosh has no build step, so the files at the tag are the release assets byte
+# for byte. The job checks that before signing anything: an asset that was
+# edited or uploaded from somewhere else fails here rather than being vouched
+# for.
+name: Attest release assets
+
+on:
+  release:
+    types: [published]
+  # For a release published before this workflow existed.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to attest, e.g. 1.1.4
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Check the assets match the tag
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -D released \
+            -p main.js -p manifest.json -p styles.css
+          for f in main.js manifest.json styles.css; do
+            cmp "$f" "released/$f" || { echo "::error::$f on the release differs from $f at $TAG"; exit 1; }
+          done
+
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
