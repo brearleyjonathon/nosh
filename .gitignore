@@ -6,3 +6,7 @@ data.json
 *.bak
 node_modules/
 .DS_Store
+
+# Claude Code's own project directory: skills and settings for working on
+# Nosh, not part of the plugin that ships.
+.claude/
