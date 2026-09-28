@@ -7,7 +7,7 @@ Nosh reads the notes you already keep, adds up what you log, and charts it
 against DASH targets: nine nutrients plus food-group servings. Everything stays
 in your vault unless you turn on the optional AI features.
 
-<img width="1280" height="640" alt="nosh: log. see. adjust. Nutrition tracking inside Obsidian, built around DASH." src="site/social-card.png" />
+<img width="1280" height="640" alt="nosh: log. see. adjust. Nutrition tracking inside Obsidian, built around DASH." src="https://nosh.health/social-card.png" />
 
 Website: [nosh.health](https://nosh.health/)
 
