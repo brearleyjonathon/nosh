@@ -812,13 +812,16 @@ function humanWeek(days) {
 
 const AI_ENDPOINT = 'https://api.anthropic.com/v1/messages';
 
-/* Both take the same request shape - adaptive thinking, an effort level - so
- * choosing between them is a settings dropdown and nothing more. The first is
- * the default for the numbers; suggestions start on the second. Keep both in
- * step with DEFAULT_SETTINGS.aiModel and .aiSuggestModel. */
+/* All take the same request shape - adaptive thinking, an effort level - so
+ * choosing between them is a settings dropdown and nothing more. The one
+ * difference is that Opus 5.5 will not be made to call a tool, and is asked
+ * to instead; aiFill() takes care of that. The first is the default for the
+ * numbers; suggestions start on Opus 5. Keep the list in step with
+ * DEFAULT_SETTINGS.aiModel and .aiSuggestModel. */
 const AI_MODELS = [
     { id: 'claude-sonnet-5', label: 'Sonnet 5' },
     { id: 'claude-opus-5',   label: 'Opus 5' },
+    { id: 'claude-opus-5-5', label: 'Opus 5.5', askForForm: true },
 ];
 
 /* A stored id that is no longer offered - a hand-edited data.json, or a model
@@ -1574,6 +1577,46 @@ async function aiCall(headers, payload) {
     return { status: 200, body: message };
 }
 
+/* --- the form ------------------------------------------------------- */
+
+/* A model can turn a request down on safety grounds. That arrives as a
+ * finished answer with nothing in it, and would otherwise read as Claude
+ * having misunderstood. */
+function aiRefused(body) {
+    if (!body || body.stop_reason !== 'refusal') return;
+    throw new Error('Claude declined to answer this one. Try putting it another way, '
+                    + 'or pick a different model in Nosh settings.');
+}
+
+/* Most of Nosh's answers are a filled-in form: one tool, and the reply is
+ * what it was called with. Most models can be told the tool must be called.
+ * Opus 5.5 turns that down, so there the prompt asks for it instead, and a
+ * reply that comes back as prose is asked for again, once. Returns the
+ * tool_use block, or null where there never was one. */
+async function aiFill(headers, payload, tool) {
+    const model = AI_MODELS.find((m) => m.id === payload.model);
+    const ask = !!(model && model.askForForm);
+    const request = Object.assign({}, payload, { tools: [tool] }, ask
+        ? { tool_choice: { type: 'auto' },
+            system: payload.system + '\n\nAnswer by calling the ' + tool.name
+                    + ' tool, and only that.' }
+        : { tool_choice: { type: 'tool', name: tool.name } });
+
+    for (let tries = ask ? 2 : 1; tries > 0; tries--) {
+        const res = await aiCall(headers, request);
+        const body = res.body;
+        if (res.status !== 200) {
+            const said = body && body.error && body.error.message;
+            throw new Error(said || ('The API answered ' + res.status + '.'));
+        }
+        aiRefused(body);
+        const block = ((body && body.content) || []).find(
+            (b) => b.type === 'tool_use' && b.name === tool.name);
+        if (block) return block;
+    }
+    return null;
+}
+
 /* --- the call ------------------------------------------------------- */
 
 async function aiDraft(plugin, kind, description, photo) {
@@ -1590,7 +1633,8 @@ async function aiDraft(plugin, kind, description, photo) {
            { type: 'text', text: description }]
         : description;
 
-    const res = await aiCall(headers, {
+    /* One tool, and it must be called. The answer is the form, not prose. */
+    const block = await aiFill(headers, {
         model: aiModelId(plugin.settings, spec.model),
         /* A meal reports every number once per ingredient now, so a long
          * one writes several times what a single set of totals did. */
@@ -1598,21 +1642,8 @@ async function aiDraft(plugin, kind, description, photo) {
         thinking: { type: 'adaptive' },
         output_config: { effort: plugin.settings.aiEffort || 'medium' },
         system: photo ? spec.system + AI_PHOTO : spec.system,
-        tools: [tool],
-        /* One tool, and it must be called. The answer is the form, not prose. */
-        tool_choice: { type: 'tool', name: tool.name },
         messages: [{ role: 'user', content: content }],
-    });
-
-    const body = res.body;
-
-    if (res.status !== 200) {
-        const said = body && body.error && body.error.message;
-        throw new Error(said || ('The API answered ' + res.status + '.'));
-    }
-
-    const block = ((body && body.content) || []).find(
-        (b) => b.type === 'tool_use' && b.name === tool.name);
+    }, tool);
     if (!block) throw new Error('Claude answered without filling the form. Try naming the amount plainly.');
 
     /* A meal is the sum of its parts, so a meal without parts is a note full
@@ -3373,26 +3404,14 @@ async function aiReading(plugin, markdown, mode) {
     const tool = kind.tool();
     const headers = await aiHeaders(plugin);
 
-    const res = await aiCall(headers, {
+    const block = await aiFill(headers, {
         model: aiModelId(plugin.settings),
         max_tokens: 4096,
         thinking: { type: 'adaptive' },
         output_config: { effort: plugin.settings.aiEffort || 'medium' },
         system: kind.system,
-        tools: [tool],
-        tool_choice: { type: 'tool', name: tool.name },
         messages: [{ role: 'user', content: markdown }],
-    });
-
-    const body = res.body;
-
-    if (res.status !== 200) {
-        const said = body && body.error && body.error.message;
-        throw new Error(said || ('The API answered ' + res.status + '.'));
-    }
-
-    const block = ((body && body.content) || []).find(
-        (b) => b.type === 'tool_use' && b.name === tool.name);
+    }, tool);
     if (!block) throw new Error('Claude answered without filling the form.');
     return block.input;
 }
@@ -3670,6 +3689,7 @@ async function aiAsk(plugin, system, messages) {
         const said = body && body.error && body.error.message;
         throw new Error(said || ('The API answered ' + res.status + '.'));
     }
+    aiRefused(body);
 
     const text = ((body && body.content) || [])
         .filter((b) => b.type === 'text')
@@ -7290,8 +7310,8 @@ class NoshSettingTab extends PluginSettingTab {
             .setDesc('Used when a description is turned into nutrition \u2014 ingredients, '
                      + 'meals, and the reading on a report. Sonnet is quick and cheap '
                      + 'enough to log a meal without thinking about the cost. Opus is the '
-                     + 'better guesser on composite or unfamiliar dishes, at roughly two '
-                     + 'and a half times the price.')
+                     + 'better guesser on composite or unfamiliar dishes: Opus 5.5 at about '
+                     + 'twice the price, Opus 5 at two and a half times.')
             .addDropdown((d) => {
                 for (const m of AI_MODELS) d.addOption(m.id, m.label);
                 d.setValue(aiModelId(this.plugin.settings))
