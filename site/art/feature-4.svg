@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 -40 540 700"><defs><filter id="c-paper-0" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="4" result="warp"/>
+    <feDisplacementMap in="SourceGraphic" in2="warp" scale="5" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.085" numOctaves="4" seed="9" result="paint"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.93  1.3 0 0 0 -0.6" result="light"/>
+    <feComposite in="light" in2="torn" operator="in" result="lightIn"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 0 0.1  0 -1.3 0 0 0.5" result="dark"/>
+    <feComposite in="dark" in2="torn" operator="in" result="darkIn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="3" result="fiber"/>
+    <feColorMatrix in="fiber" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 1.2 0 -0.62" result="flecks"/>
+    <feComposite in="flecks" in2="torn" operator="in" result="flecksIn"/>
+    <feMerge result="painted"><feMergeNode in="torn"/><feMergeNode in="lightIn"/><feMergeNode in="darkIn"/><feMergeNode in="flecksIn"/></feMerge>
+    <feDropShadow in="painted" dx="1.20" dy="2.40" stdDeviation="1.6" flood-color="#1c0d09" flood-opacity=".42"/>
+  </filter>
+  <filter id="c-paper-30" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="5" result="warp"/>
+    <feDisplacementMap in="SourceGraphic" in2="warp" scale="5" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.085" numOctaves="4" seed="10" result="paint"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.93  1.3 0 0 0 -0.6" result="light"/>
+    <feComposite in="light" in2="torn" operator="in" result="lightIn"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 0 0.1  0 -1.3 0 0 0.5" result="dark"/>
+    <feComposite in="dark" in2="torn" operator="in" result="darkIn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="3" result="fiber"/>
+    <feColorMatrix in="fiber" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 1.2 0 -0.62" result="flecks"/>
+    <feComposite in="flecks" in2="torn" operator="in" result="flecksIn"/>
+    <feMerge result="painted"><feMergeNode in="torn"/><feMergeNode in="lightIn"/><feMergeNode in="darkIn"/><feMergeNode in="flecksIn"/></feMerge>
+    <feDropShadow in="painted" dx="2.24" dy="1.48" stdDeviation="1.6" flood-color="#1c0d09" flood-opacity=".42"/>
+  </filter>
+  <filter id="c-paper-60" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="6" result="warp"/>
+    <feDisplacementMap in="SourceGraphic" in2="warp" scale="5" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.085" numOctaves="4" seed="11" result="paint"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.93  1.3 0 0 0 -0.6" result="light"/>
+    <feComposite in="light" in2="torn" operator="in" result="lightIn"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 0 0.1  0 -1.3 0 0 0.5" result="dark"/>
+    <feComposite in="dark" in2="torn" operator="in" result="darkIn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="3" result="fiber"/>
+    <feColorMatrix in="fiber" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 1.2 0 -0.62" result="flecks"/>
+    <feComposite in="flecks" in2="torn" operator="in" result="flecksIn"/>
+    <feMerge result="painted"><feMergeNode in="torn"/><feMergeNode in="lightIn"/><feMergeNode in="darkIn"/><feMergeNode in="flecksIn"/></feMerge>
+    <feDropShadow in="painted" dx="2.68" dy="0.16" stdDeviation="1.6" flood-color="#1c0d09" flood-opacity=".42"/>
+  </filter>
+  <filter id="c-paper-90" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="7" result="warp"/>
+    <feDisplacementMap in="SourceGraphic" in2="warp" scale="5" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.085" numOctaves="4" seed="12" result="paint"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.93  1.3 0 0 0 -0.6" result="light"/>
+    <feComposite in="light" in2="torn" operator="in" result="lightIn"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 0 0.1  0 -1.3 0 0 0.5" result="dark"/>
+    <feComposite in="dark" in2="torn" operator="in" result="darkIn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="3" result="fiber"/>
+    <feColorMatrix in="fiber" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 1.2 0 -0.62" result="flecks"/>
+    <feComposite in="flecks" in2="torn" operator="in" result="flecksIn"/>
+    <feMerge result="painted"><feMergeNode in="torn"/><feMergeNode in="lightIn"/><feMergeNode in="darkIn"/><feMergeNode in="flecksIn"/></feMerge>
+    <feDropShadow in="painted" dx="2.40" dy="-1.20" stdDeviation="1.6" flood-color="#1c0d09" flood-opacity=".42"/>
+  </filter>
+  <filter id="c-paper-120" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="8" result="warp"/>
+    <feDisplacementMap in="SourceGraphic" in2="warp" scale="5" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.085" numOctaves="4" seed="13" result="paint"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.93  1.3 0 0 0 -0.6" result="light"/>
+    <feComposite in="light" in2="torn" operator="in" result="lightIn"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 0 0.1  0 -1.3 0 0 0.5" result="dark"/>
+    <feComposite in="dark" in2="torn" operator="in" result="darkIn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="3" result="fiber"/>
+    <feColorMatrix in="fiber" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 1.2 0 -0.62" result="flecks"/>
+    <feComposite in="flecks" in2="torn" operator="in" result="flecksIn"/>
+    <feMerge result="painted"><feMergeNode in="torn"/><feMergeNode in="lightIn"/><feMergeNode in="darkIn"/><feMergeNode in="flecksIn"/></feMerge>
+    <feDropShadow in="painted" dx="1.48" dy="-2.24" stdDeviation="1.6" flood-color="#1c0d09" flood-opacity=".42"/>
+  </filter>
+  <filter id="c-paper-150" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="9" result="warp"/>
+    <feDisplacementMap in="SourceGraphic" in2="warp" scale="5" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.014 0.085" numOctaves="4" seed="14" result="paint"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.93  1.3 0 0 0 -0.6" result="light"/>
+    <feComposite in="light" in2="torn" operator="in" result="lightIn"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 0 0.1  0 -1.3 0 0 0.5" result="dark"/>
+    <feComposite in="dark" in2="torn" operator="in" result="darkIn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="3" result="fiber"/>
+    <feColorMatrix in="fiber" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 1.2 0 -0.62" result="flecks"/>
+    <feComposite in="flecks" in2="torn" operator="in" result="flecksIn"/>
+    <feMerge result="painted"><feMergeNode in="torn"/><feMergeNode in="lightIn"/><feMergeNode in="darkIn"/><feMergeNode in="flecksIn"/></feMerge>
+    <feDropShadow in="painted" dx="0.16" dy="-2.68" stdDeviation="1.6" flood-color="#1c0d09" flood-opacity=".42"/>
+  </filter>
+  <filter id="c-soil" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="12" result="warp"/>
+    <feDisplacementMap in="SourceGraphic" in2="warp" scale="9" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.02 0.12" numOctaves="4" seed="5" result="paint"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 0.55  0 0 0 0 0.38  0 0 0 0 0.3  1.3 0 0 0 -0.55" result="light"/>
+    <feComposite in="light" in2="torn" operator="in" result="lightIn"/>
+    <feMerge><feMergeNode in="torn"/><feMergeNode in="lightIn"/></feMerge>
+  </filter>
+  <filter id="c-small" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="4" result="warp"/>
+    <feDisplacementMap in="SourceGraphic" in2="warp" scale="2" xChannelSelector="R" yChannelSelector="G" result="torn"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.12 0.9" numOctaves="2" seed="9" result="paint"/>
+    <feColorMatrix in="paint" type="matrix" values="0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.93  1.4 0 0 0 -0.6" result="light"/>
+    <feComposite in="light" in2="torn" operator="in" result="lightIn"/>
+    <feMerge result="painted"><feMergeNode in="torn"/><feMergeNode in="lightIn"/></feMerge>
+    <feDropShadow in="painted" dx="0.5" dy="1" stdDeviation="0.6" flood-color="#1c0d09" flood-opacity=".35"/>
+  </filter></defs><g transform="rotate(120 280 350)" filter="url(#c-paper-120)"><g transform="rotate(-120 280 350)"><path d="M330 210C335 213 347 205 354 202C360 198 366 194 370 189C374 184 376 178 380 173C383 167 388 163 392 157C395 152 397 146 400 140C402 134 404 128 406 122C408 116 412 111 413 104C414 98 413 91 414 84C415 78 418 72 419 66C419 59 419 53 418 46C417 39 416 25 412 24C408 23 400 33 394 38C389 42 385 47 381 52C377 57 376 63 372 68C369 73 363 77 360 83C356 88 355 94 352 99C350 104 347 109 344 115C341 120 338 125 336 131C334 137 334 143 332 149C330 155 327 160 325 166C324 172 323 178 324 186C325 193 325 207 330 210Z" fill="#93b372"/><path d="M345 183Q365 168 377 168" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M345 183Q345 158 338 148" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M358 156Q379 141 393 141" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M358 156Q357 130 348 120" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M371 128Q392 112 405 112" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M371 128Q369 103 361 93" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M384 100Q401 83 413 81" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M384 100Q383 75 376 66" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M395 72Q409 53 417 50" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M395 72Q397 48 393 41" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M330 210Q380 121 407 38" fill="none" stroke="#c24f90" stroke-width="3.2" stroke-linecap="round"/></g></g><g transform="rotate(150 280 350)" filter="url(#c-paper-150)"><g transform="rotate(-150 280 350) rotate(-8 48 138)"><path d="M40 110Q40 91 30 76" fill="none" stroke="#aac38b" stroke-width="4.0868896346348045" stroke-linecap="round"/><path d="M49 110Q51 93 49 77" fill="none" stroke="#aac38b" stroke-width="5.477209638261496" stroke-linecap="round"/><path d="M58 110Q63 92 68 75" fill="none" stroke="#aac38b" stroke-width="4.739028212882305" stroke-linecap="round"/><path d="M43 187L43 190L43 193L43 196L44 200L44 203L44 206L45 209L45 212L45 216L45 219L46 219L46 216L46 212L46 209L47 206L47 203L47 200L48 196L48 193L48 190L49 187Z" fill="#f2e3e7"/><clipPath id="c-clip-18"><path d="M89 136C89 143 88 152 81 160C74 169 53 185 46 187C39 189 42 176 37 172C33 168 22 167 18 162C13 156 10 145 9 137C8 130 8 123 13 117C18 112 31 106 39 104C46 102 52 103 58 105C65 107 74 112 79 117C84 123 88 129 89 136Z"/></clipPath><path d="M89 136C89 143 88 152 81 160C74 169 53 185 46 187C39 189 42 176 37 172C33 168 22 167 18 162C13 156 10 145 9 137C8 130 8 123 13 117C18 112 31 106 39 104C46 102 52 103 58 105C65 107 74 112 79 117C84 123 88 129 89 136Z" fill="#f2e3e7"/><path d="M97 120C96 126 91 135 85 139C80 142 74 142 65 143C56 144 40 147 31 146C23 144 17 139 12 134C6 130 -0 124 -0 118C0 112 8 102 14 97C20 92 27 91 35 88C43 86 52 82 62 84C71 86 86 94 92 100C98 106 98 113 97 120Z" fill="#9a5fa2" clip-path="url(#c-clip-18)"/><path d="M42 113Q58 107 62 124" fill="none" stroke="#fbf3ec" stroke-width="1.1" stroke-linecap="round" opacity="0.35"/><path d="M60 141Q40 153 30 132" fill="none" stroke="#fbf3ec" stroke-width="1.1" stroke-linecap="round" opacity="0.35"/></g></g><g transform="rotate(60 280 350)" filter="url(#c-paper-60)"><g transform="rotate(-60 280 350)"><path d="M110 520C113 516 111 505 110 499C109 494 105 491 103 486C101 482 100 477 98 473C95 469 92 467 89 464C86 461 82 458 79 455C76 452 73 449 71 445C68 442 65 439 62 436C59 433 55 431 50 428C46 426 41 424 37 422C33 420 30 416 25 414C20 412 11 408 8 410C5 412 6 423 7 428C7 433 10 437 12 442C13 447 14 452 15 457C17 462 19 467 21 471C24 475 28 478 31 481C34 485 38 488 41 491C44 495 47 499 50 502C54 506 57 510 61 512C65 515 70 516 75 518C80 519 83 522 89 523C95 523 107 524 110 520Z" fill="#7b9d5b"/><path d="M93 505Q87 487 91 476" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M93 505Q74 501 64 505" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M76 490Q72 470 77 459" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M76 490Q56 486 46 491" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M60 474Q57 454 62 444" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M60 474Q41 469 30 473" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M45 457Q41 439 46 429" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M45 457Q27 450 18 453" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M31 440Q25 423 27 416" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M31 440Q16 430 8 431" fill="none" stroke="#e690bb" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/><path d="M110 520Q52 472 14 419" fill="none" stroke="#c24f90" stroke-width="2.9000000000000004" stroke-linecap="round"/></g></g><g transform="rotate(150 280 350)" filter="url(#c-paper-150)"><g transform="rotate(-150 280 350) rotate(16 386 506)"><path d="M385 490Q387 480 382 471" fill="none" stroke="#7b9d5b" stroke-width="5.8045861806892125" stroke-linecap="round"/><path d="M388 490Q386 477 391 465" fill="none" stroke="#7b9d5b" stroke-width="5.65085204485061" stroke-linecap="round"/><path d="M385 534L385 537L385 540L386 543L386 546L387 549L387 552L387 556L388 559L388 562L389 565L390 565L389 562L389 559L389 555L389 552L389 549L389 546L389 543L389 540L389 537L389 534Z" fill="#f8e6ea"/><clipPath id="c-clip-19"><path d="M411 505C412 509 409 513 405 518C401 522 391 532 387 534C382 535 381 530 378 527C375 525 370 522 367 519C365 516 363 512 362 507C362 503 363 495 366 492C368 488 372 487 377 486C382 485 391 484 396 485C401 486 401 488 404 491C406 494 411 500 411 505Z"/></clipPath><path d="M411 505C412 509 409 513 405 518C401 522 391 532 387 534C382 535 381 530 378 527C375 525 370 522 367 519C365 516 363 512 362 507C362 503 363 495 366 492C368 488 372 487 377 486C382 485 391 484 396 485C401 486 401 488 404 491C406 494 411 500 411 505Z" fill="#df437a"/><path d="M403 527C403 530 402 534 400 536C398 538 393 540 390 541C386 542 384 543 381 542C379 541 374 538 372 536C369 534 368 532 368 529C368 527 371 523 373 521C376 518 379 516 382 515C385 514 389 515 393 516C396 517 399 518 401 520C403 522 404 525 403 527Z" fill="#f8e6ea" clip-path="url(#c-clip-19)"/></g></g><g transform="rotate(30 280 350)" filter="url(#c-paper-30)"><g transform="rotate(-30 280 350)"><path d="M95 597C94 601 91 601 88 604C85 606 81 611 76 612C71 612 64 609 58 606C52 604 46 600 43 597C40 594 39 590 40 587C41 583 43 579 47 577C51 574 58 572 63 571C69 571 77 572 82 574C87 576 91 577 93 581C95 585 96 593 95 597Z" fill="#efd58c"/><circle cx="76" cy="599" r="1" fill="#c9a45b"/><circle cx="50" cy="587" r="2" fill="#c9a45b"/><circle cx="61" cy="585" r="1" fill="#c9a45b"/><circle cx="70" cy="596" r="1" fill="#c9a45b"/></g></g></svg>

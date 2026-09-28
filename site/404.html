@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page not found · nosh</title>
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Krub:wght@400;500&display=swap" rel="stylesheet">
+<script>
+(function(){try{var t=localStorage.getItem('nosh-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+<style>
+:root {
+  --bg: #ffffff; --bg-2: #f6f5f8; --text: #1c1b1f; --text-2: #5f5c67; --rule-2: #d6d3dc;
+  --primary: #b28ecc; --primary-text: #684590; --accent: #7cb342; --art-wash: #f0e7f7;
+  --font-head: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Krub", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17120f; --bg-2: #201a16; --text: #f5efe8; --text-2: #b4a99f; --rule-2: #3f3630;
+    --primary-text: #cdb3e2; --art-wash: #2d2438;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17120f; --bg-2: #201a16; --text: #f5efe8; --text-2: #b4a99f; --rule-2: #3f3630;
+  --primary-text: #cdb3e2; --art-wash: #2d2438;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 32px 16px 48px;
+  background: radial-gradient(60% 50% at 50% 42%, var(--art-wash), transparent 70%), var(--bg);
+  color: var(--text); font-family: var(--font-body); font-size: 1.0625rem; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 30em; text-align: center; }
+.art { display: block; width: 200px; height: auto; margin: 0 auto; }
+.code { margin-top: 8px; font-family: var(--font-head); font-weight: 600; color: var(--primary-text); }
+h1 { margin: 6px 0 0; font-family: var(--font-head); font-weight: 800; font-size: clamp(2.25rem, 7vw, 3.25rem); line-height: 1.05; letter-spacing: -0.035em; text-wrap: balance; }
+p { margin: 14px 0 0; color: var(--text-2); text-wrap: pretty; }
+a.btn {
+  display: inline-flex; margin-top: 28px; padding: 12px 20px; border-radius: 10px;
+  background: var(--text); color: var(--bg); font-family: var(--font-head); font-weight: 600; text-decoration: none;
+  transition: transform .2s cubic-bezier(0.22, 0.7, 0.2, 1), background-color .2s;
+}
+a.btn:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--text) 86%, var(--primary)); }
+a.btn:active { transform: scale(0.98); }
+a:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+  <img class="art" src="/art/radish.svg" alt="" width="240" height="200">
+  <div class="code">404</div>
+  <h1>Nothing logged at this address.</h1>
+  <p>The page you asked for is not on nosh.health. The tracker, the demo and the install buttons are all on the home page.</p>
+  <a class="btn" href="/">Back to nosh</a>
+</main>
+</body>
+</html>
