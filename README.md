@@ -249,6 +249,12 @@ Off until you add an API key. It adds:
 - What's for… Suggests a meal that fits what's left of your day, with a method.
   It asks how many you're cooking for, how much effort you want, and what needs
   using up.
+- Eating out? Give it a restaurant's name or a Google or Apple Maps link.
+  Claude looks up the menu, using the chain's published nutrition where there
+  is any, and says what to order for what's left of your day. You get the
+  order with any changes to ask for, two or three alternatives, and links to
+  the menu it used. Web searches are billed on top of the tokens, a few cents
+  a time.
 - Ask about this recipe. Question any recipe note (where the sodium comes from,
   how to stretch it, what to serve with it) from the command palette or the
   right-click menu. Save to note appends the conversation.
@@ -260,6 +266,11 @@ Estimating and inventing meals can use separate models, so the frequent job can
 use a cheaper one. Each can be Sonnet 5, Opus 5 or Opus 5.5. Sonnet 5 is the
 default for estimating and Opus 5 for suggestions. Opus 5.5 costs less than
 Opus 5, at about twice Sonnet's price.
+
+Each answer shows roughly what it cost, with the model and token counts, under
+the draft card or the recipe answer. For a reading, it shows as a notice, so it
+stays out of the report. The figure uses list prices, including any web
+searches, so a negotiated rate will make your bill differ.
 
 ### Credentials
 
