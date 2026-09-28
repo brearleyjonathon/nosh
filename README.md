@@ -27,7 +27,8 @@ API key. With them on:
   with Claude* link. Clicking it opens claude.ai in your browser with the
   recipe in the page address. Nothing is sent until you click.
 - Where the key lives. Your API key is kept in Obsidian's keychain, on the
-  device and outside the vault. Obsidian older than 1.11.4 has no keychain, so
+  device and outside the vault, so it doesn't sync: each device you use Nosh AI
+  on needs it added once. Obsidian older than 1.11.4 has no keychain, so
   there it's stored in plain text in `data.json` in the plugin folder, inside
   your vault. See [Credentials](#credentials).
 - The notes Nosh looks at. To find your foods, log notes and targets note, Nosh
@@ -266,12 +267,54 @@ Nosh AI uses an API key from [platform.claude.com](https://platform.claude.com),
 and every request is billed to that account at API rates. It works on desktop
 and mobile.
 
-The key is kept in Obsidian's keychain (Obsidian 1.11.4 and later). In Nosh
-settings, pick a key already stored there or add a new one. The keychain is on
-the device, not in the vault, so the key doesn't sync and each device needs it
-once. A key an earlier version of Nosh kept in `data.json` moves to the
-keychain the first time Nosh loads. On older Obsidian the key stays in
-plain text in `data.json` in the plugin folder.
+The key is kept in Obsidian's keychain (Obsidian 1.11.4 and later), not in the
+vault. That keeps it out of whatever the vault syncs to, but it also means **the
+key doesn't travel with the vault**. Obsidian Sync doesn't carry it, and
+neither does anything else. Each device keeps its own copy, and Obsidian keeps
+the keychain per vault too.
+
+To set it up:
+
+1. Open **Settings → Nosh → AI → API key** to bring up the keychain picker.
+2. Add a secret named `nosh-anthropic-api-key` and paste in your key, or pick
+   one already there.
+3. Press **Test**.
+
+Do this once on every device, and in every vault, that you use Nosh AI in.
+
+#### More than one device
+
+- One key is enough for all of them. A key isn't tied to a device, and using
+  it on several at once is fine.
+- The picker shows the same name, `nosh-anthropic-api-key`, on every device,
+  but each device has its own value behind it. Seeing the name on one device
+  says nothing about what another holds, and changing the key on one device
+  leaves the others as they were.
+- Deleting or rotating a key on platform.claude.com breaks every device still
+  holding it. Put the new key on each of them.
+
+#### If Test fails
+
+- *No API key set.* This device's keychain has nothing for Nosh. Add the key
+  as above.
+- *API key is invalid*, or another message from Anthropic. Nosh found a key on
+  this device and Anthropic refused it: the copy here is revoked, out of date,
+  or was pasted incompletely. Press the eye icon in the picker to compare it
+  with the keys listed on platform.claude.com, then delete the entry and add it
+  again with a working key.
+- *Could not reach api.anthropic.com.* The connection is the problem, not the
+  key.
+
+A key an earlier version of Nosh kept in `data.json` moves to the keychain the
+first time Nosh loads. Before 1.2.2, which keychain entry to use was stored in
+`data.json` and synced, so picking a different entry on one device could leave
+another looking for an entry it didn't have. From 1.2.2 each device remembers
+its own choice.
+
+On Obsidian older than 1.11.4 there is no keychain, and the key stays in plain
+text in `data.json` in the plugin folder, where it does sync. Mixing old and
+new Obsidian doesn't work well: a device with a keychain moves the key out of
+`data.json`, and the older device loses it. Update Obsidian on every device.
 
 > On older Obsidian, other plugins, sync services and any repository you commit
 > the vault to can read `data.json`. Don't commit it. This repository ignores

@@ -7305,8 +7305,10 @@ class NoshSettingTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('API key')
                 .setDesc('An Anthropic API key, kept in Obsidian’s keychain on this '
-                         + 'device rather than in the vault. Pick one already there or add '
-                         + 'a new one. Each device you use Nosh AI on needs it once.')
+                         + 'device rather than in the vault, so it does not sync: add it '
+                         + 'once on each device you use Nosh AI on. The same key works on '
+                         + 'all of them. If Test says the key is invalid, the copy on this '
+                         + 'device is the one to replace.')
                 .addComponent((el) => new SecretComponent(this.app, el)
                     .setValue(keyName(this.plugin) || localKeyName(this.app))
                     .onChange((v) => setLocalKeyName(this.app, v)));
