@@ -926,7 +926,11 @@
     border-start-end-radius: var(--setting-items-radius, 0);
 }
 
-.nosh-settings .nosh-target-row:not(:has(+ .nosh-target-row)) {
+/* The last row of a table, marked when the table is built. Finding it
+ * from the stylesheet means a relational selector, which the plugin review
+ * flags as slow to restyle. As specific as the rule above it, and later,
+ * so its margin wins. */
+.nosh-settings .nosh-target-row.nosh-target-last {
     margin-bottom: var(--size-4-2);
     border-end-start-radius: var(--setting-items-radius, 0);
     border-end-end-radius: var(--setting-items-radius, 0);

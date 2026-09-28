@@ -7514,6 +7514,7 @@ class NoshSettingTab extends PluginSettingTab {
                         this.plugin.refreshViews();
                     }));
             row.settingEl.addClass('nosh-target-row');
+            if (n === NUTRIENTS[NUTRIENTS.length - 1]) row.settingEl.addClass('nosh-target-last');
             describeTarget(row, nutrientShapeNote(shape), n.key);
         }
 
@@ -7586,6 +7587,7 @@ class NoshSettingTab extends PluginSettingTab {
                     }));
             row.settingEl.addClass('nosh-target-row');
             row.settingEl.addClass('nosh-group-row');
+            if (g === FOOD_GROUPS[FOOD_GROUPS.length - 1]) row.settingEl.addClass('nosh-target-last');
             describeTarget(row, shapeNote(shape), g.key);
         }
 
