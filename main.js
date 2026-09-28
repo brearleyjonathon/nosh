@@ -232,7 +232,7 @@ const DEFAULT_SETTINGS = {
      * several shortfalls through what little headroom is left - so it starts
      * on Opus. Cleared, it falls back on aiModel. */
     aiSuggestModel: 'claude-opus-5',
-    aiKeySecret: '',      // the name of the key in Obsidian's keychain
+    aiKeySecret: '',      // the keychain name an earlier Nosh synced; read, never written
     aiApiKey: '',         // the key itself, only where there is no keychain
     aiEffort: 'medium',
     /* Free text, appended to the What's for... prompt. Nothing here is
@@ -1335,20 +1335,47 @@ function pickPhoto() {
 
 /* An API key, kept in Obsidian's keychain from 1.11.4 on. The keychain is on
  * the device rather than in the vault, so the key does not travel with the
- * vault to wherever it syncs or is committed, and it works on a phone. The
- * setting holds only the key's name there. An older app has no keychain, and
- * the key falls back to data.json, which is inside the vault. */
+ * vault to wherever it syncs or is committed, and it works on a phone. An
+ * older app has no keychain, and the key falls back to data.json, which is
+ * inside the vault.
+ *
+ * Which entry in the keychain is the key is as much the device's business as
+ * the key is, so the name is kept on the device too. Kept in data.json, it
+ * synced: a key picked on the phone renamed the one the desk looked for, the
+ * desk's keychain had nothing under that name, and only the device that
+ * picked last could reach the API. */
 
 const KEY_SECRET = 'nosh-anthropic-api-key';   // the name Nosh files a moved key under
+const KEY_NAME_LOCAL = 'nosh-ai-key-secret';   // where this device keeps the name
 
 function keychain(app) {
     return (app && app.secretStorage && SecretComponent) ? app.secretStorage : null;
 }
 
+function localKeyName(app) {
+    const v = typeof app.loadLocalStorage === 'function'
+        ? app.loadLocalStorage(KEY_NAME_LOCAL) : null;
+    return typeof v === 'string' ? v : '';
+}
+
+function setLocalKeyName(app, name) {
+    if (typeof app.saveLocalStorage === 'function') app.saveLocalStorage(KEY_NAME_LOCAL, name || null);
+}
+
+/* The keychain entry this device uses: the one picked here, else the name an
+ * earlier Nosh left in data.json, else the one a moved key was filed under -
+ * the first of them this keychain actually has. */
+function keyName(plugin) {
+    const chain = keychain(plugin.app);
+    if (!chain) return '';
+    const names = [localKeyName(plugin.app), plugin.settings.aiKeySecret, KEY_SECRET];
+    return names.find((n) => n && chain.getSecret(n)) || '';
+}
+
 function apiKey(plugin) {
     const chain = keychain(plugin.app);
-    const s = plugin.settings;
-    const key = chain && s.aiKeySecret ? chain.getSecret(s.aiKeySecret) : s.aiApiKey;
+    const name = keyName(plugin);
+    const key = chain ? (name ? chain.getSecret(name) : '') : plugin.settings.aiApiKey;
     return String(key || '').trim();
 }
 
@@ -4098,9 +4125,9 @@ module.exports = class NoshPlugin extends Plugin {
             try {
                 /* A key already picked from the keychain is the one meant,
                  * and is not written over by an old copy. */
-                const name = this.settings.aiKeySecret || KEY_SECRET;
+                const name = keyName(this) || KEY_SECRET;
                 if (!chain.getSecret(name)) chain.setSecret(name, this.settings.aiApiKey);
-                this.settings.aiKeySecret = name;
+                setLocalKeyName(this.app, name);
                 this.settings.aiApiKey = '';
                 await this.saveData(this.settings);
             } catch (e) {
@@ -7281,11 +7308,8 @@ class NoshSettingTab extends PluginSettingTab {
                          + 'device rather than in the vault. Pick one already there or add '
                          + 'a new one. Each device you use Nosh AI on needs it once.')
                 .addComponent((el) => new SecretComponent(this.app, el)
-                    .setValue(this.plugin.settings.aiKeySecret)
-                    .onChange(async (v) => {
-                        this.plugin.settings.aiKeySecret = v || '';
-                        await this.plugin.saveSettings();
-                    }));
+                    .setValue(keyName(this.plugin) || localKeyName(this.app))
+                    .onChange((v) => setLocalKeyName(this.app, v)));
         } else {
             new Setting(containerEl)
                 .setName('API key')
