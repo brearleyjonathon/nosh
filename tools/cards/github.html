@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Krub:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; }
+  body { width: 1280px; height: 640px; overflow: hidden; background: #fff; position: relative; font-family: "Krub", sans-serif; color: #1c1b1f; -webkit-font-smoothing: antialiased; text-align: center; }
+  .copy { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 780px; }
+  .ring { width: 76px; height: 76px; }
+  h1 { margin: 18px 0 0; font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 150px; line-height: 0.84; letter-spacing: -0.05em; }
+  .verbs { display: inline-block; margin-top: 8px; padding-bottom: 14px; position: relative; font-family: "Bricolage Grotesque", sans-serif; font-weight: 650; font-size: 46px; letter-spacing: -0.03em; color: #684590; }
+  .verbs::after { content: ""; position: absolute; left: 14%; bottom: 0; width: 72%; height: 5px; border-radius: 3px; background: #7cb342; }
+  p { margin: 26px 0 0; font-size: 27px; line-height: 1.4; color: #5f5c67; }
+  .foot { margin-top: 24px; font-size: 22px; color: #8a8792; }
+  .side { position: absolute; top: 0; height: 640px; }
+  .left { left: -6px; }
+  .right { right: -6px; }
+</style>
+</head>
+<body>
+  <img class="side left" src="card-left.svg" alt="">
+  <img class="side right" src="card-right.svg" alt="">
+  <div class="copy">
+    <svg class="ring" viewBox="0 0 26 26" aria-hidden="true">
+      <circle cx="13" cy="13" r="10" fill="none" stroke="#d6d3dc" stroke-width="4"/>
+      <circle cx="13" cy="13" r="10" fill="none" stroke="#7cb342" stroke-width="4" stroke-linecap="round" stroke-dasharray="62.8" stroke-dashoffset="8" transform="rotate(-90 13 13)"/>
+      <circle cx="13" cy="13" r="4" fill="#b28ecc"/>
+    </svg>
+    <h1>nosh</h1>
+    <div class="verbs">log. see. adjust.</div>
+    <p>A nutrition tracker for Obsidian, built around DASH.<br>Log meals from your own notes. Nothing leaves your vault.</p>
+    <div class="foot">github.com/brearleyjonathon/nosh</div>
+  </div>
+</body>
+</html>
