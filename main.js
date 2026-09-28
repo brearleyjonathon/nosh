@@ -244,6 +244,9 @@ const DEFAULT_SETTINGS = {
      * far less often than it changes what it fancies, so this one is worth
      * remembering and the rest of the ask is not. */
     suggestServes: 1,
+    /* Where the last restaurant was, for Eating out. Most places eaten at
+     * are in the same town, and a name alone is ambiguous for a chain. */
+    restaurantNear: '',
     /* key -> 'floor' | 'range' | 'ceiling', and only where it differs from
      * what FOOD_GROUPS says. An empty object is a vault that agrees with
      * DASH about every bar. */
@@ -817,11 +820,13 @@ const AI_ENDPOINT = 'https://api.anthropic.com/v1/messages';
  * difference is that Opus 5.5 will not be made to call a tool, and is asked
  * to instead; aiFill() takes care of that. The first is the default for the
  * numbers; suggestions start on Opus 5. Keep the list in step with
- * DEFAULT_SETTINGS.aiModel and .aiSuggestModel. */
+ * DEFAULT_SETTINGS.aiModel and .aiSuggestModel. `input` and `output` are list
+ * prices in dollars per million tokens, for the cost on each card; keep them
+ * in step with platform.claude.com. */
 const AI_MODELS = [
-    { id: 'claude-sonnet-5', label: 'Sonnet 5' },
-    { id: 'claude-opus-5',   label: 'Opus 5' },
-    { id: 'claude-opus-5-5', label: 'Opus 5.5', askForForm: true },
+    { id: 'claude-sonnet-5', label: 'Sonnet 5', input: 2, output: 10 },
+    { id: 'claude-opus-5',   label: 'Opus 5',   input: 5, output: 25 },
+    { id: 'claude-opus-5-5', label: 'Opus 5.5', input: 4, output: 20, askForForm: true },
 ];
 
 /* A stored id that is no longer offered - a hand-edited data.json, or a model
@@ -835,6 +840,66 @@ function aiModelId(settings, key) {
      * that predates the second setting behaves exactly as it did. */
     const base = String((settings && settings.aiModel) || '').trim();
     return AI_MODELS.some((m) => m.id === base) ? base : AI_MODELS[0].id;
+}
+
+/* --- what it cost ---------------------------------------------------- *
+ *
+ * Every card that comes back from Claude says roughly what it cost, worked
+ * out from the usage the API reports on the answer and the list prices
+ * above, which are dollars per million tokens. Thinking is billed as output
+ * and is already counted in it. A web search is billed on top of its tokens;
+ * a web fetch is only its tokens. Nosh does not cache prompts, but the
+ * multipliers are here so the figure stays honest if it ever does. It is list
+ * price: a negotiated rate, or tax, is not something this can know. */
+const AI_SEARCH_PRICE = 0.01;      // dollars per web search
+const AI_CACHE_WRITE = 1.25;       // times the input price
+const AI_CACHE_READ = 0.1;
+
+/* A run of calls, added up as it goes: a form asked for twice, or a menu
+ * looked up over several turns, is paid for in full, not just the last. */
+function aiSpend(model) {
+    return { model: model, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, searches: 0 };
+}
+
+function aiSpent(spend, usage) {
+    if (!spend || !usage) return;
+    spend.input += parseNum(usage.input_tokens);
+    spend.output += parseNum(usage.output_tokens);
+    spend.cacheWrite += parseNum(usage.cache_creation_input_tokens);
+    spend.cacheRead += parseNum(usage.cache_read_input_tokens);
+    spend.searches += parseNum(usage.server_tool_use && usage.server_tool_use.web_search_requests);
+}
+
+function aiCost(spend) {
+    const m = AI_MODELS.find((x) => x.id === spend.model) || AI_MODELS[0];
+    const inRate = m.input / 1e6;
+    return spend.input * inRate +
+           spend.cacheWrite * inRate * AI_CACHE_WRITE +
+           spend.cacheRead * inRate * AI_CACHE_READ +
+           spend.output * (m.output / 1e6) +
+           spend.searches * AI_SEARCH_PRICE;
+}
+
+/* "About 3¢ · Sonnet 5, 4,210 tokens in, 1,050 out, 2 searches". Cents are
+ * rounded whole, since the figure is an estimate and a tenth of a cent would
+ * claim otherwise. */
+function costText(spend) {
+    if (!spend) return '';
+    const dollars = aiCost(spend);
+    const cents = dollars * 100;
+    const money = cents < 1 ? 'Under 1¢'
+        : cents < 100 ? 'About ' + Math.round(cents) + '¢'
+        : 'About $' + dollars.toFixed(2);
+    const m = AI_MODELS.find((x) => x.id === spend.model);
+    const bits = [
+        (m ? m.label + ', ' : '') + fmt(Math.round(spend.input + spend.cacheWrite +
+                                                   spend.cacheRead)) + ' tokens in',
+        fmt(Math.round(spend.output)) + ' out',
+    ];
+    if (spend.searches) {
+        bits.push(spend.searches + (spend.searches === 1 ? ' search' : ' searches'));
+    }
+    return money + ' · ' + bits.join(', ');
 }
 
 /* Portions are here to be pictured against a measuring cup, not weighed, so
@@ -1107,6 +1172,55 @@ function aiSuggestTool() {
     return tool;
 }
 
+/* Eating out is the same answer again with the kitchen taken away: the parts
+ * are what goes on the order rather than what goes in the pan, and instead of
+ * a method there is what to say to the server. Derived from the meal tool for
+ * the same reason the suggestion is. */
+function aiOrderTool() {
+    const tool = aiMealTool();
+    const props = tool.input_schema.properties;
+    tool.name = 'order_meal';
+    tool.description =
+        'Say what to order at this restaurant so the meal fits what the day ' +
+        'still has room for. Call this once, after looking at the menu.';
+
+    props.name.description =
+        'What the order is called, with the restaurant after it, e.g. ' +
+        '"Harvest Bowl at Sweetgreen". Becomes the filename.';
+    props.ingredients.description =
+        'Every item on the order as it will be eaten, each with its own portion ' +
+        'and its own numbers for that portion: a dish, a side, a drink. Split a ' +
+        'dish into its parts only where a part is being changed or left.';
+    props.restaurant = {
+        type: 'string',
+        description: 'The restaurant as you found it: its name, and the branch ' +
+                     'or town where you could tell.',
+    };
+    props.order = {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'What to say when ordering, one item per line, in the ' +
+                     'menu\'s own words, with any change asked for on the same ' +
+                     'line: "Chicken shawarma plate, rice swapped for salad, ' +
+                     'garlic sauce on the side".',
+    };
+    props.alternatives = {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Two or three other things on the menu that would also ' +
+                     'do, one per line, each with a few words on why - in case ' +
+                     'the first choice is off, or does not appeal.',
+    };
+    props.sources = {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'The URLs the menu and any published nutrition came from. ' +
+                     'Empty if you found nothing and worked from the name alone.',
+    };
+    tool.input_schema.required = Object.keys(props);
+    return tool;
+}
+
 /* Cooking is where a recipe stops being a row of numbers, and a chat handles
  * that better than a note can: something tickable, scaled to the number of
  * people actually sitting down. The link carries the dish, its parts and its
@@ -1205,6 +1319,52 @@ const AI_SUGGEST_SYSTEM = [
     '  come, and anything it deliberately leaves short.',
 ]).join('\n');
 
+/* The menu is the one thing here Claude cannot know, so it goes and looks.
+ * The numbers are still estimates, but a chain that publishes its nutrition
+ * has done the estimating already, and better. */
+const AI_ORDER_SYSTEM = [
+    'You choose what to order at a restaurant in a day of DASH eating. You are',
+    'given the restaurant - a name, a maps link, or both - what the day still',
+    'has room for, and roughly how much of the remainder is this meal\'s.',
+    '',
+    '- Find the restaurant\'s current menu first. Search for it, and fetch the',
+    '  restaurant\'s own site or a menu page where you can. A maps link names',
+    '  the place, in its path or its query, even where the page itself will',
+    '  not load. Where the name is ambiguous, use the town you are given.',
+    '- Chains often publish nutrition for every item. Where they do, use their',
+    '  figures rather than estimating, and say so in `note`.',
+    '- Where they do not, estimate from the menu\'s description at restaurant',
+    '  portions, which are larger and carry more oil, butter and salt than the',
+    '  same dish cooked at home. Sodium especially: a restaurant main often',
+    '  carries more than a day\'s worth. Do not flatter the order.',
+    '- Choose only from what is actually on the menu. Where you could not find',
+    '  a menu at all, say so plainly in `note`, choose from what a place of',
+    '  that kind reliably serves, and leave `sources` empty.',
+    '- Take this meal\'s share of what is outstanding and no more, and stay',
+    '  inside every limit given. A limit is a ceiling, not a target. Where the',
+    '  menu makes that impossible, get as close as the menu allows and say',
+    '  which limit gives way.',
+    '- Make the order better with the changes a kitchen will usually make:',
+    '  dressing or sauce on the side, a side salad or vegetables for the fries,',
+    '  grilled rather than fried, no added salt. Put each change on its line in',
+    '  `order`, and make the numbers describe the dish as changed.',
+    '- Where the plate is bigger than the meal\'s share, say how much of it to',
+    '  eat - half, with the rest boxed - by setting that item\'s `quantity` to',
+    '  the part eaten, and say it on the item\'s line in `order` too.',
+    '- `ingredients` lists what is eaten, one item of the order each: `name` is',
+    '  the menu item, `quantity` and `unit` count it the way the menu does - 1',
+    '  plate, 2 tacos, 1 side, 12 oz glass - and the numbers are for that much.',
+    '  Do not total them: the meal is added up from the items afterwards.',
+    '- `meal_type` is the occasion asked about.',
+].concat(AI_DASH, [
+    '- `note` says in a sentence or two what the order does for the day, where',
+    '  the numbers came from - published or estimated - and anything it',
+    '  deliberately leaves short.',
+    '',
+    'When you have what you need, answer by calling the order_meal tool, and',
+    'only that.',
+]).join('\n');
+
 /* What the picker's two tabs mean on this side: which prompt, which tool,
  * which folder the note lands in, and how it gets written out. */
 const AI_KINDS = {
@@ -1230,6 +1390,15 @@ const AI_KINDS = {
         title: 'Suggested meal',
         system: AI_SUGGEST_SYSTEM,
         tool: aiSuggestTool,
+        sub: SUB_MEALS,
+        note: aiMealNote,
+        model: 'aiSuggestModel',
+    },
+    /* A meal like any other once it is kept; the note just says where. */
+    restaurant: {
+        title: 'What to order',
+        system: AI_ORDER_SYSTEM,
+        tool: aiOrderTool,
         sub: SUB_MEALS,
         note: aiMealNote,
         model: 'aiSuggestModel',
@@ -1508,9 +1677,14 @@ async function aiCall(headers, payload) {
             case 'message_start':
                 Object.assign(message, data.message, { content: [] });
                 break;
+            /* A web search Claude runs for itself arrives as a server_tool_use,
+             * with its input in pieces exactly as a tool_use's is. It has to
+             * be put back together too, since a paused turn is resumed by
+             * sending every block back as it came. */
             case 'content_block_start':
                 message.content[data.index] = Object.assign({}, data.content_block);
-                if (data.content_block.type === 'tool_use') partial[data.index] = '';
+                if (data.content_block.type === 'tool_use' ||
+                    data.content_block.type === 'server_tool_use') partial[data.index] = '';
                 break;
             case 'content_block_delta': {
                 const block = message.content[data.index];
@@ -1524,15 +1698,17 @@ async function aiCall(headers, payload) {
                     block.thinking = (block.thinking || '') + d.thinking;
                 } else if (d.type === 'signature_delta') {
                     block.signature = d.signature;
+                } else if (d.type === 'citations_delta') {
+                    block.citations = (block.citations || []).concat([d.citation]);
                 }
                 break;
             }
             case 'content_block_stop': {
                 const block = message.content[data.index];
-                if (block && block.type === 'tool_use') {
+                if (block && data.index in partial) {
                     const json = partial[data.index] || '';
                     try {
-                        block.input = json.trim() ? JSON.parse(json) : {};
+                        block.input = json.trim() ? JSON.parse(json) : (block.input || {});
                     } catch (e) {
                         throw new Error('Claude\'s answer arrived garbled. Try again.');
                     }
@@ -1620,7 +1796,7 @@ function aiRefused(body) {
  * Opus 5.5 turns that down, so there the prompt asks for it instead, and a
  * reply that comes back as prose is asked for again, once. Returns the
  * tool_use block, or null where there never was one. */
-async function aiFill(headers, payload, tool) {
+async function aiFill(headers, payload, tool, spend) {
     const model = AI_MODELS.find((m) => m.id === payload.model);
     const ask = !!(model && model.askForForm);
     const request = Object.assign({}, payload, { tools: [tool] }, ask
@@ -1636,6 +1812,7 @@ async function aiFill(headers, payload, tool) {
             const said = body && body.error && body.error.message;
             throw new Error(said || ('The API answered ' + res.status + '.'));
         }
+        aiSpent(spend, body && body.usage);
         aiRefused(body);
         const block = ((body && body.content) || []).find(
             (b) => b.type === 'tool_use' && b.name === tool.name);
@@ -1661,8 +1838,10 @@ async function aiDraft(plugin, kind, description, photo) {
         : description;
 
     /* One tool, and it must be called. The answer is the form, not prose. */
+    const model = aiModelId(plugin.settings, spec.model);
+    const spend = aiSpend(model);
     const block = await aiFill(headers, {
-        model: aiModelId(plugin.settings, spec.model),
+        model: model,
         /* A meal reports every number once per ingredient now, so a long
          * one writes several times what a single set of totals did. */
         max_tokens: 8192,
@@ -1670,7 +1849,7 @@ async function aiDraft(plugin, kind, description, photo) {
         output_config: { effort: plugin.settings.aiEffort || 'medium' },
         system: photo ? spec.system + AI_PHOTO : spec.system,
         messages: [{ role: 'user', content: content }],
-    }, tool);
+    }, tool, spend);
     if (!block) throw new Error('Claude answered without filling the form. Try naming the amount plainly.');
 
     /* A meal is the sum of its parts, so a meal without parts is a note full
@@ -1683,7 +1862,87 @@ async function aiDraft(plugin, kind, description, photo) {
                         'Try naming what was in it.');
     }
 
+    /* Rides along with the draft to the card. No note writer reads it. */
+    block.input.spend = spend;
     return block.input;
+}
+
+/* Searching and reading run on Anthropic's side, so nothing here fetches a
+ * menu: Claude does, and the answer arrives with the looking already done.
+ * A few of each is plenty for one restaurant, and caps what a search that
+ * keeps missing can cost. */
+const AI_WEB_TOOLS = [
+    { type: 'web_search_20260209', name: 'web_search', max_uses: 5 },
+    { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 5 },
+];
+
+/* A long search can pause the turn part way; it is picked up again by
+ * sending back what came so far. This many times, and then it is given up. */
+const AI_WEB_RESUMES = 4;
+
+/* Unlike aiFill, the form cannot be demanded up front - a forced tool would
+ * be called before the menu had been looked at - so it is asked for in the
+ * prompt, and asked for again, once, if Claude stops without it. */
+async function aiOrder(plugin, prompt) {
+    const spec = AI_KINDS.restaurant;
+    const tool = spec.tool();
+    const headers = await aiHeaders(plugin);
+    const messages = [{ role: 'user', content: prompt }];
+    const model = aiModelId(plugin.settings, spec.model);
+    const spend = aiSpend(model);
+    const request = {
+        model: model,
+        /* Room for the thinking, the searching and the form together. */
+        max_tokens: 16000,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: plugin.settings.aiEffort || 'medium' },
+        system: spec.system,
+        tools: AI_WEB_TOOLS.concat([tool]),
+        tool_choice: { type: 'auto' },
+        messages: messages,
+    };
+
+    let nudged = false;
+    for (let turn = 0; turn <= AI_WEB_RESUMES; turn++) {
+        const res = await aiCall(headers, request);
+        const body = res.body;
+        if (res.status !== 200) {
+            const said = body && body.error && body.error.message;
+            throw new Error(said || ('The API answered ' + res.status + '.'));
+        }
+        aiSpent(spend, body && body.usage);
+        aiRefused(body);
+
+        const content = (body && body.content) || [];
+        const block = content.find((b) => b && b.type === 'tool_use' && b.name === tool.name);
+        if (block) {
+            const parts = block.input && block.input.ingredients;
+            if (!(Array.isArray(parts) && parts.some((p) => p && typeof p === 'object'))) {
+                throw new Error('Claude answered without saying what to order. Try again.');
+            }
+            block.input.spend = spend;
+            return block.input;
+        }
+        if (body.stop_reason === 'max_tokens') {
+            throw new Error('Claude ran out of room before choosing. Try again.');
+        }
+
+        /* The API will not take back an empty text block, and a stream can
+         * leave one behind. Everything else goes back exactly as it came. */
+        messages.push({
+            role: 'assistant',
+            content: content.filter((b) => b && !(b.type === 'text' && !b.text)),
+        });
+        if (body.stop_reason === 'pause_turn') continue;
+        if (nudged) break;
+        nudged = true;
+        messages.push({
+            role: 'user',
+            content: 'Answer now by calling the order_meal tool, with the best ' +
+                     'order you can make from what you found.',
+        });
+    }
+    throw new Error('Claude looked at the menu but never chose an order. Try again.');
 }
 
 /* A cheap request that exercises the credential path and nothing else, so
@@ -1793,18 +2052,31 @@ function aiMealNote(draft, iso, settings) {
     /* The numbers below describe one portion whatever this says, so it is a
      * note about the method and nothing the totals ever read. */
     if (many > 1) head.push(['serves', many]);
+    const where = String(draft.restaurant || '').trim();
+    if (where) head.push(['restaurant', yamlStr(where)]);
 
     const lines = aiFrontMatter(draft, iso, head, [kindTag(settings, 'meal')]);
 
     lines.push('');
     lines.push('# ' + draft.name);
 
+    const listOf = (v) => (Array.isArray(v) ? v.filter(Boolean).map((s) => String(s).trim()) : []);
+    const bullets = (title, items) => {
+        if (!items.length) return;
+        lines.push('', '## ' + title, '');
+        for (const item of items) lines.push('- ' + item);
+    };
+
+    /* Eaten out, the parts are what was on the plate, and what to ask for
+     * comes first: it is what the note is kept for next time. */
+    if (where) bullets('Order', listOf(draft.order));
+
     const parts = Array.isArray(draft.ingredients) ? draft.ingredients.filter(Boolean) : [];
-    if (parts.length) {
-        lines.push('');
-        lines.push('## Ingredients');
-        lines.push('');
-        for (const p of parts) lines.push('- ' + String(p).trim());
+    bullets(where ? 'What was eaten' : 'Ingredients', listOf(parts));
+
+    if (where) {
+        bullets('Also would do', listOf(draft.alternatives));
+        bullets('Sources', listOf(draft.sources));
     }
 
     /* Only a meal that has not been cooked yet has a method. A note written
@@ -2156,6 +2428,129 @@ class NoshSuggestModal extends Modal {
     }
 }
 
+/* What was typed or pasted into Eating out, as a name and a link. A place
+ * shared out of a maps app is usually both - "Joe's Pizza" and a link under
+ * it. A full Google Maps link carries the place in its path
+ * (/maps/place/Joe's+Pizza/@...) and an Apple one in its query (q=, name=);
+ * a short link carries nothing but itself, and is left for Claude to follow. */
+function placeFromText(text) {
+    const said = String(text || '').trim();
+    const found = said.match(/https?:\/\/\S+/i);
+    if (!found) return { name: said, url: '' };
+
+    const url = found[0];
+    let name = '';
+    try {
+        const u = new URL(url);
+        const place = u.pathname.match(/\/maps\/place\/([^/]+)/);
+        if (place) name = decodeURIComponent(place[1].replace(/\+/g, ' '));
+        if (!name) {
+            name = u.searchParams.get('q') || u.searchParams.get('query') ||
+                   u.searchParams.get('name') || '';
+        }
+    } catch (e) { /* not a URL after all; the words around it still are */ }
+
+    /* A pair of coordinates is where the pin is, not what it is called. */
+    if (/^\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*$/.test(name)) name = '';
+    const around = said.replace(url, ' ').replace(/\s+/g, ' ').trim();
+    return { name: (name || around).trim(), url: url };
+}
+
+/* Between wanting to eat out and being told what to order. Where the place
+ * is, and anything about tonight - sharing, not very hungry - that the
+ * numbers cannot say. */
+class NoshRestaurantModal extends Modal {
+    constructor(app, view, onDone) {
+        super(app);
+        this.view = view;
+        this.onDone = onDone;
+        this.answer = null;
+        this.ask = {
+            place: '',
+            near: String(view.plugin.settings.restaurantNear || ''),
+            extra: '',
+        };
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        this.unfit = fitModalToKeyboard(this);
+        contentEl.addClass('nosh-draft');
+        this.setTitle('Eating out for ' +
+                      (OCCASION_ASK[this.view.occasion] ||
+                       this.view.occasion.toLowerCase()) + '?');
+
+        const placed = contentEl.createDiv({ cls: 'nosh-draft-row' });
+        placed.createEl('label', { text: 'Where' });
+        const placeEl = placed.createEl('input', { type: 'text' });
+        placeEl.placeholder = 'Name, or a Google or Apple Maps link';
+
+        const neared = contentEl.createDiv({ cls: 'nosh-draft-row' });
+        neared.createEl('label', { text: 'Near' });
+        const nearEl = neared.createEl('input', { type: 'text' });
+        nearEl.placeholder = 'Town, if the name is not enough';
+        nearEl.value = this.ask.near;
+        nearEl.addEventListener('input', () => {
+            this.ask.near = nearEl.value;
+            this.preview();
+        });
+
+        const extraEl = contentEl.createEl('textarea', { cls: 'nosh-draft-extra' });
+        extraEl.placeholder = 'Sharing starters, not very hungry, no alcohol…';
+        extraEl.rows = 2;
+        extraEl.addEventListener('input', () => {
+            this.ask.extra = extraEl.value;
+            this.preview();
+        });
+
+        contentEl.createDiv({
+            cls: 'nosh-draft-note',
+            text: 'Claude looks the menu up on the web, so this takes longer than a ' +
+                  'suggestion and costs a little more.',
+        });
+
+        const box = contentEl.createEl('details', { cls: 'nosh-draft-preview' });
+        box.createEl('summary', { text: 'What Claude will be told' });
+        this.previewEl = box.createEl('pre');
+
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
+        const cancel = actions.createEl('button', { text: 'Cancel' });
+        cancel.addEventListener('click', () => this.close());
+
+        const go = actions.createEl('button', { cls: 'mod-cta', text: 'What should I order?' });
+        const send = () => {
+            if (!this.ask.place.trim()) return;
+            this.answer = this.ask;
+            this.close();
+        };
+        go.addEventListener('click', send);
+
+        /* Nothing to look up until there is a place to look up. */
+        const ready = () => { go.disabled = !this.ask.place.trim(); };
+        placeEl.addEventListener('input', () => {
+            this.ask.place = placeEl.value;
+            ready();
+            this.preview();
+        });
+        placeEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+        ready();
+        this.preview();
+
+        window.setTimeout(() => placeEl.focus(), 50);
+    }
+
+    preview() {
+        if (this.previewEl) this.previewEl.setText(this.view.restaurantPrompt(this.ask));
+    }
+
+    /* Dismissing leaves the answer null: nothing is looked up. */
+    onClose() {
+        if (this.unfit) { this.unfit(); this.unfit = null; }
+        this.contentEl.empty();
+        this.onDone(this.answer);
+    }
+}
+
 /* Drafting something the vault already holds used to file a second note
  * beside the first - the "Quinoa 2" and "Arugula 2" of a log that had quietly
  * started counting one food as two. Ask instead. */
@@ -2376,6 +2771,38 @@ class NoshDraftModal extends Modal {
             this.chatSteps = steps;
         }
 
+        /* An order is judged at the table, so what to say to the server is
+         * on screen in the words to say it in, with the fallbacks under it. */
+        const listOf = (v) => (Array.isArray(v) ? v.filter(Boolean).map(String) : []);
+        const order = listOf(this.draft.order);
+        if (this.draft.restaurant) {
+            contentEl.createDiv({ cls: 'nosh-draft-where', text: String(this.draft.restaurant) });
+        }
+        if (order.length) {
+            contentEl.createDiv({ cls: 'nosh-draft-head', text: 'Order' });
+            const said = contentEl.createEl('ul', { cls: 'nosh-draft-method' });
+            for (const line of order) said.createEl('li', { text: line });
+        }
+        const also = listOf(this.draft.alternatives);
+        if (also.length) {
+            contentEl.createDiv({ cls: 'nosh-draft-head', text: 'Also would do' });
+            const alt = contentEl.createEl('ul', { cls: 'nosh-draft-method' });
+            for (const line of also) alt.createEl('li', { text: line });
+        }
+        const sources = listOf(this.draft.sources).filter((u) => /^https?:\/\//i.test(u));
+        if (sources.length) {
+            const from = contentEl.createDiv({ cls: 'nosh-draft-sources' });
+            from.createSpan({ text: 'Menu from ' });
+            sources.forEach((u, i) => {
+                if (i) from.createSpan({ text: ', ' });
+                let host = u;
+                try { host = new URL(u).hostname.replace(/^www\./, ''); } catch (e) { /* as is */ }
+                const a = from.createEl('a', { text: host, href: u });
+                a.setAttr('target', '_blank');
+                a.setAttr('rel', 'noopener');
+            });
+        }
+
         /* Read, not typed. Every figure here is what the portions above come
          * to, and a number you could overwrite would only be a number that had
          * stopped describing the food. */
@@ -2392,6 +2819,10 @@ class NoshDraftModal extends Modal {
 
         if (this.draft.note) {
             contentEl.createDiv({ cls: 'nosh-draft-note', text: this.draft.note });
+        }
+
+        if (this.draft.spend) {
+            contentEl.createDiv({ cls: 'nosh-cost', text: costText(this.draft.spend) });
         }
 
         const logged = contentEl.createDiv({ cls: 'nosh-draft-log' });
@@ -3431,15 +3862,18 @@ async function aiReading(plugin, markdown, mode) {
     const tool = kind.tool();
     const headers = await aiHeaders(plugin);
 
+    const model = aiModelId(plugin.settings);
+    const spend = aiSpend(model);
     const block = await aiFill(headers, {
-        model: aiModelId(plugin.settings),
+        model: model,
         max_tokens: 4096,
         thinking: { type: 'adaptive' },
         output_config: { effort: plugin.settings.aiEffort || 'medium' },
         system: kind.system,
         messages: [{ role: 'user', content: markdown }],
-    }, tool);
+    }, tool, spend);
     if (!block) throw new Error('Claude answered without filling the form.');
+    block.input.spend = spend;
     return block.input;
 }
 
@@ -3698,11 +4132,13 @@ function probePrompt(recipe, settings) {
 async function aiAsk(plugin, system, messages) {
     const headers = await aiHeaders(plugin);
 
+    /* The harder of the two models, for the same reason a suggestion gets
+     * it: this is asked once over a cup of tea, not once a mouthful, and
+     * the answer is worth thinking about. */
+    const model = aiModelId(plugin.settings, 'aiSuggestModel');
+    const spend = aiSpend(model);
     const res = await aiCall(headers, {
-        /* The harder of the two models, for the same reason a suggestion
-         * gets it: this is asked once over a cup of tea, not once a
-         * mouthful, and the answer is worth thinking about. */
-        model: aiModelId(plugin.settings, 'aiSuggestModel'),
+        model: model,
         max_tokens: 2048,
         thinking: { type: 'adaptive' },
         output_config: { effort: plugin.settings.aiEffort || 'medium' },
@@ -3716,6 +4152,7 @@ async function aiAsk(plugin, system, messages) {
         const said = body && body.error && body.error.message;
         throw new Error(said || ('The API answered ' + res.status + '.'));
     }
+    aiSpent(spend, body && body.usage);
     aiRefused(body);
 
     const text = ((body && body.content) || [])
@@ -3724,7 +4161,7 @@ async function aiAsk(plugin, system, messages) {
         .join('\n')
         .trim();
     if (!text) throw new Error('Claude answered with nothing to read.');
-    return text;
+    return { text: text, spend: spend };
 }
 
 /* Obsidian has rendered markdown for years, under two names. Take whichever
@@ -3879,10 +4316,14 @@ class NoshProbeModal extends Modal {
         });
 
         try {
-            const said = await aiAsk(this.plugin, AI_PROBE_SYSTEM, this.messages);
+            const answer = await aiAsk(this.plugin, AI_PROBE_SYSTEM, this.messages);
+            const said = answer.text;
             this.messages.push({ role: 'assistant', content: said });
             this.turns.push({ question, answer: said });
             await renderMarkdownInto(this.app, said, answerEl, this.file.path, this.owner);
+            /* Each answer resends the conversation so far, so a long one
+             * costs more per question; the line under each says so. */
+            answerEl.parentElement.createDiv({ cls: 'nosh-cost', text: costText(answer.spend) });
             this.logEl.scrollTop = this.logEl.scrollHeight;
             this.saveEl.disabled = false;
         } catch (e) {
@@ -5413,33 +5854,61 @@ class NoshView extends ItemView {
         return { short: short, room: room, groups: groups, reference: reference };
     }
 
+    /* What else the day has in it, said before any number, because it is
+     * what the numbers mean: a shortfall with dinner still to come is a
+     * different ask from the same shortfall at dinner. The share is rounded
+     * to a round figure, since it is a steer and not a target. */
+    planLine() {
+        const plan = this.mealPlan();
+        const what = this.occasion.toLowerCase();
+        if (!plan.toCome.length) {
+            return 'Nothing is planned after this. Close what one ' + what +
+                   ' sensibly can, and stay inside what is left.';
+        }
+        const names = plan.toCome.map((m) => m.toLowerCase());
+        const last = names.pop();
+        const list = names.length ? names.join(', ') + ' and ' + last : last;
+        const many = plan.toCome.length > 1;
+        return list.charAt(0).toUpperCase() + list.slice(1) +
+               (many ? ' are' : ' is') + ' still to come. Take about ' +
+               Math.round(plan.share * 20) * 5 +
+               '% of what is outstanding and leave the rest of the room for ' +
+               (many ? 'them' : 'it') + '.';
+    }
+
+    /* The taste note and the numbers, in the order both prompts want them.
+     * The taste goes ahead of the numbers, because it frames what is being
+     * asked for rather than constraining it. The shortfalls say what the
+     * meal has to do; this says what it should be like. */
+    briefLines(lines) {
+        const brief = this.remainingBrief();
+        const taste = String(this.plugin.settings.suggestNote || '').trim();
+        if (taste) {
+            lines.push('');
+            lines.push('What I like:');
+            lines.push(taste);
+        }
+
+        const section = (title, rows) => {
+            if (!rows.length) return;
+            lines.push('');
+            lines.push(title);
+            lines.push.apply(lines, rows);
+        };
+
+        section('Still short of target:', brief.short);
+        section('Food groups not yet met:', brief.groups);
+        section('Room left before the limits:', brief.room);
+        section('For reference only, not a target either way:', brief.reference);
+    }
+
     suggestionPrompt(asked) {
         const ask = asked || {};
-        const brief = this.remainingBrief();
-        const plan = this.mealPlan();
         const what = this.occasion.toLowerCase();
         const lines = [
             'Suggest one ' + what + ' for ' + humanDay(this.cursor) + '.',
+            this.planLine(),
         ];
-
-        /* What else the day has in it, said before any number, because it
-         * is what the numbers mean: a shortfall with dinner still to come is
-         * a different ask from the same shortfall at dinner. The share is
-         * rounded to a round figure, since it is a steer and not a target. */
-        if (plan.toCome.length) {
-            const names = plan.toCome.map((m) => m.toLowerCase());
-            const last = names.pop();
-            const list = names.length ? names.join(', ') + ' and ' + last : last;
-            const many = plan.toCome.length > 1;
-            lines.push(list.charAt(0).toUpperCase() + list.slice(1) +
-                       (many ? ' are' : ' is') + ' still to come. Take about ' +
-                       Math.round(plan.share * 20) * 5 +
-                       '% of what is outstanding and leave the rest of the room for ' +
-                       (many ? 'them' : 'it') + '.');
-        } else {
-            lines.push('Nothing is planned after this. Close what one ' + what +
-                       ' sensibly can, and stay inside what is left.');
-        }
 
         const serves = Math.max(1, parseNum(ask.serves) || 1);
         if (serves > 1) {
@@ -5460,27 +5929,36 @@ class NoshView extends ItemView {
             lines.push('Use these if they fit: ' + use + '.');
         }
 
-        /* Ahead of the numbers, because it frames what is being asked for
-         * rather than constraining it. The shortfalls say what the meal has
-         * to do; this says what it should be like. */
-        const taste = String(this.plugin.settings.suggestNote || '').trim();
-        if (taste) {
+        this.briefLines(lines);
+
+        const extra = String(ask.extra || '').trim();
+        if (extra) {
             lines.push('');
-            lines.push('What I like:');
-            lines.push(taste);
+            lines.push(extra);
         }
 
-        const section = (title, rows) => {
-            if (!rows.length) return;
-            lines.push('');
-            lines.push(title);
-            lines.push.apply(lines, rows);
-        };
+        return lines.join('\n');
+    }
 
-        section('Still short of target:', brief.short);
-        section('Food groups not yet met:', brief.groups);
-        section('Room left before the limits:', brief.room);
-        section('For reference only, not a target either way:', brief.reference);
+    /* The same day, put as a different question: not what to cook but what
+     * to choose off somebody else's menu. The link goes in whole even where a
+     * name could be read off it, because the link is what Claude may fetch. */
+    restaurantPrompt(asked) {
+        const ask = asked || {};
+        const place = placeFromText(ask.place);
+        const lines = [
+            'Choose what I should order for ' + this.occasion.toLowerCase() +
+            ' on ' + humanDay(this.cursor) + ', at this restaurant:',
+        ];
+        if (place.name) lines.push('Restaurant: ' + place.name);
+        if (place.url) lines.push('Maps link: ' + place.url);
+        const near = String(ask.near || '').trim();
+        if (near) lines.push('Near: ' + near);
+
+        lines.push('');
+        lines.push(this.planLine());
+
+        this.briefLines(lines);
 
         const extra = String(ask.extra || '').trim();
         if (extra) {
@@ -5494,6 +5972,12 @@ class NoshView extends ItemView {
     askSuggestion() {
         return new Promise((resolve) => {
             new NoshSuggestModal(this.app, this, resolve).open();
+        });
+    }
+
+    askRestaurant() {
+        return new Promise((resolve) => {
+            new NoshRestaurantModal(this.app, this, resolve).open();
         });
     }
 
@@ -5550,6 +6034,38 @@ class NoshView extends ItemView {
             } finally {
                 go.disabled = false;
                 go.setText(said);
+            }
+        });
+
+        this.renderEatingOut(el);
+    }
+
+    /* The same question for a night when somebody else is cooking. Asked of
+     * the same gaps, so it lives and hides with the button above it. */
+    renderEatingOut(el) {
+        const out = el.createEl('button', { cls: 'nosh-suggest-btn' });
+        out.setText('🍴  Eating out?');
+        out.setAttr('aria-label',
+            'Ask Claude what to order at a restaurant, from its menu and what is left of the day');
+
+        out.addEventListener('click', async () => {
+            const asked = await this.askRestaurant();
+            if (!asked) return;
+
+            this.plugin.settings.restaurantNear = String(asked.near || '').trim();
+            await this.plugin.saveSettings();
+
+            const said = out.textContent;
+            out.disabled = true;
+            out.setText('Reading the menu…');
+            try {
+                const draft = await aiOrder(this.plugin, this.restaurantPrompt(asked));
+                new NoshDraftModal(this.app, this, 'restaurant', draft).open();
+            } catch (e) {
+                new Notice('Nosh AI: ' + (e && e.message ? e.message : e), 8000);
+            } finally {
+                out.disabled = false;
+                out.setText(said);
             }
         });
     }
@@ -7089,6 +7605,9 @@ class NoshView extends ItemView {
             try {
                 const reading = await aiReading(this.plugin, body, r.mode);
                 body += readingMarkdown(reading, aiModelId(settings), r.mode);
+                /* The report is a note, and may be shared; the cost is the
+                 * reader's business rather than the note's. */
+                new Notice('Reading: ' + costText(reading.spend), 8000);
             } catch (e) {
                 new Notice('Report written without a reading: ' +
                            (e && e.message ? e.message : e), 8000);
@@ -7349,7 +7868,7 @@ class NoshSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Model for suggestions')
-            .setDesc('Used by What\u2019s for\u2026 and by Ask about this recipe. Inventing '
+            .setDesc('Used by What\u2019s for\u2026, Eating out and Ask about this recipe. Inventing '
                      + 'a meal worth cooking, or arguing about one already written down, is '
                      + 'a different job from costing one that has already been eaten, and it '
                      + 'is the one where Opus earns its price. Both run once a day rather '

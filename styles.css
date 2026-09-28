@@ -779,6 +779,11 @@
     cursor: default;
 }
 
+/* Eating out sits under What's for..., the same offer asked another way. */
+.nosh-tracker .nosh-suggest-btn + .nosh-suggest-btn {
+    margin-top: 6px;
+}
+
 /* The last time ------------------------------------------------------
  *
  * Offered at the top of an empty occasion's list, in the suggestion's
@@ -1592,6 +1597,31 @@
     text-decoration: underline;
 }
 
+/* An order: where, what to say, and what else would do. */
+.nosh-draft .nosh-draft-where {
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.nosh-draft .nosh-draft-head {
+    margin-bottom: 4px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+}
+
+.nosh-draft .nosh-draft-sources {
+    margin-bottom: 10px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.nosh-draft .nosh-draft-sources a {
+    color: var(--text-accent);
+    text-decoration: none;
+}
+
 .nosh-draft .nosh-draft-parts {
     margin: 0 0 10px;
     padding-left: 1.2em;
@@ -1720,4 +1750,14 @@
 .nosh-probe .nosh-probe-chip:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
+}
+
+/* What a call to Claude cost, under what it answered. An estimate from list
+ * prices, so it is small and quiet: worth knowing, not worth reading. */
+.nosh-draft .nosh-cost,
+.nosh-probe-turn .nosh-cost {
+    padding-top: 6px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
 }
