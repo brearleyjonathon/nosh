@@ -428,6 +428,9 @@ exchange to the bottom of the note if it was worth keeping.
 
 Two models can be set separately. Estimating a meal runs once a mouthful and
 wants something cheap; inventing one runs once a day and is the harder job.
+Each can be Sonnet 5, Opus 5 or Opus 5.5. Sonnet 5 is the default for the
+numbers and Opus 5 for suggestions. Opus 5.5 is the newest Opus and costs
+less than Opus 5, at about twice Sonnet's price.
 
 ### Credentials
 
