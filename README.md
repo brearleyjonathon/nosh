@@ -44,8 +44,8 @@ files outside the vault, and runs no other programs.
 
 Nosh lives in the sidebar on desktop and mobile.
 
-<img width="2436" height="2420" alt="nosh-dark" src="https://github.com/user-attachments/assets/a1e3d437-0cbf-4575-a326-255b705065a6" />
-<img width="2436" height="2420" alt="nosh-light" src="https://github.com/user-attachments/assets/08acc345-8f96-4c5d-8aa9-c11da9945145" />
+![Nosh in the sidebar, dark theme](https://github.com/user-attachments/assets/a1e3d437-0cbf-4575-a326-255b705065a6)
+![Nosh in the sidebar, light theme](https://github.com/user-attachments/assets/08acc345-8f96-4c5d-8aa9-c11da9945145)
 
 ## Tagging notes
 
