@@ -251,10 +251,16 @@ Off until you add an API key. It adds:
   using up.
 - Eating out? Give it a restaurant's name or a Google or Apple Maps link.
   Claude looks up the menu, using the chain's published nutrition where there
-  is any, and says what to order for what's left of your day. You get the
-  order with any changes to ask for, two or three alternatives, and links to
-  the menu it used. Web searches are billed on top of the tokens, a few cents
-  a time.
+  is any, and offers three orders that fit what's left of your day, the best
+  fit first. Each comes with any changes to ask for and its figures, plus links
+  to the menu it used. Nothing is logged yet: the orders are kept in a note
+  under `Eating out`, so you can decide at the table. Web searches are billed
+  on top of the tokens, a few cents a time.
+- Ate out. After the meal, pick the order you had from the ones Eating out
+  offered, adjust any portion (half of it boxed, say), and it's logged to the
+  meal you asked about. The meal note lists the other options too. Had
+  something else, or never asked? Say where you ate and what you had, and
+  Claude estimates it at restaurant portions.
 - Ask about this recipe. Question any recipe note (where the sodium comes from,
   how to stretch it, what to serve with it) from the command palette or the
   right-click menu. Save to note appends the conversation.
@@ -262,10 +268,18 @@ Off until you add an API key. It adds:
   watch for a day or week, progress and ranked improvements for a month. Only
   the report's tables are sent.
 
-Estimating and inventing meals can use separate models, so the frequent job can
-use a cheaper one. Each can be Sonnet 5, Opus 5 or Opus 5.5. Sonnet 5 is the
-default for estimating and Opus 5 for suggestions. Opus 5.5 costs less than
-Opus 5, at about twice Sonnet's price.
+Estimating, inventing meals and Eating out each have their own model setting,
+so the frequent job can use a cheaper model and the one you wait on a faster
+one. Each can be Sonnet 5, Sonnet 5.5, Opus 5 or Opus 5.5. Sonnet 5 is the
+default for estimating and for Eating out, and Opus 5 for suggestions. Sonnet
+5.5 costs the same as Sonnet 5. Opus 5.5 costs less than Opus 5, at about twice
+Sonnet's price.
+
+On a phone, switching to another app while Claude is answering cuts the call
+off, because plugins can't run in the background. When you come back to
+Obsidian, Nosh asks again by itself. Whatever you typed into What's for…,
+Eating out, Ate out or the drafting box is kept until it gets an answer, even
+if Obsidian was closed.
 
 Each answer shows roughly what it cost, with the model and token counts, under
 the draft card or the recipe answer. For a reading, it shows as a notice, so it

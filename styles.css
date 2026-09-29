@@ -779,9 +779,44 @@
     cursor: default;
 }
 
-/* Eating out sits under What's for..., the same offer asked another way. */
+/* Eating out sits under What's for..., the same offer asked another way,
+ * and Ate out under that. */
 .nosh-tracker .nosh-suggest-btn + .nosh-suggest-btn {
     margin-top: 6px;
+}
+
+/* Ate out for a restaurant with orders kept, and the cross that clears
+ * them. The name is cut short rather than wrapped, so the row keeps the
+ * height of the buttons above it. */
+.nosh-tracker .nosh-ate-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.nosh-tracker .nosh-ate-row .nosh-suggest-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nosh-tracker .nosh-ate-clear {
+    flex: 0 0 auto;
+    padding: 0 8px;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px dashed var(--background-modifier-border);
+    box-shadow: none;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+}
+
+.nosh-tracker .nosh-ate-clear:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+    border-style: solid;
 }
 
 /* The last time ------------------------------------------------------
@@ -1275,8 +1310,11 @@
 
 /* Sits under the source switcher, quieter than the tabs above it, so the
  * list stays the thing you look at. */
+/* The box is two lines tall, and the buttons beside it stand as tall as it
+ * does - the camera staying square, so it grows into a larger target too. */
 .nosh-tracker .nosh-ai {
     display: flex;
+    align-items: stretch;
     gap: 4px;
     padding: 0 0 8px;
 }
@@ -1284,11 +1322,17 @@
 .nosh-tracker .nosh-ai-input {
     flex: 1 1 auto;
     min-width: 0;
+    min-height: 0;
     font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+    resize: vertical;
 }
 
 .nosh-tracker .nosh-ai-go {
     flex: 0 0 auto;
+    /* Obsidian gives a button the height of one line of input; here it
+     * takes the row's. */
+    height: auto;
     padding: 2px 10px;
     color: var(--text-accent);
     font-size: var(--font-ui-smaller);
@@ -1305,11 +1349,14 @@
     background: var(--background-modifier-hover);
 }
 
+/* Near enough square beside a two-line box. A width, not an aspect ratio:
+ * a button stretched to the row's height does not work its width out from
+ * it, and came out a sliver. */
 .nosh-tracker .nosh-ai-shot {
     display: flex;
     align-items: center;
     justify-content: center;
-    aspect-ratio: 1;
+    width: 44px;
     padding: 0;
 }
 
@@ -1620,6 +1667,53 @@
 .nosh-draft .nosh-draft-sources a {
     color: var(--text-accent);
     text-decoration: none;
+}
+
+/* Eating out's orders, a card each, the best fit first. The figures are the
+ * few an order is chosen on at the table; the rest wait for the card that
+ * logs it. */
+.nosh-draft .nosh-outing-option {
+    margin-bottom: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+}
+
+.nosh-draft .nosh-outing-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-bottom: 4px;
+}
+
+.nosh-draft .nosh-outing-name {
+    font-weight: var(--font-semibold);
+}
+
+.nosh-draft .nosh-outing-best {
+    color: var(--text-accent);
+    font-size: var(--font-ui-smaller);
+}
+
+.nosh-draft .nosh-outing-pitch {
+    margin-bottom: 6px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.nosh-draft .nosh-outing-option .nosh-draft-method {
+    margin-bottom: 6px;
+}
+
+.nosh-draft .nosh-outing-figures {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.nosh-draft .nosh-outing-had {
+    display: block;
+    margin: 8px 0 0 auto;
 }
 
 .nosh-draft .nosh-draft-parts {

@@ -36,8 +36,11 @@ function parseScalar(v) {
     if (t === 'true') return true;
     if (t === 'false') return false;
     if (/^-?\d+(\.\d+)?$/.test(t)) return Number(t);
-    const m = t.match(/^"([\s\S]*)"$/);
-    return m ? m[1].replace(/""/g, '"') : t;
+    /* Double-quoted, as Nosh writes it: JSON's escapes, which YAML shares. */
+    if (/^"[\s\S]*"$/.test(t)) {
+        try { return JSON.parse(t); } catch (e) { throw new Error('bad quoted string: ' + t); }
+    }
+    return t;
 }
 
 function parseYaml(text) {
