@@ -2,7 +2,7 @@
 
 const { Plugin, ItemView, PluginSettingTab, Setting, Modal, Menu, Notice,
         setIcon, getAllTags, MarkdownRenderer, Component,
-        normalizePath, SecretComponent } = require('obsidian');
+        normalizePath, SecretComponent, SettingGroup } = require('obsidian');
 
 const VIEW_TYPE_DASH = 'nosh-view';
 
@@ -3789,6 +3789,28 @@ function parseTargetsNote(cache) {
 function barWeight(settings, key) {
     const w = Number(((settings && settings.weights) || {})[key]);
     return isFinite(w) && w > 0 ? w : 1;
+}
+
+/* A section of the settings pane: a heading, a line under it saying what
+ * the section is for, and the settings that go together sharing one card,
+ * the way Obsidian's own panes are laid out. Returns what the settings are
+ * to be built into. Obsidian before 1.11 has no groups and no cards, so
+ * there the heading is an ordinary heading row and the settings follow it
+ * in the pane as they always did. */
+function settingGroup(containerEl, name, desc) {
+    if (!SettingGroup) {
+        const head = new Setting(containerEl).setName(name).setHeading();
+        if (desc) head.setDesc(desc);
+        return containerEl;
+    }
+    /* A group's heading has no line of its own for a description, but it
+     * takes a fragment, and Obsidian already styles a description sitting
+     * inside a heading. */
+    const group = new SettingGroup(containerEl).setHeading(createFragment((f) => {
+        f.appendText(name);
+        if (desc) f.createDiv({ cls: 'setting-item-description nosh-heading-desc', text: desc });
+    }));
+    return group.listEl;
 }
 
 /* The target rows are a table: a dropdown and a few number boxes a row,
@@ -8534,7 +8556,15 @@ class NoshSettingTab extends PluginSettingTab {
         containerEl.empty();
         containerEl.addClass('nosh-settings');
 
-        new Setting(containerEl)
+        const tag = this.plugin.settings.tag || 'nutrition';
+        const notes = settingGroup(containerEl, 'Notes',
+            'A note is a meal or an ingredient by its tags — #' + tag +
+            '/meal or #' + tag + '/ingredient. Meals fold into a section per ' +
+            'occasion, read from a meal_type field. Ingredients fold by food ' +
+            'group, worked out from their DASH servings or named outright in a ' +
+            'group field.');
+
+        new Setting(notes)
             .setName('Meal tag')
             .setDesc('Notes carrying this tag are offered in the picker. Leave empty to match any note with a calories field.')
             .addText((t) => t
@@ -8546,7 +8576,7 @@ class NoshSettingTab extends PluginSettingTab {
                     this.plugin.refreshViews();
                 }));
 
-        new Setting(containerEl)
+        new Setting(notes)
             .setName('Nosh folder')
             .setDesc('Where Nosh files what it creates. It makes Meals, Ingredients ' +
                      'Reports and Log underneath. A vault-relative path; empty puts them ' +
@@ -8560,7 +8590,20 @@ class NoshSettingTab extends PluginSettingTab {
                     this.plugin.refreshViews();
                 }));
 
-        new Setting(containerEl)
+        new Setting(notes)
+            .setName('Only look in the Nosh folder')
+            .setDesc('Off, Nosh reads tagged notes wherever they live, so a vault that ' +
+                     'already keeps its recipes somewhere needs no rearranging. On, it ' +
+                     'ignores everything outside the folder above.')
+            .addToggle((t) => t
+                .setValue(!!this.plugin.settings.restrictToFolder)
+                .onChange(async (v) => {
+                    this.plugin.settings.restrictToFolder = v;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshViews();
+                }));
+
+        new Setting(notes)
             .setName('Sample notes')
             .setDesc('An ingredient in every food group and three meals built ' +
                      'from them, written into the folder above as ordinary ' +
@@ -8574,7 +8617,9 @@ class NoshSettingTab extends PluginSettingTab {
                     b.setDisabled(false);
                 }));
 
-        new Setting(containerEl)
+        const log = settingGroup(containerEl, 'Log');
+
+        new Setting(log)
             .setName('Keep a log note per day')
             .setDesc('Each day with anything logged is also written as a note in ' +
                      'Log - "Nosh log 2026-09-17" - with the log in its ' +
@@ -8591,7 +8636,7 @@ class NoshSettingTab extends PluginSettingTab {
                     this.plugin.refreshViews();
                 }));
 
-        new Setting(containerEl)
+        new Setting(log)
             .setName('Keep the targets in a note')
             .setDesc('Every target, range, shape and weight below is also written ' +
                      'to "' + TARGETS_NOTE_NAME + '" in the Nosh folder, and read ' +
@@ -8613,29 +8658,7 @@ class NoshSettingTab extends PluginSettingTab {
                     }
                 }));
 
-        new Setting(containerEl)
-            .setName('Only look in the Nosh folder')
-            .setDesc('Off, Nosh reads tagged notes wherever they live, so a vault that ' +
-                     'already keeps its recipes somewhere needs no rearranging. On, it ' +
-                     'ignores everything outside the folder above.')
-            .addToggle((t) => t
-                .setValue(!!this.plugin.settings.restrictToFolder)
-                .onChange(async (v) => {
-                    this.plugin.settings.restrictToFolder = v;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshViews();
-                }));
-
-        containerEl.createDiv({
-            cls: 'setting-item-description nosh-note',
-            text: 'A note is a meal or an ingredient by its tags \u2014 #' + (this.plugin.settings.tag || 'nutrition') +
-                  '/meal or #' + (this.plugin.settings.tag || 'nutrition') + '/ingredient. Meals fold into a section per ' +
-                  'occasion, read from a meal_type field. Ingredients fold by food ' +
-                  'group, worked out from their DASH servings or named outright in a ' +
-                  'group field.',
-        });
-
-        new Setting(containerEl)
+        new Setting(log)
             .setName('Week starts on')
             .setDesc('Which day the Week tab groups from.')
             .addDropdown((d) => d
@@ -8648,13 +8671,13 @@ class NoshSettingTab extends PluginSettingTab {
                     this.plugin.refreshViews();
                 }));
 
-        new Setting(containerEl).setName('AI').setHeading()
-            .setDesc('What you type, the note you are asking about, and any '
-                     + 'photograph you take go to the Anthropic API. Nothing is '
-                     + 'sent until you ask for something.');
+        const ai = settingGroup(containerEl, 'AI',
+            'What you type, the note you are asking about, and any '
+            + 'photograph you take go to the Anthropic API. Nothing is '
+            + 'sent until you ask for something.');
 
         if (keychain(this.app)) {
-            new Setting(containerEl)
+            new Setting(ai)
                 .setName('API key')
                 .setDesc('An Anthropic API key, kept in Obsidian’s keychain on this '
                          + 'device rather than in the vault, so it does not sync: add it '
@@ -8665,7 +8688,7 @@ class NoshSettingTab extends PluginSettingTab {
                     .setValue(keyName(this.plugin) || localKeyName(this.app))
                     .onChange((v) => setLocalKeyName(this.app, v)));
         } else {
-            new Setting(containerEl)
+            new Setting(ai)
                 .setName('API key')
                 .setDesc('Kept in plain text in this plugin’s data.json, inside your '
                          + 'vault. Anything that reads the vault can read it — other '
@@ -8683,7 +8706,25 @@ class NoshSettingTab extends PluginSettingTab {
                 });
         }
 
-        new Setting(containerEl)
+        new Setting(ai)
+            .setName('Test credentials')
+            .setDesc('One short request, to find out whether the key works.')
+            .addButton((b) => b
+                .setButtonText('Test')
+                .onClick(async () => {
+                    b.setDisabled(true).setButtonText('…');
+                    try {
+                        await aiPing(this.plugin);
+                        new Notice('Nosh AI: credentials work.');
+                    } catch (e) {
+                        new Notice('Nosh AI: ' + (e && e.message ? e.message : e), 8000);
+                    }
+                    b.setDisabled(false).setButtonText('Test');
+                }));
+
+        const models = settingGroup(containerEl, 'Models');
+
+        new Setting(models)
             .setName('Model for the numbers')
             .setDesc('Used when a description is turned into nutrition \u2014 ingredients, '
                      + 'meals, and the reading on a report. Sonnet is quick and cheap '
@@ -8699,7 +8740,7 @@ class NoshSettingTab extends PluginSettingTab {
                     });
             });
 
-        new Setting(containerEl)
+        new Setting(models)
             .setName('Model for suggestions')
             .setDesc('Used by What\u2019s for\u2026 and Ask about this recipe. Inventing '
                      + 'a meal worth cooking, or arguing about one already written down, is '
@@ -8715,7 +8756,7 @@ class NoshSettingTab extends PluginSettingTab {
                     });
             });
 
-        new Setting(containerEl)
+        new Setting(models)
             .setName('Model for Eating out')
             .setDesc('Most of an Eating out lookup is spent searching for the menu and '
                      + 'reading it, and Sonnet does that as well as Opus in a good deal less '
@@ -8730,7 +8771,7 @@ class NoshSettingTab extends PluginSettingTab {
                     });
             });
 
-        new Setting(containerEl)
+        new Setting(models)
             .setName('Effort')
             .setDesc('How hard the model works at the estimate. Medium suits everyday food; '
                      + 'raise it for composite or unfamiliar dishes.')
@@ -8744,7 +8785,9 @@ class NoshSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        new Setting(containerEl)
+        const asks = settingGroup(containerEl, 'Suggestions and reports');
+
+        new Setting(asks)
             .setName('Read the log in reports')
             .setDesc('Adds a Reading section to an exported report — what the days show, '
                      + 'what to watch; for a month, the progress made and ways to improve — '
@@ -8757,7 +8800,7 @@ class NoshSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        const prefs = new Setting(containerEl)
+        const prefs = new Setting(asks)
             .setName('Suggestion preferences')
             .setDesc('Added to the What\u2019s for\u2026 prompt in your own words: cuisines '
                      + 'you like, what you will not eat, how adventurous to be, what you '
@@ -8775,29 +8818,13 @@ class NoshSettingTab extends PluginSettingTab {
             });
         prefs.settingEl.addClass('nosh-area-row');
 
-        new Setting(containerEl)
-            .setName('Test credentials')
-            .setDesc('One short request, to find out whether the key works.')
-            .addButton((b) => b
-                .setButtonText('Test')
-                .onClick(async () => {
-                    b.setDisabled(true).setButtonText('\u2026');
-                    try {
-                        await aiPing(this.plugin);
-                        new Notice('Nosh AI: credentials work.');
-                    } catch (e) {
-                        new Notice('Nosh AI: ' + (e && e.message ? e.message : e), 8000);
-                    }
-                    b.setDisabled(false).setButtonText('Test');
-                }));
+        const diet = settingGroup(containerEl, 'Diet pattern',
+            'Fills in every target below from one calorie figure, scaled ' +
+            'from the DASH 2,000 kcal reference. It lands near the ' +
+            'published pattern for a calorie level rather than on it, and ' +
+            'nothing here stops you editing a row afterwards.');
 
-        new Setting(containerEl).setName('Diet pattern').setHeading()
-            .setDesc('Fills in every target below from one calorie figure, scaled ' +
-                     'from the DASH 2,000 kcal reference. It lands near the ' +
-                     'published pattern for a calorie level rather than on it, and ' +
-                     'nothing here stops you editing a row afterwards.');
-
-        new Setting(containerEl)
+        new Setting(diet)
             .setName('Calories a day')
             .setDesc('Between 1,000 and 4,000. The grams follow it; potassium ' +
                      'and calcium are amounts to reach and do not.')
@@ -8815,7 +8842,7 @@ class NoshSettingTab extends PluginSettingTab {
                     });
             });
 
-        new Setting(containerEl)
+        new Setting(diet)
             .setName('Sodium (mg a day)')
             .setDesc('Asked separately from the calories, and does not scale ' +
                      'with them. DASH puts the standard limit at ' +
@@ -8832,7 +8859,7 @@ class NoshSettingTab extends PluginSettingTab {
                     });
             });
 
-        new Setting(containerEl)
+        new Setting(diet)
             .setName('Fill the targets from this')
             .setDesc('Overwrites every nutrient target and every food-group ' +
                      'range. Which bars are shown, and whether each is a floor, ' +
@@ -8854,20 +8881,40 @@ class NoshSettingTab extends PluginSettingTab {
                                fmt(settings.dietSodium) + ' mg sodium.');
                 }));
 
-        new Setting(containerEl).setName('Daily nutrient targets').setHeading()
-            .setDesc('For each nutrient: its shape, its weight in the score, ' +
-                     'its daily target, and whether the bar shows. The weight ' +
-                     'only matters to the score: 1 is the default, 2 makes a ' +
-                     'bar count double, 0.5 half. The Week tab multiplies each ' +
-                     'target by seven.');
+        new Setting(diet)
+            .setName('Reset targets')
+            .setDesc('Back to the DASH 2,000 kcal reference pattern with the ' +
+                     'standard 2,300 mg sodium limit, and every shape and ' +
+                     'weight below back to what it was shipped with.')
+            .addButton((b) => b
+                .setButtonText('Reset')
+                .onClick(async () => {
+                    this.plugin.settings.targets = Object.assign({}, DEFAULT_TARGETS);
+                    this.plugin.settings.groupTargets = JSON.parse(JSON.stringify(DEFAULT_GROUP_TARGETS));
+                    this.plugin.settings.groupDirs = {};
+                    this.plugin.settings.nutrientDirs = {};
+                    this.plugin.settings.weights = {};
+                    this.plugin.settings.dietCalories = DASH_REFERENCE;
+                    this.plugin.settings.dietSodium = SODIUM_STANDARD;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshViews();
+                    this.redraw();
+                }));
 
-        targetHeader(containerEl, ['Shape', 'Weight', 'Target', 'Show']);
+        const nutrients = settingGroup(containerEl, 'Daily nutrient targets',
+            'For each nutrient: its shape, its weight in the score, ' +
+            'its daily target, and whether the bar shows. The weight ' +
+            'only matters to the score: 1 is the default, 2 makes a ' +
+            'bar count double, 0.5 half. The Week tab multiplies each ' +
+            'target by seven.');
+
+        targetHeader(nutrients, ['Shape', 'Weight', 'Target', 'Show']);
         for (const n of NUTRIENTS) {
             const hidden = (this.plugin.settings.hiddenNutrients || []).includes(n.key);
             const shape = nutrientShape(n, this.plugin.settings);
 
             /* Held so the dropdown can rewrite the line under the name. */
-            const row = new Setting(containerEl)
+            const row = new Setting(nutrients)
                 .setName(n.label + ' (' + n.unit + ')')
                 .addDropdown((d) => d
                     .addOption('floor', 'Floor')
@@ -8907,18 +8954,17 @@ class NoshSettingTab extends PluginSettingTab {
                         this.plugin.refreshViews();
                     }));
             row.settingEl.addClass('nosh-target-row');
-            if (n === NUTRIENTS[NUTRIENTS.length - 1]) row.settingEl.addClass('nosh-target-last');
             describeTarget(row, nutrientShapeNote(shape), n.key);
         }
 
-        new Setting(containerEl).setName('Food group servings').setHeading()
-            .setDesc('For each DASH food group: its shape, its weight in the ' +
-                     'score (1 unless you say otherwise), then its minimum and ' +
-                     'maximum servings. Per-day groups are ' +
-                     'multiplied by seven in the Week tab; per-week groups are ' +
-                     'already weekly.');
+        const servings = settingGroup(containerEl, 'Food group servings',
+            'For each DASH food group: its shape, its weight in the ' +
+            'score (1 unless you say otherwise), then its minimum and ' +
+            'maximum servings. Per-day groups are ' +
+            'multiplied by seven in the Week tab; per-week groups are ' +
+            'already weekly.');
 
-        targetHeader(containerEl, ['Shape', 'Weight', 'Min', 'Max', 'Show'], 'nosh-group-row');
+        targetHeader(servings,['Shape', 'Weight', 'Min', 'Max', 'Show'], 'nosh-group-row');
         for (const g of FOOD_GROUPS) {
             const hidden = (this.plugin.settings.hiddenGroups || []).includes(g.key);
             const t = this.plugin.settings.groupTargets[g.key];
@@ -8930,7 +8976,7 @@ class NoshSettingTab extends PluginSettingTab {
             const shape = groupShape(g, this.plugin.settings);
 
             /* Held so the dropdown can rewrite the line under the name. */
-            const row = new Setting(containerEl)
+            const row = new Setting(servings)
                 .setName(g.label + ' (' + per + ')')
                 .addDropdown((d) => d
                     .addOption('floor', 'Floor')
@@ -8980,28 +9026,7 @@ class NoshSettingTab extends PluginSettingTab {
                     }));
             row.settingEl.addClass('nosh-target-row');
             row.settingEl.addClass('nosh-group-row');
-            if (g === FOOD_GROUPS[FOOD_GROUPS.length - 1]) row.settingEl.addClass('nosh-target-last');
             describeTarget(row, shapeNote(shape), g.key);
         }
-
-        new Setting(containerEl)
-            .setName('Reset targets')
-            .setDesc('Back to the DASH 2,000 kcal reference pattern with the ' +
-                     'standard 2,300 mg sodium limit, and every shape and ' +
-                     'weight above back to what it was shipped with.')
-            .addButton((b) => b
-                .setButtonText('Reset')
-                .onClick(async () => {
-                    this.plugin.settings.targets = Object.assign({}, DEFAULT_TARGETS);
-                    this.plugin.settings.groupTargets = JSON.parse(JSON.stringify(DEFAULT_GROUP_TARGETS));
-                    this.plugin.settings.groupDirs = {};
-                    this.plugin.settings.nutrientDirs = {};
-                    this.plugin.settings.weights = {};
-                    this.plugin.settings.dietCalories = DASH_REFERENCE;
-                    this.plugin.settings.dietSodium = SODIUM_STANDARD;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshViews();
-                    this.redraw();
-                }));
     }
 }
