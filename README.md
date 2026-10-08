@@ -270,10 +270,11 @@ Off until you add an API key. It adds:
 
 Estimating, inventing meals and Eating out each have their own model setting,
 so the frequent job can use a cheaper model and the one you wait on a faster
-one. Each can be Sonnet 5, Sonnet 5.5, Opus 5 or Opus 5.5. Sonnet 5 is the
-default for estimating and for Eating out, and Opus 5 for suggestions. Sonnet
-5.5 costs the same as Sonnet 5. Opus 5.5 costs less than Opus 5, at about twice
-Sonnet's price.
+one. Each can be Sonnet 5, Sonnet 5.5, Opus 5, Opus 5.5 or Haiku 5.5. Sonnet
+5 is the default for estimating and for Eating out, and Opus 5 for
+suggestions. Sonnet 5.5 costs the same as Sonnet 5. Opus 5.5 costs less than
+Opus 5, at about twice Sonnet's price. Haiku 5.5 costs about a twentieth of
+Sonnet's price, and suits plain foods that need little judgement.
 
 On a phone, switching to another app while Claude is answering cuts the call
 off, because plugins can't run in the background. When you come back to

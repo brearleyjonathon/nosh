@@ -829,17 +829,22 @@ const AI_ENDPOINT = 'https://api.anthropic.com/v1/messages';
 
 /* All take the same request shape - adaptive thinking, an effort level - so
  * choosing between them is a settings dropdown and nothing more. The one
- * difference is that the 5.5 models will not be made to call a tool, and are
- * asked to instead; aiFill() takes care of that. The first is the default for
- * the numbers; suggestions start on Opus 5. Keep the list in step with
- * DEFAULT_SETTINGS.aiModel, .aiSuggestModel and .aiOrderModel. `input` and
- * `output` are list prices in dollars per million tokens, for the cost on
- * each card; keep them in step with platform.claude.com. */
+ * difference is that the 5.5 models are asked to call a tool rather than made
+ * to: Sonnet and Opus 5.5 refuse to be made, and Haiku 5.5 allows it but then
+ * answers without thinking first. aiFill() takes care of that. The first is
+ * the default for the numbers, and the fallback for an id no longer offered,
+ * which is why Haiku goes on the end; suggestions start on Opus 5. Keep the
+ * list in step with DEFAULT_SETTINGS.aiModel, .aiSuggestModel and
+ * .aiOrderModel. `input` and `output` are list prices in dollars per million
+ * tokens, for the cost on each card; keep them in step with
+ * platform.claude.com. Haiku 5.5 is five times dearer on a prompt over 100,000
+ * tokens, which no Nosh request comes near, so only the lower rate is here. */
 const AI_MODELS = [
     { id: 'claude-sonnet-5',   label: 'Sonnet 5',   input: 2, output: 10 },
     { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', input: 2, output: 10, askForForm: true },
     { id: 'claude-opus-5',     label: 'Opus 5',     input: 5, output: 25 },
     { id: 'claude-opus-5-5',   label: 'Opus 5.5',   input: 4, output: 20, askForForm: true },
+    { id: 'claude-haiku-5-5',  label: 'Haiku 5.5',  input: 0.1, output: 0.5, askForForm: true },
 ];
 
 /* A stored id that is no longer offered - a hand-edited data.json, or a model
@@ -1949,9 +1954,10 @@ function aiRefused(body) {
 
 /* Most of Nosh's answers are a filled-in form: one tool, and the reply is
  * what it was called with. Most models can be told the tool must be called.
- * The 5.5 models turn that down, so there the prompt asks for it instead, and a
- * reply that comes back as prose is asked for again, once. Returns the
- * tool_use block, or null where there never was one. */
+ * The 5.5 models turn that down, or skip their thinking to comply, so there
+ * the prompt asks for it instead, and a reply that comes back as prose is
+ * asked for again, once. Returns the tool_use block, or null where there
+ * never was one. */
 async function aiFill(headers, payload, tool, spend) {
     const model = AI_MODELS.find((m) => m.id === payload.model);
     const ask = !!(model && model.askForForm);
@@ -8730,7 +8736,8 @@ class NoshSettingTab extends PluginSettingTab {
                      + 'meals, and the reading on a report. Sonnet is quick and cheap '
                      + 'enough to log a meal without thinking about the cost. Opus is the '
                      + 'better guesser on composite or unfamiliar dishes: Opus 5.5 at about '
-                     + 'twice the price, Opus 5 at two and a half times.')
+                     + 'twice the price, Opus 5 at two and a half times. Haiku costs about '
+                     + 'a twentieth of Sonnet, for plain foods that need little judgement.')
             .addDropdown((d) => {
                 for (const m of AI_MODELS) d.addOption(m.id, m.label);
                 d.setValue(aiModelId(this.plugin.settings))
