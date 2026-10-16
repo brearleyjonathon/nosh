@@ -3247,6 +3247,75 @@ class NoshExistsModal extends Modal {
  * the plate says a plate, and neither says whether it was half or two. So the
  * picture is shown back for a moment with room for a sentence, and the words
  * ride along with it. Leaving the box empty is an answer too. */
+/* Where a draft is described. Draft (or Enter) sends it, Cancel throws it
+ * away, and any other way out - a tap outside, Escape - keeps the words
+ * under Drafts in the pane. onDone hears { action, text }: 'send', 'cancel'
+ * or 'keep'. */
+class NoshComposeModal extends Modal {
+    constructor(app, seed, onDone) {
+        super(app);
+        this.seed = seed || '';
+        this.onDone = onDone;
+        this.result = null;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        this.unfit = fitModalToKeyboard(this);
+        contentEl.addClass('nosh-draft');
+        this.setTitle('Draft');
+
+        /* A meal is often more than one line's worth: what was in it, and
+         * how much of it was eaten. Enter drafts; Shift and Enter starts a
+         * new line. */
+        this.input = contentEl.createEl('textarea', { cls: 'nosh-draft-extra nosh-compose-input' });
+        this.input.rows = 4;
+        this.input.placeholder = 'Describe a meal or an ingredient\u2026';
+        this.input.value = this.seed;
+        this.input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+                e.preventDefault();
+                this.send();
+            }
+        });
+
+        contentEl.createDiv({
+            cls: 'nosh-draft-note',
+            text: 'Claude works out whether it is a meal or an ingredient. Say how ' +
+                  'much where you can: "2 eggs", "a large bowl".',
+        });
+
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
+        const cancel = actions.createEl('button', { text: 'Cancel' });
+        cancel.addEventListener('click', () => {
+            this.result = { action: 'cancel', text: '' };
+            this.close();
+        });
+        const go = actions.createEl('button', { cls: 'mod-cta', text: 'Draft' });
+        go.addEventListener('click', () => this.send());
+
+        window.setTimeout(() => {
+            this.input.focus();
+            const end = this.input.value.length;
+            this.input.setSelectionRange(end, end);
+        }, 50);
+    }
+
+    send() {
+        const text = String(this.input.value || '').trim();
+        if (!text) return;
+        this.result = { action: 'send', text: text };
+        this.close();
+    }
+
+    onClose() {
+        if (this.unfit) { this.unfit(); this.unfit = null; }
+        const typed = this.input ? String(this.input.value || '') : this.seed;
+        this.contentEl.empty();
+        this.onDone(this.result || { action: 'keep', text: typed });
+    }
+}
+
 class NoshPhotoModal extends Modal {
     constructor(app, photo, seed, onDone) {
         super(app);
@@ -8988,16 +9057,20 @@ class NoshView extends ItemView {
         });
     }
 
-    /* Describe it, and Claude fills in the numbers - and decides whether it
-     * is a meal or an ingredient, which picks the form and the folder. Nothing
-     * reaches the vault until the draft has been read, so a bad guess costs a
-     * glance. */
+    /* Two buttons: Draft, which opens a card to describe it in, and the
+     * camera. Claude fills in the numbers and decides whether it is a meal or
+     * an ingredient, which picks the form and the folder. Nothing reaches the
+     * vault until the draft has been read, so a bad guess costs a glance.
+     *
+     * Under them, the Drafts section: words typed and not sent, and answers
+     * whose card was closed without being saved. */
     renderCompose(parent) {
-        /* What is in the box outlives the box. The panel is redrawn whenever
-         * anything is logged, which used to take a half-typed description
-         * with it; and once sent, the words are kept in data.json until an
-         * answer comes back, as What's for... and Eating out keep theirs, so
-         * a phone that puts Obsidian away mid-draft does not lose them. */
+        /* What was typed outlives the card it was typed into. The panel is
+         * redrawn whenever anything is logged; a card is closed by a tap
+         * anywhere outside it; and once sent, the words are kept in data.json
+         * until an answer comes back, as What's for... and Eating out keep
+         * theirs, so a phone that puts Obsidian away mid-draft does not lose
+         * them. */
         if (!this.composeText) this.composeText = {};
         if (!this.composeBusy) this.composeBusy = {};
         const key = 'any';
@@ -9009,51 +9082,37 @@ class NoshView extends ItemView {
             this.composeText[key] = String(kept.text || '');
         }
 
-        /* A card closed without saving waits here until it is saved or
-         * cancelled, so a tap outside one never costs the answer. */
-        const waiting = this.plugin.keptDrafts();
-        if (waiting.length) {
-            const list = parent.createDiv({ cls: 'nosh-kept' });
-            keptRows(list, waiting.slice(0, KEPT_SHOWN), this.plugin);
-            if (waiting.length > KEPT_SHOWN) {
-                const more = list.createEl('button', {
-                    cls: 'nosh-kept-open nosh-kept-more',
-                    text: (waiting.length - KEPT_SHOWN) + ' more\u2026',
-                });
-                more.addEventListener('click', () => new NoshKeptModal(this.app, this.plugin).open());
-            }
-        }
-
         const box = parent.createDiv({ cls: 'nosh-ai' });
-        /* Two lines, because a meal is often more than one line's worth: what
-         * was in it, and how much of it was eaten. Enter still drafts; Shift
-         * and Enter starts a new line. */
-        const input = box.createEl('textarea', { cls: 'nosh-ai-input' });
-        input.rows = 2;
-        input.placeholder = 'Describe a meal or an ingredient\u2026';
-        input.value = this.composeText[key] || '';
-        input.addEventListener('input', () => { this.composeText[key] = input.value; });
-        const go = box.createEl('button', { cls: 'nosh-ai-go', text: 'Draft' });
+        const go = box.createEl('button', { cls: 'nosh-ai-go nosh-ai-draft' });
+        go.setAttr('aria-label', 'Describe a meal or an ingredient');
+        const label = () => {
+            go.empty();
+            setIcon(go.createSpan({ cls: 'nosh-ai-draft-icon' }), 'pencil');
+            go.createSpan({ text: 'Draft' });
+        };
+        label();
 
         const shot = box.createEl('button', { cls: 'nosh-ai-go nosh-ai-shot' });
         shot.setAttr('aria-label', 'Photograph a label, or a plate of food');
         setIcon(shot, 'camera');
 
-        /* Held while a draft is out, including when the box is drawn again
+        /* Held while a draft is out, including when the row is drawn again
          * part way through, so the same words cannot be sent twice. */
         const busy = (on) => {
-            input.disabled = on;
             go.disabled = on;
             shot.disabled = on;
-            go.empty();
-            /* Something to watch while it thinks, rather than a dead button. */
-            if (on) go.createSpan({ cls: 'nosh-ai-spin', text: '\ud83e\udd66' });
-            else go.setText('Draft');
+            if (on) {
+                go.empty();
+                /* Something to watch while it thinks, rather than a dead button. */
+                go.createSpan({ cls: 'nosh-ai-spin', text: '\ud83e\udd66' });
+            } else {
+                label();
+            }
         };
         if (this.composeBusy[key]) busy(true);
-        /* The box on screen now, for a draft sent from an earlier one. */
+        /* The row on screen now, for a draft sent from an earlier one. */
         if (!this.composeLive) this.composeLive = {};
-        this.composeLive[key] = { input: input, busy: busy };
+        this.composeLive[key] = { busy: busy };
 
         /* One path for both, because a picture and a description are the same
          * ask with different evidence, and a picture is often worth a word
@@ -9065,6 +9124,7 @@ class NoshView extends ItemView {
 
             this.composeBusy[key] = true;
             busy(true);
+            this.renderDrafts();
             if (text) await this.keepAsk('draft-' + key, { text: text });
             try {
                 /* With a picture, the words are about the picture, so it is
@@ -9085,26 +9145,36 @@ class NoshView extends ItemView {
                 await this.plugin.openDraft(got.kind, got.draft, { type: 'new' }, this);
             } catch (e) {
                 new Notice('Nosh AI: ' + (e && e.message ? e.message : e) +
-                           (text ? ' What you typed is kept for the next try.' : ''), 8000);
+                           (text ? ' What you typed is kept under Drafts.' : ''), 8000);
             } finally {
                 this.composeBusy[key] = false;
-                /* Whichever box is on screen by now, which is not always the
+                /* Whichever row is on screen by now, which is not always the
                  * one the draft was sent from. */
                 const live = this.composeLive[key];
-                if (live) {
-                    live.busy(false);
-                    live.input.value = this.composeText[key] || '';
-                }
+                if (live) live.busy(false);
+                this.renderDrafts();
             }
         };
 
-        go.addEventListener('click', () => run(null, input.value));
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-                e.preventDefault();
-                run(null, input.value);
-            }
-        });
+        /* The card to type into. Draft sends it; Cancel throws the words
+         * away; closed any other way, the words are kept under Drafts, as an
+         * answer is when its card is closed without saving. */
+        const write = () => {
+            if (this.composeBusy[key]) return;
+            new NoshComposeModal(this.app, this.composeText[key] || '', async (done) => {
+                if (done.action === 'send') {
+                    this.composeText[key] = done.text;
+                    run(null, done.text);
+                    return;
+                }
+                const text = done.action === 'cancel' ? '' : String(done.text || '');
+                this.composeText[key] = text;
+                await this.keepAsk('draft-' + key, text.trim() ? { text: text } : null);
+                this.renderDrafts();
+            }).open();
+        };
+        this.composeWrite = write;
+        go.addEventListener('click', write);
 
         shot.addEventListener('click', async () => {
             if (shot.disabled) return;
@@ -9123,13 +9193,57 @@ class NoshView extends ItemView {
             }
             if (!photo) return;
             /* A moment with the picture before it goes: what it is, and how
-             * much of it was eaten. Whatever was already typed is the start
-             * of the answer. */
+             * much of it was eaten. Whatever was typed and not sent is the
+             * start of the answer. */
             const words = await new Promise((resolve) => {
-                new NoshPhotoModal(this.app, photo, input.value, resolve).open();
+                new NoshPhotoModal(this.app, photo, this.composeText[key] || '', resolve).open();
             });
             if (words !== null) run(photo, words);
         });
+
+        this.draftsEl = parent.createDiv({ cls: 'nosh-drafts' });
+        this.renderDrafts();
+    }
+
+    /* Everything waiting to be finished: the words not sent, first, then the
+     * answers whose card was closed unsaved, newest first. Nothing waiting,
+     * no section. */
+    renderDrafts() {
+        const el = this.draftsEl;
+        if (!el) return;
+        el.empty();
+
+        const text = String((this.composeText || {}).any || '').trim();
+        const unsent = text && !(this.composeBusy || {}).any;
+        const waiting = this.plugin.keptDrafts();
+        if (!unsent && !waiting.length) return;
+
+        el.createDiv({ cls: 'nosh-drafts-head', text: 'Drafts' });
+        const list = el.createDiv({ cls: 'nosh-kept' });
+
+        if (unsent) {
+            const row = list.createDiv({ cls: 'nosh-kept-row' });
+            row.createSpan({ cls: 'nosh-kept-name', text: '\u201c' + text + '\u201d' });
+            row.createSpan({ cls: 'nosh-kept-when', text: 'not sent' });
+            const open = row.createEl('button', { cls: 'nosh-kept-open', text: 'Reopen' });
+            open.addEventListener('click', () => { if (this.composeWrite) this.composeWrite(); });
+            const drop = row.createEl('button', { cls: 'nosh-kept-drop', text: '\u00d7' });
+            drop.setAttr('aria-label', 'Discard what was typed');
+            drop.addEventListener('click', async () => {
+                this.composeText.any = '';
+                await this.keepAsk('draft-any', null);
+                this.renderDrafts();
+            });
+        }
+
+        keptRows(list, waiting.slice(0, KEPT_SHOWN), this.plugin);
+        if (waiting.length > KEPT_SHOWN) {
+            const more = list.createEl('button', {
+                cls: 'nosh-kept-open nosh-kept-more',
+                text: (waiting.length - KEPT_SHOWN) + ' more\u2026',
+            });
+            more.addEventListener('click', () => new NoshKeptModal(this.app, this.plugin).open());
+        }
     }
 
     /* Resolves to the note the day now points at - written, replaced or the
