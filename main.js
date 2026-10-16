@@ -584,7 +584,8 @@ function logNoteFrontmatter(iso, rows, settings) {
         if (r.occasion) lines.push('    occasion: ' + r.occasion);
         lines.push('    servings: ' + r.servings);
     }
-    lines.push('tags:', '  - ' + kindTag(settings, 'log'), '---');
+    lines.push.apply(lines, tagLines(noteTags(settings, 'log')));
+    lines.push('---');
     return lines.join('\n');
 }
 
@@ -1957,15 +1958,24 @@ function aiRefused(body) {
  * The 5.5 models turn that down, or skip their thinking to comply, so there
  * the prompt asks for it instead, and a reply that comes back as prose is
  * asked for again, once. Returns the tool_use block, or null where there
- * never was one. */
+ * never was one.
+ *
+ * Handed several tools, the form is whichever one of them Claude picks:
+ * Add to log does not know until it has read the words whether they are a
+ * meal or an ingredient. */
 async function aiFill(headers, payload, tool, spend) {
+    const tools = Array.isArray(tool) ? tool : [tool];
+    const names = tools.map((t) => t.name);
     const model = AI_MODELS.find((m) => m.id === payload.model);
     const ask = !!(model && model.askForForm);
-    const request = Object.assign({}, payload, { tools: [tool] }, ask
-        ? { tool_choice: { type: 'auto' },
-            system: payload.system + '\n\nAnswer by calling the ' + tool.name
-                    + ' tool, and only that.' }
-        : { tool_choice: { type: 'tool', name: tool.name } });
+    const say = names.length === 1
+        ? 'Answer by calling the ' + names[0] + ' tool, and only that.'
+        : 'Answer by calling exactly one of the ' + names.join(' or ') +
+          ' tools, once, and nothing else.';
+    const request = Object.assign({}, payload, { tools: tools }, ask
+        ? { tool_choice: { type: 'auto' }, system: payload.system + '\n\n' + say }
+        : { tool_choice: names.length === 1
+              ? { type: 'tool', name: names[0] } : { type: 'any' } });
 
     for (let tries = ask ? 2 : 1; tries > 0; tries--) {
         const res = await aiCall(headers, request);
@@ -1977,7 +1987,7 @@ async function aiFill(headers, payload, tool, spend) {
         aiSpent(spend, body && body.usage);
         aiRefused(body);
         const block = ((body && body.content) || []).find(
-            (b) => b.type === 'tool_use' && b.name === tool.name);
+            (b) => b.type === 'tool_use' && names.includes(b.name));
         if (block) return block;
     }
     return null;
@@ -2012,6 +2022,10 @@ async function aiDraft(plugin, kind, description, photo) {
         system: photo ? spec.system + AI_PHOTO : spec.system,
         messages: [{ role: 'user', content: content }],
     }, tool, spend);
+    return aiChecked(kind, block, spend);
+}
+
+function aiChecked(kind, block, spend) {
     if (!block) throw new Error('Claude answered without filling the form. Try naming the amount plainly.');
 
     /* A meal is the sum of its parts, so a meal without parts is a note full
@@ -2027,6 +2041,50 @@ async function aiDraft(plugin, kind, description, photo) {
     /* Rides along with the draft to the card. No note writer reads it. */
     block.input.spend = spend;
     return block.input;
+}
+
+/* Add to log starts from words in a note, and words do not say which form
+ * they are. Both are offered and Claude picks; the rules for each are the
+ * ones the picker's own boxes use, so a meal logged from a note and a meal
+ * logged from the pane come out the same. */
+const AI_LOG_SYSTEM = [
+    'You turn a line out of somebody\'s own notes about something they ate',
+    'into a DASH diet log entry. First decide what it describes:',
+    '',
+    '- One food or one drink, however much of it - "2 eggs", "a flat white",',
+    '  "1.5 cups of chicken breast" - is an ingredient: call log_ingredient.',
+    '- A dish, a plate or several foods eaten together - "eggs on toast",',
+    '  "chicken, rice and broccoli" - is a meal: call log_meal.',
+    '',
+    'Call exactly one of the two, once. The rules for each follow.',
+    '',
+    '## log_ingredient',
+    '',
+    AI_INGREDIENT_SYSTEM,
+    '',
+    '## log_meal',
+    '',
+    AI_MEAL_SYSTEM,
+].join('\n');
+
+/* Resolves to { kind, draft }, kind being the picker tab the answer belongs
+ * to, so the card and the note writer are the ones that tab would use. */
+async function aiDraftAny(plugin, description) {
+    const ingredient = AI_KINDS.ingredients.tool();
+    const meal = AI_KINDS.meals.tool();
+    const headers = await aiHeaders(plugin);
+    const model = aiModelId(plugin.settings, 'aiModel');
+    const spend = aiSpend(model);
+    const block = await aiFill(headers, {
+        model: model,
+        max_tokens: 8192,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: plugin.settings.aiEffort || 'medium' },
+        system: AI_LOG_SYSTEM,
+        messages: [{ role: 'user', content: description }],
+    }, [ingredient, meal], spend);
+    const kind = block && block.name === meal.name ? 'meals' : 'ingredients';
+    return { kind: kind, draft: aiChecked(kind, block, spend) };
 }
 
 /* Searching and reading run on Anthropic's side, so nothing here fetches a
@@ -2171,6 +2229,31 @@ function kindTag(settings, kind) {
            '/' + kind;
 }
 
+/* Everything Nosh writes carries the umbrella tag on its own as well as the
+ * nested one. Obsidian's search counts #nutrition/meal as #nutrition, but a
+ * property filter or a Bases view matches the list exactly, and there the
+ * nested tag alone is a note that #nutrition never finds. */
+function rootTag(settings) {
+    return String((settings && settings.tag) || 'nutrition').replace(/^#/, '');
+}
+
+function noteTags(settings, kind) {
+    return [rootTag(settings), kindTag(settings, kind)];
+}
+
+function tagLines(tags) {
+    return ['tags:'].concat(tags.map((t) => '  - ' + t));
+}
+
+/* The same two tags added to a note that is already there, keeping whatever
+ * else it was tagged with. */
+function withNoteTags(fm, settings, kind) {
+    const tags = Array.isArray(fm.tags) ? fm.tags.slice()
+        : fm.tags ? [String(fm.tags)] : [];
+    for (const t of noteTags(settings, kind)) if (!tags.includes(t)) tags.push(t);
+    fm.tags = tags;
+}
+
 function aiFrontMatter(draft, iso, head, tags) {
     const lines = ['---'];
     lines.push('date: ' + yamlStr(stamp(iso)));
@@ -2192,7 +2275,7 @@ function aiIngredientNote(draft, iso, settings) {
     const lines = aiFrontMatter(draft, iso,
         [['amount', yamlStr(draft.amount)],
          ['meal_type', draft.meal_type]],
-        [kindTag(settings, 'ingredient')]);
+        noteTags(settings, 'ingredient'));
 
     lines.push('');
     lines.push('# ' + draft.name);
@@ -2236,7 +2319,7 @@ function aiMealNote(draft, iso, settings) {
     const where = String(draft.restaurant || '').trim();
     if (where) head.push(['restaurant', yamlStr(where)]);
 
-    const lines = aiFrontMatter(draft, iso, head, [kindTag(settings, 'meal')]);
+    const lines = aiFrontMatter(draft, iso, head, noteTags(settings, 'meal'));
 
     lines.push('');
     lines.push('# ' + draft.name);
@@ -2372,8 +2455,7 @@ function outingNote(outing, settings) {
         'day: ' + outing.day,
         'occasion: ' + outing.occasion,
         'restaurant: ' + yamlStr(outing.restaurant),
-        'tags:',
-        '  - ' + kindTag(settings, 'outing'),
+    ].concat(tagLines(noteTags(settings, 'outing')), [
         '---',
         '',
         '# ' + outing.restaurant,
@@ -2381,7 +2463,7 @@ function outingNote(outing, settings) {
         'What to order for ' + occasionLabel(outing.occasion).toLowerCase() +
         ', ' + when + '. Once you have eaten, press Ate out in Nosh and pick ' +
         'the one you had.',
-    ];
+    ]);
 
     outing.options.forEach((option, i) => {
         lines.push('', '## ' + String(option.name || 'Option ' + (i + 1)).trim(), '');
@@ -2500,8 +2582,7 @@ function composedMealNote(name, parts, occasion, iso, settings) {
     }
     for (const n of NUTRIENTS) lines.push(n.key + ': ' + round(totals[n.key]));
     for (const g of FOOD_GROUPS) lines.push(g.key + ': ' + round(totals[g.key]));
-    lines.push('tags:');
-    lines.push('  - ' + kindTag(settings, 'meal'));
+    lines.push.apply(lines, tagLines(noteTags(settings, 'meal')));
     lines.push('---');
 
     lines.push('');
@@ -3250,7 +3331,7 @@ class NoshDraftModal extends Modal {
         this.unfit = fitModalToKeyboard(this);
         const spec = AI_KINDS[this.kind] || AI_KINDS.ingredients;
         contentEl.addClass('nosh-draft');
-        this.setTitle(spec.title);
+        this.setTitle(this.opts.title || spec.title);
 
         const named = contentEl.createDiv({ cls: 'nosh-draft-row' });
         named.createEl('label', { text: 'Name' });
@@ -3364,6 +3445,13 @@ class NoshDraftModal extends Modal {
             contentEl.createDiv({ cls: 'nosh-cost', text: costText(this.draft.spend) });
         }
 
+        /* An edit rewrites a note that is already logged wherever it was
+         * eaten, so there is no serving to add and nothing to name. */
+        if (this.opts.save) {
+            this.saveActions(contentEl);
+            return;
+        }
+
         const logged = contentEl.createDiv({ cls: 'nosh-draft-log' });
         const box = logged.createEl('input', { type: 'checkbox' });
         box.checked = this.shouldLog;
@@ -3390,6 +3478,24 @@ class NoshDraftModal extends Modal {
                 }
             } catch (e) {
                 create.disabled = false;
+                new Notice('Nosh could not write the note: ' + (e && e.message ? e.message : e), 8000);
+            }
+        });
+    }
+
+    saveActions(contentEl) {
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
+        const cancel = actions.createEl('button', { text: 'Cancel' });
+        cancel.addEventListener('click', () => this.close());
+
+        const save = actions.createEl('button', { cls: 'mod-cta', text: 'Save changes' });
+        save.addEventListener('click', async () => {
+            save.disabled = true;
+            try {
+                await this.opts.save(this.draft);
+                this.close();
+            } catch (e) {
+                save.disabled = false;
                 new Notice('Nosh could not write the note: ' + (e && e.message ? e.message : e), 8000);
             }
         });
@@ -3697,7 +3803,8 @@ function targetsNoteFrontmatter(settings) {
     lines.push(hidden.length ? 'hidden:' : 'hidden: []');
     for (const key of hidden) lines.push('  - ' + key);
 
-    lines.push('tags:', '  - ' + kindTag(settings, 'targets'), '---');
+    lines.push.apply(lines, tagLines(noteTags(settings, 'targets')));
+    lines.push('---');
     return lines.join('\n');
 }
 
@@ -4048,13 +4155,16 @@ function foodTable(r) {
 
 /* Deliberately carries no nutrient fields and not the meal tag: collectNotes()
  * picks up anything with a calories field, and a report is not a thing you
- * ate. */
-function reportHead(r) {
+ * ate. The umbrella tag is safe, since it says nothing about which side of
+ * the picker a note sits on, and the report is skipped for having no numbers
+ * long before its tags are read. */
+function reportHead(r, settings) {
     return [
         '---',
         'date: ' + yamlStr(stamp(r.days[0])),
         'nosh_report: ' + r.mode,
         'tags:',
+        '  - ' + rootTag(settings),
         '  - nosh-report',
         '---',
         '',
@@ -4062,9 +4172,9 @@ function reportHead(r) {
     ];
 }
 
-function reportMarkdown(r) {
-    if (r.mode === 'month') return monthReportMarkdown(r);
-    const lines = reportHead(r);
+function reportMarkdown(r, settings) {
+    if (r.mode === 'month') return monthReportMarkdown(r, settings);
+    const lines = reportHead(r, settings);
     lines.push('');
     lines.push(r.meals
         ? r.meals + (r.meals === 1 ? ' entry · ' : ' entries · ') + fmt(r.totals.calories) +
@@ -4170,8 +4280,8 @@ function signed(n) {
  * and a weekly group against its weekly one, as so many servings in seven
  * logged days. What a month can say that a week cannot is which way things
  * are going: against the month before, and week by week inside itself. */
-function monthReportMarkdown(r) {
-    const lines = reportHead(r);
+function monthReportMarkdown(r, settings) {
+    const lines = reportHead(r, settings);
     lines.push('');
     if (!r.meals) {
         lines.push('Nothing logged.');
@@ -4649,7 +4759,7 @@ const AI_PROBE_SYSTEM = [
 
 /* The recipe, its numbers and the targets they are read against, all of it on
  * the first question only: after that the conversation is carrying it. */
-function probePrompt(recipe, settings) {
+function probePrompt(recipe, settings, lead) {
     const lines = ['The note: ' + recipe.path];
     if (recipe.serves > 1) lines.push('Its method serves ' + recipe.serves + '.');
     if (recipe.amount) lines.push('One serving is ' + recipe.amount + '.');
@@ -4690,7 +4800,7 @@ function probePrompt(recipe, settings) {
     lines.push('');
     lines.push(recipe.body);
     lines.push('');
-    lines.push('The question:');
+    lines.push(lead || 'The question:');
 
     return lines.join('\n');
 }
@@ -4932,6 +5042,214 @@ class NoshProbeModal extends Modal {
     }
 }
 
+/* Edit this meal ------------------------------------------------------
+ *
+ * A note Nosh already reads, changed by saying what changed: "it was brown
+ * rice", "half the cheese", "add a side of broccoli". Claude is handed the
+ * note as written and the change, and answers on the same form a new note
+ * would - so the change comes back through the same card, where its
+ * portions can still be moved, and is written over the note in place. */
+
+const AI_EDIT_RULES = [
+    '',
+    'This time you are not starting from nothing. The reader\'s note for this',
+    'food is below, with the change they want made to it.',
+    '',
+    '- Make the change asked for, and keep everything else as the note has',
+    '  it: the same ingredients, the same portions, the same name - unless',
+    '  the change is to one of those.',
+    '- Where the note carries figures for a part the change does not touch,',
+    '  keep them. Work out afresh only what the change actually moves.',
+    '- Rename it only if the change makes the old name wrong.',
+    '- `note` says, in a sentence, what was changed and what it did to the',
+    '  numbers.',
+].join('\n');
+
+/* Which form a note is edited on, or '' for one that is not Nosh's to edit:
+ * a meal or an ingredient by its tags, carrying numbers. Logs, targets,
+ * reports and outings are all tagged too, and none of them is food. */
+function editableKind(app, file, settings) {
+    if (!file || typeof file.path !== 'string' || !file.path.toLowerCase().endsWith('.md')) return '';
+    if (isTargetsNoteName(file) || logNoteDay(file)) return '';
+    const cache = app.metadataCache.getFileCache(file);
+    const fm = cache && cache.frontmatter;
+    if (!fm || fm.nosh_report !== undefined) return '';
+    const said = noteKind(getAllTags(cache) || [], settings.tag);
+    if (!said) return '';
+    if (!NUTRIENTS.some((n) => fm[n.key] !== undefined) &&
+        !FOOD_GROUPS.some((g) => fm[g.key] !== undefined)) return '';
+    if (said === 'ingredient') return 'ingredients';
+    if (said === 'meal') return 'meals';
+    return underFolder(file.path, noshFolder(settings, SUB_INGREDIENTS)) ? 'ingredients' : 'meals';
+}
+
+async function aiEdit(plugin, kind, recipe, change) {
+    const spec = AI_KINDS[kind] || AI_KINDS.meals;
+    const tool = spec.tool();
+    const headers = await aiHeaders(plugin);
+    const model = aiModelId(plugin.settings, 'aiModel');
+    const spend = aiSpend(model);
+    const block = await aiFill(headers, {
+        model: model,
+        max_tokens: 8192,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: plugin.settings.aiEffort || 'medium' },
+        system: spec.system + '\n' + AI_EDIT_RULES,
+        messages: [{
+            role: 'user',
+            content: probePrompt(recipe, plugin.settings, 'What to change:') + '\n\n' + change,
+        }],
+    }, tool, spend);
+    return aiChecked(kind, block, spend);
+}
+
+/* Sections Nosh appends to a note after writing it - questions asked about
+ * it, the words it was logged from - are the reader's record rather than
+ * the note's numbers, and survive the numbers being rewritten. */
+const KEPT_SECTIONS = /^## (?:Asked about this recipe|As written)[ \t]*$/m;
+
+function keptTail(text) {
+    const body = stripFrontMatter(text);
+    const at = body.search(KEPT_SECTIONS);
+    return at < 0 ? '' : body.slice(at).replace(/\s*$/, '\n');
+}
+
+/* Frontmatter the new note does not write is put back as it was, so a
+ * property somebody added by hand outlives the edit. Not the parts of a
+ * composed meal: those would have the note read as built from ingredient
+ * notes again, totalled from them, and the edit undone. */
+const EDIT_DROPS = ['components', 'ingredients'];
+
+class NoshEditModal extends Modal {
+    constructor(app, plugin, file, recipe, opts) {
+        super(app);
+        this.plugin = plugin;
+        this.file = file;
+        this.recipe = recipe;
+        this.opts = opts;
+        this.busy = false;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        this.unfit = fitModalToKeyboard(this);
+        contentEl.addClass('nosh-draft');
+        contentEl.addClass('nosh-probe');
+        const noun = this.opts.kind === 'ingredients' ? 'ingredient' : 'meal';
+        this.setTitle('Edit ' + this.recipe.name);
+
+        const parts = this.recipe.parts.length;
+        contentEl.createDiv({
+            cls: 'nosh-probe-source',
+            text: (parts ? parts + ' ingredient' + (parts === 1 ? '' : 's') + ', ' : '') +
+                  (this.recipe.hasNumbers ? 'its numbers, ' : '') + 'from ' + this.file.path,
+        });
+
+        if (this.opts.composed) {
+            contentEl.createDiv({
+                cls: 'nosh-draft-note',
+                text: 'This meal is built from ingredient notes. Saving an edit writes ' +
+                      'its ingredients into the meal itself; the ingredient notes are ' +
+                      'left as they are.',
+            });
+        }
+
+        this.askEl = contentEl.createEl('textarea', { cls: 'nosh-draft-extra' });
+        this.askEl.rows = 3;
+        this.askEl.placeholder = noun === 'meal'
+            ? 'What changed? "It was brown rice, not white", "half the cheese", ' +
+              '"add a side of broccoli"'
+            : 'What changed? "It was 2 cups, not 1", "skim, not whole"';
+        this.askEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+                e.preventDefault();
+                this.go();
+            }
+        });
+
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
+        const cancel = actions.createEl('button', { text: 'Cancel' });
+        cancel.addEventListener('click', () => this.close());
+        this.goEl = actions.createEl('button', { cls: 'mod-cta', text: 'Redraft' });
+        this.goEl.addEventListener('click', () => this.go());
+
+        this.askEl.focus();
+    }
+
+    async go() {
+        const change = String(this.askEl.value || '').trim();
+        if (!change || this.busy) return;
+        this.busy = true;
+        this.goEl.disabled = true;
+        this.goEl.empty();
+        this.goEl.createSpan({ cls: 'nosh-ai-spin', text: '🥦' });
+
+        let draft;
+        try {
+            draft = await aiEdit(this.plugin, this.opts.kind, this.recipe, change);
+        } catch (e) {
+            /* What was typed stays in the box for the next try. */
+            new Notice('Nosh AI: ' + (e && e.message ? e.message : e), 8000);
+            this.busy = false;
+            this.goEl.disabled = false;
+            this.goEl.setText('Redraft');
+            return;
+        }
+
+        /* What the form has no field for is carried over from the note, so
+         * the method's yield and where it was eaten are not edited away. */
+        if (this.recipe.serves > 1 && !draft.serves) draft.serves = this.recipe.serves;
+        if (this.opts.restaurant && !draft.restaurant) draft.restaurant = this.opts.restaurant;
+
+        this.close();
+        const { plugin, file } = this;
+        const kind = this.opts.kind;
+        new NoshDraftModal(this.app, null, kind, draft, {
+            title: 'Edit ' + this.recipe.name,
+            save: (d) => plugin.saveEdit(file, kind, d, this.recipe.name),
+        }).open();
+    }
+
+    onClose() {
+        if (this.unfit) { this.unfit(); this.unfit = null; }
+        this.contentEl.empty();
+    }
+}
+
+/* Add to log ---------------------------------------------------------
+ *
+ * What it works on: the selection, or else the line the cursor is on less
+ * its list marker, checkbox, quote or heading marks. Those belong to the
+ * note around the words, and stay put when the words become a link. A line
+ * that is already nothing but a link has been logged. */
+const LINE_LEAD = /^\s*(?:>\s*)*(?:#{1,6}\s+|[-*+]\s+(?:\[.\]\s+)?|\d+[.)]\s+(?:\[.\]\s+)?)?/;
+
+function logSpan(editor) {
+    if (!editor) return null;
+    let raw, start;
+    if (editor.somethingSelected()) {
+        raw = editor.getRange(editor.getCursor('from'), editor.getCursor('to'));
+        start = editor.posToOffset(editor.getCursor('from'));
+    } else {
+        const line = editor.getCursor().line;
+        const whole = editor.getLine(line);
+        const lead = (whole.match(LINE_LEAD) || [''])[0].length;
+        raw = whole.slice(lead);
+        start = editor.posToOffset({ line: line, ch: lead });
+    }
+    const text = raw.trim();
+    if (!text || /^!?\[\[[^\]]*\]\]$/.test(text)) return null;
+    return { start: start + (raw.length - raw.trimStart().length), text: text };
+}
+
+/* Where the words are now, which is where they were unless something was
+ * typed above them while Claude was reading: then the first place they turn
+ * up, or nowhere. */
+function findWords(whole, span) {
+    if (whole.substr(span.start, span.text.length) === span.text) return span.start;
+    return whole.indexOf(span.text);
+}
+
 module.exports = class NoshPlugin extends Plugin {
     async onload() {
         await this.loadSettings();
@@ -5011,6 +5329,48 @@ module.exports = class NoshPlugin extends Plugin {
             },
         });
 
+        this.addCommand({
+            id: 'edit-this-meal',
+            name: 'Edit this meal',
+            icon: 'pencil',
+            checkCallback: (checking) => {
+                const file = this.app.workspace.getActiveFile();
+                if (!editableKind(this.app, file, this.settings)) return false;
+                if (!checking) this.editNote(file);
+                return true;
+            },
+        });
+
+        /* Words typed into any note - a journal line, a list - become a meal
+         * or an ingredient note, logged, with a link left where they were. */
+        this.addCommand({
+            id: 'add-to-log',
+            name: 'Add to log',
+            icon: 'utensils',
+            editorCheckCallback: (checking, editor, ctx) => {
+                if (!logSpan(editor)) return false;
+                if (!checking) this.addToLog(editor, ctx);
+                return true;
+            },
+        });
+
+        this.registerEvent(this.app.workspace.on('editor-menu', (menu, editor, ctx) => {
+            if (!logSpan(editor)) return;
+            menu.addItem((item) => item
+                .setTitle('Add to log')
+                .setIcon('utensils')
+                .onClick(() => this.addToLog(editor, ctx)));
+        }));
+
+        /* Notes written before the umbrella tag carry only the nested one.
+         * One pass adds it beside that, and leaves alone anything that
+         * already has it. */
+        this.addCommand({
+            id: 'tag-existing-notes',
+            name: 'Add the nutrition tag to existing notes',
+            callback: () => this.tagExistingNotes(),
+        });
+
         /* A recipe already in the vault is a question waiting to be asked, and
          * the note it sits in is the whole of the context the asking needs. */
         this.addCommand({
@@ -5061,6 +5421,13 @@ module.exports = class NoshPlugin extends Plugin {
          * menu is a list you scan; the command is offered on any note at all,
          * a palette being somewhere you go on purpose. */
         this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
+            const kind = editableKind(this.app, file, this.settings);
+            if (kind) {
+                menu.addItem((item) => item
+                    .setTitle(kind === 'ingredients' ? 'Edit this ingredient' : 'Edit this meal')
+                    .setIcon('pencil')
+                    .onClick(() => this.editNote(file)));
+            }
             if (!looksLikeRecipe(this.app, file, this.settings)) return;
             menu.addItem((item) => item
                 .setTitle('Ask about this recipe')
@@ -5256,6 +5623,210 @@ module.exports = class NoshPlugin extends Plugin {
         } catch (e) {
             new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
         }
+    }
+
+    /* A meal with a method is edited on the suggestion's form, which has a
+     * field for the steps, so changing an ingredient rewrites the method to
+     * match rather than dropping it. */
+    async editNote(file) {
+        try {
+            const kind = editableKind(this.app, file, this.settings);
+            if (!kind) {
+                new Notice('Nosh edits its own meal and ingredient notes, and this is not one.', 8000);
+                return;
+            }
+            const recipe = readRecipe(this.app, file, await this.app.vault.cachedRead(file));
+            const fm = (this.app.metadataCache.getFileCache(file) || {}).frontmatter || {};
+            new NoshEditModal(this.app, this, file, recipe, {
+                kind: kind === 'meals' && recipe.steps.length ? 'suggest' : kind,
+                composed: parseComponents(fm.components).length > 0,
+                restaurant: typeof fm.restaurant === 'string' ? fm.restaurant.trim() : '',
+            }).open();
+        } catch (e) {
+            new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+        }
+    }
+
+    /* Written over the note where it stands, so every day that logged it
+     * now reads the corrected numbers. A new name is a rename, which
+     * Obsidian carries through every link and the log repair carries
+     * through every day. */
+    async saveEdit(file, kind, draft, was) {
+        const app = this.app;
+        if (!String(draft.name || '').trim()) draft.name = was;
+        const spec = AI_KINDS[kind] || AI_KINDS.meals;
+        const before = Object.assign({},
+            (app.metadataCache.getFileCache(file) || {}).frontmatter || {});
+        const old = await app.vault.read(file);
+
+        await app.vault.modify(file,
+            spec.note(draft, todayIso(), this.settings).replace(/\s*$/, '\n') +
+            (keptTail(old) ? '\n' + keptTail(old) : ''));
+
+        await app.fileManager.processFrontMatter(file, (fm) => {
+            for (const key of Object.keys(before)) {
+                if (key === 'tags' || EDIT_DROPS.includes(key)) continue;
+                if (fm[key] === undefined) fm[key] = before[key];
+            }
+            /* Made when it was first written; an edit is not a new note. */
+            if (before.date !== undefined) fm.date = before.date;
+            const had = Array.isArray(before.tags) ? before.tags
+                : before.tags ? [String(before.tags)] : [];
+            const tags = Array.isArray(fm.tags) ? fm.tags.slice() : [];
+            for (const t of had) if (!tags.includes(t)) tags.push(t);
+            fm.tags = tags;
+        });
+
+        /* Only a name the edit changed: a note filed under a name of its
+         * own, unlike its heading, keeps it. */
+        let saved = file;
+        const name = safeName(draft.name);
+        if (String(draft.name).trim() !== String(was || '').trim() && name !== file.basename) {
+            const cut = file.path.lastIndexOf('/');
+            const to = (cut >= 0 ? file.path.slice(0, cut + 1) : '') + name + '.md';
+            if (!app.vault.getAbstractFileByPath(to)) {
+                await app.fileManager.renameFile(file, to);
+                saved = app.vault.getAbstractFileByPath(to) || file;
+            }
+        }
+
+        await awaitCache(app, saved, 2000);
+        this.refreshViews();
+        new Notice('Updated ' + saved.basename);
+    }
+
+    /* The card logs through the pane - its day, its occasion - so the pane
+     * is opened if it is not, and woken if Obsidian deferred it. */
+    async noshView() {
+        const find = () => this.app.workspace.getLeavesOfType(VIEW_TYPE_DASH)[0];
+        let leaf = find();
+        if (!leaf) {
+            await this.activateView();
+            leaf = find();
+        }
+        if (leaf && typeof leaf.loadIfDeferred === 'function') await leaf.loadIfDeferred();
+        return leaf && leaf.view instanceof NoshView ? leaf.view : null;
+    }
+
+    async addToLog(editor, ctx) {
+        const span = logSpan(editor);
+        if (!span) return;
+        const source = ctx && ctx.file ? ctx.file : null;
+
+        const view = await this.noshView();
+        if (!view) {
+            new Notice('Nosh: open the Nosh pane, then try again.', 8000);
+            return;
+        }
+
+        const shown = span.text.length > 60 ? span.text.slice(0, 57) + '…' : span.text;
+        const wait = new Notice('Nosh is reading “' + shown + '”…', 0);
+        let got;
+        try {
+            got = await aiDraftAny(this, span.text);
+        } catch (e) {
+            new Notice('Nosh AI: ' + (e && e.message ? e.message : e), 8000);
+            return;
+        } finally {
+            wait.hide();
+        }
+
+        new NoshDraftModal(this.app, view, got.kind, got.draft, {
+            onCreated: async (file) => {
+                await this.keepWords(file, span.text, source);
+                if (source) await this.linkWords(source, span, file);
+            },
+        }).open();
+    }
+
+    /* The words move into the note they became, so what was written at the
+     * time is kept with the numbers that were made of it. Appended, so a
+     * note that was already there gains a line rather than losing one. */
+    async keepWords(file, text, source) {
+        const lines = ['', '## As written', ''];
+        for (const line of text.split('\n')) lines.push('> ' + line);
+        if (source) {
+            lines.push('', '*From ' +
+                this.app.fileManager.generateMarkdownLink(source, file.path) +
+                ', ' + humanDay(todayIso()) + '.*');
+        }
+        lines.push('');
+        await this.app.vault.process(file, (t) => t.replace(/\s*$/, '\n') + lines.join('\n'));
+    }
+
+    /* Through the editor when the note is open in one, so the swap can be
+     * undone and does not race the editor's own save; through the file when
+     * it is not. */
+    async linkWords(source, span, file) {
+        const link = this.app.fileManager.generateMarkdownLink(file, source.path);
+        let editor = null;
+        this.app.workspace.iterateAllLeaves((leaf) => {
+            const v = leaf.view;
+            if (!editor && v && v.editor && v.file && v.file.path === source.path &&
+                typeof v.getViewType === 'function' && v.getViewType() === 'markdown') {
+                editor = v.editor;
+            }
+        });
+
+        let done = false;
+        if (editor) {
+            const at = findWords(editor.getValue(), span);
+            if (at >= 0) {
+                editor.replaceRange(link, editor.offsetToPos(at),
+                                    editor.offsetToPos(at + span.text.length));
+                done = true;
+            }
+        } else {
+            await this.app.vault.process(source, (t) => {
+                const at = findWords(t, span);
+                if (at < 0) return t;
+                done = true;
+                return t.slice(0, at) + link + t.slice(at + span.text.length);
+            });
+        }
+        if (!done) {
+            new Notice('Nosh: ' + file.basename + ' is written, but the words in ' +
+                       source.basename + ' had changed, so no link was left there.', 8000);
+        }
+    }
+
+    /* A note is Nosh's by a nested tag under the umbrella or by being a
+     * report. Only the frontmatter is read and written: that is where Nosh
+     * puts its tags, and a #nutrition/meal typed in passing in a journal is
+     * somebody's sentence, not a note to retag. */
+    async tagExistingNotes() {
+        const root = rootTag(this.settings);
+        const want = root.toLowerCase();
+        const listOf = (v) => (Array.isArray(v) ? v
+            : v ? String(v).split(/[,\s]+/) : [])
+            .map((t) => String(t).replace(/^#/, '').trim()).filter(Boolean);
+
+        let done = 0;
+        try {
+            for (const file of this.app.vault.getMarkdownFiles()) {
+                const cache = this.app.metadataCache.getFileCache(file);
+                const fm = cache && cache.frontmatter;
+                if (!fm) continue;
+                const tags = listOf(fm.tags).map((t) => t.toLowerCase());
+                const ours = fm.nosh_report !== undefined || tags.includes('nosh-report') ||
+                    tags.some((t) => t.startsWith(want + '/'));
+                if (!ours || tags.includes(want)) continue;
+
+                await this.app.fileManager.processFrontMatter(file, (f) => {
+                    const had = listOf(f.tags);
+                    if (had.some((t) => t.toLowerCase() === want)) return;
+                    f.tags = [root].concat(had);
+                });
+                done++;
+            }
+        } catch (e) {
+            new Notice('Nosh: stopped after ' + done + ' notes: ' +
+                       (e && e.message ? e.message : e), 8000);
+            return;
+        }
+        new Notice(done
+            ? 'Nosh: added #' + root + ' to ' + done + ' note' + (done === 1 ? '' : 's') + '.'
+            : 'Nosh: every note already carries #' + root + '.');
     }
 
     /* One pass over the vault, split by kind. Tags say which side of the
@@ -5625,8 +6196,6 @@ module.exports = class NoshPlugin extends Plugin {
         const file = this.logNoteFile(iso);
         const path = file ? file.path : this.logNotePath(iso);
         const rows = logNoteRows(app, day, path);
-        const tag = kindTag(this.settings, 'log');
-
         if (!rows.length) {
             if (!file) return;
             /* A day emptied takes its note with it, unless somebody wrote
@@ -5665,10 +6234,7 @@ module.exports = class NoshPlugin extends Plugin {
                 e.servings = r.servings;
                 return e;
             });
-            const tags = Array.isArray(fm.tags) ? fm.tags.slice()
-                : fm.tags ? [String(fm.tags)] : [];
-            if (!tags.includes(tag)) tags.push(tag);
-            fm.tags = tags;
+            withNoteTags(fm, this.settings, 'log');
         });
         this.markLogNote(iso);
         await vault.process(file, (text) => spliceBlock(text, logNoteBlock(iso, rows),
@@ -5880,11 +6446,7 @@ module.exports = class NoshPlugin extends Plugin {
             fm.shapes = targetShapes(block);
             fm.weights = Object.assign({}, block.weights);
             fm.hidden = block.hiddenNutrients.concat(block.hiddenGroups);
-            const tag = kindTag(this.settings, 'targets');
-            const tags = Array.isArray(fm.tags) ? fm.tags.slice()
-                : fm.tags ? [String(fm.tags)] : [];
-            if (!tags.includes(tag)) tags.push(tag);
-            fm.tags = tags;
+            withNoteTags(fm, this.settings, 'targets');
         });
         this.markTargetsNote();
         await vault.process(file, (text) => spliceBlock(text, body,
@@ -8456,7 +9018,7 @@ class NoshView extends ItemView {
     async exportReport(withReading) {
         const settings = this.plugin.settings;
         const r = this.reportData();
-        let body = reportMarkdown(r);
+        let body = reportMarkdown(r, settings);
 
         const wants = withReading === undefined ? !!settings.aiReading : withReading;
         /* An empty month is one line saying so, and there is nothing in one

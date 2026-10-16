@@ -57,7 +57,10 @@ tags:
 ```
 
 The flat pair `#nutrition` + `#meal` works too, and the umbrella tag is
-configurable. Folders don't matter. The Nosh folder setting only controls where
+configurable. Every note Nosh writes, reports included, also carries the
+umbrella tag on its own, so a property filter or a Bases view on `nutrition`
+finds them all. *Add the nutrition tag to existing notes* in the command palette
+adds it to notes written before that. Folders don't matter. The Nosh folder setting only controls where
 new notes go (`Meals`, `Ingredients`, `Reports`, `Log` and
 [the targets note](#the-targets)), though *Only look in the Nosh folder* limits
 the search for foods to it.
@@ -261,6 +264,16 @@ Off until you add an API key. It adds:
   meal you asked about. The meal note lists the other options too. Had
   something else, or never asked? Say where you ate and what you had, and
   Claude estimates it at restaurant portions.
+- Add to log. Select a line in any note, such as *2 eggs scrambled in butter*,
+  and choose Add to log from the right-click menu or the command palette. With
+  nothing selected it uses the line the cursor is on. Claude decides whether
+  it's a meal or an ingredient and opens the usual draft. Once the note is
+  written, the words move into it under *As written*, and a link replaces them.
+- Edit this meal. From a meal or ingredient note's menu, say what changed (*it
+  was brown rice, not white*, *half the cheese*) and Claude redrafts it. Check
+  the portions on the draft, then Save changes rewrites the note in place.
+  Properties and tags you added, and any *Asked about this recipe* or *As
+  written* sections, are kept.
 - Ask about this recipe. Question any recipe note (where the sodium comes from,
   how to stretch it, what to serve with it) from the command palette or the
   right-click menu. Save to note appends the conversation.
