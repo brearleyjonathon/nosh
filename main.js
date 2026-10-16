@@ -1591,6 +1591,10 @@ function pickPhoto() {
 
 const KEY_SECRET = 'nosh-anthropic-api-key';   // the name Nosh files a moved key under
 const KEY_NAME_LOCAL = 'nosh-ai-key-secret';   // where this device keeps the name
+const KEPT_DRAFT_LOCAL = 'nosh-kept-draft';     // the one card a test build kept
+const KEPT_DRAFTS_LOCAL = 'nosh-kept-drafts';   // cards closed without saving
+const KEPT_DRAFTS_MAX = 10;
+const KEPT_SHOWN = 3;                           // under the draft box; the rest a tap away
 
 function keychain(app) {
     return (app && app.secretStorage && SecretComponent) ? app.secretStorage : null;
@@ -2043,18 +2047,21 @@ function aiChecked(kind, block, spend) {
     return block.input;
 }
 
-/* Add to log starts from words in a note, and words do not say which form
- * they are. Both are offered and Claude picks; the rules for each are the
- * ones the picker's own boxes use, so a meal logged from a note and a meal
- * logged from the pane come out the same. */
+/* Words do not say which form they are, and neither does a photograph.
+ * Both forms are offered and Claude picks - for the draft box, and for Add
+ * to log - with the same rules the forms have always had, so a meal comes
+ * out the same whichever way it arrived. */
 const AI_LOG_SYSTEM = [
-    'You turn a line out of somebody\'s own notes about something they ate',
-    'into a DASH diet log entry. First decide what it describes:',
+    'You turn a description of something somebody ate - typed, a line out of',
+    'their notes, or a photograph - into a DASH diet log entry. First decide',
+    'what it describes:',
     '',
     '- One food or one drink, however much of it - "2 eggs", "a flat white",',
     '  "1.5 cups of chicken breast" - is an ingredient: call log_ingredient.',
+    '  So is one packaged product, and a nutrition panel, which describes one.',
     '- A dish, a plate or several foods eaten together - "eggs on toast",',
-    '  "chicken, rice and broccoli" - is a meal: call log_meal.',
+    '  "chicken, rice and broccoli", a photograph of a plate with more than',
+    '  one thing on it - is a meal: call log_meal.',
     '',
     'Call exactly one of the two, once. The rules for each follow.',
     '',
@@ -2069,19 +2076,26 @@ const AI_LOG_SYSTEM = [
 
 /* Resolves to { kind, draft }, kind being the picker tab the answer belongs
  * to, so the card and the note writer are the ones that tab would use. */
-async function aiDraftAny(plugin, description) {
+async function aiDraftAny(plugin, description, photo) {
     const ingredient = AI_KINDS.ingredients.tool();
     const meal = AI_KINDS.meals.tool();
     const headers = await aiHeaders(plugin);
     const model = aiModelId(plugin.settings, 'aiModel');
     const spend = aiSpend(model);
+    /* The picture first, as aiDraft sends it: it is the thing being asked
+     * about, and the words are what to do with it. */
+    const content = photo
+        ? [{ type: 'image',
+             source: { type: 'base64', media_type: photo.type, data: photo.data } },
+           { type: 'text', text: description }]
+        : description;
     const block = await aiFill(headers, {
         model: model,
         max_tokens: 8192,
         thinking: { type: 'adaptive' },
         output_config: { effort: plugin.settings.aiEffort || 'medium' },
-        system: AI_LOG_SYSTEM,
-        messages: [{ role: 'user', content: description }],
+        system: photo ? AI_LOG_SYSTEM + AI_PHOTO : AI_LOG_SYSTEM,
+        messages: [{ role: 'user', content: content }],
     }, [ingredient, meal], spend);
     const kind = block && block.name === meal.name ? 'meals' : 'ingredients';
     return { kind: kind, draft: aiChecked(kind, block, spend) };
@@ -2955,6 +2969,15 @@ class NoshRestaurantModal extends Modal {
         this.previewEl = box.createEl('pre');
 
         const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
+        /* The meal out nobody planned. There is no menu to look up any more,
+         * only what was had, and the place typed so far comes along. */
+        const ate = actions.createEl('button', { text: 'Already eaten' });
+        ate.setAttr('aria-label', 'Log what you had here instead of looking up the menu');
+        ate.addEventListener('click', () => {
+            this.answer = Object.assign({}, this.ask, { eaten: true });
+            this.close();
+        });
+
         const cancel = actions.createEl('button', { text: 'Cancel' });
         cancel.addEventListener('click', () => this.close());
 
@@ -3287,15 +3310,38 @@ class NoshPhotoModal extends Modal {
 class NoshDraftModal extends Modal {
     /* `opts.occasion` logs somewhere other than the occasion on screen - an
      * order eaten at dinner is dinner, whenever it is logged - and
-     * `opts.onCreated` hears about the note once it is in the vault. */
+     * `opts.onCreated` hears about the note once it is in the vault.
+     *
+     * A card opened through plugin.draftOpts() is kept if it is closed
+     * without being saved or cancelled - a tap outside it, Escape - so the
+     * answer that was paid for can be opened again. `opts.restore` is such
+     * a kept card: the portions, name and meal it was left at. */
     constructor(app, view, kind, draft, opts) {
         super(app);
         this.view = view;
         this.kind = kind;
+        /* As Claude answered it, before any portion was moved: the parts are
+         * rebuilt from this on reopening, and the totals from them. */
+        this.source = JSON.parse(JSON.stringify(draft));
         this.draft = Object.assign({}, draft);
         this.parts = draftParts(kind, this.draft);
         this.shouldLog = true;
         this.opts = opts || {};
+        this.finished = false;
+        this.discarded = false;
+
+        const back = this.opts.restore;
+        if (back) {
+            if (Array.isArray(back.qtys)) {
+                this.parts.forEach((part, i) => {
+                    const q = back.qtys[i];
+                    if (typeof q === 'number' && q >= 0) part.qty = q;
+                });
+            }
+            if (typeof back.name === 'string') this.draft.name = back.name;
+            if (typeof back.meal_type === 'string') this.draft.meal_type = back.meal_type;
+            if (typeof back.shouldLog === 'boolean') this.shouldLog = back.shouldLog;
+        }
     }
 
     /* One place where a changed portion becomes a changed meal: the draft's
@@ -3460,7 +3506,7 @@ class NoshDraftModal extends Modal {
 
         const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
         const cancel = actions.createEl('button', { text: 'Cancel' });
-        cancel.addEventListener('click', () => this.close());
+        cancel.addEventListener('click', () => this.discard());
 
         const create = actions.createEl('button', { cls: 'mod-cta', text: 'Create note' });
         create.addEventListener('click', async () => {
@@ -3468,6 +3514,9 @@ class NoshDraftModal extends Modal {
             try {
                 const file = await this.view.createFromDraft(
                     this.kind, this.draft, this.shouldLog, this.opts.occasion);
+                /* Nothing back means the which-note question was waved
+                 * away, and the card is as unsaved as it ever was. */
+                this.finished = !!file;
                 this.close();
                 /* The note is written by now, so nothing that goes wrong
                  * after this is a reason to offer writing it again. */
@@ -3486,13 +3535,14 @@ class NoshDraftModal extends Modal {
     saveActions(contentEl) {
         const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
         const cancel = actions.createEl('button', { text: 'Cancel' });
-        cancel.addEventListener('click', () => this.close());
+        cancel.addEventListener('click', () => this.discard());
 
         const save = actions.createEl('button', { cls: 'mod-cta', text: 'Save changes' });
         save.addEventListener('click', async () => {
             save.disabled = true;
             try {
                 await this.opts.save(this.draft);
+                this.finished = true;
                 this.close();
             } catch (e) {
                 save.disabled = false;
@@ -3501,8 +3551,98 @@ class NoshDraftModal extends Modal {
         });
     }
 
+    /* Cancel is the one way to close a card on purpose. */
+    discard() {
+        this.discarded = true;
+        this.close();
+    }
+
     onClose() {
         if (this.unfit) { this.unfit(); this.unfit = null; }
+        this.contentEl.empty();
+
+        const plugin = this.opts.plugin;
+        if (!plugin) return;
+        if (this.opts.keptAt) plugin.keptOpen(this.opts.keptAt, false);
+        if (this.finished || this.discarded) {
+            if (this.opts.keptAt) plugin.forgetDraft(this.opts.keptAt);
+            return;
+        }
+        plugin.keepDraft({
+            kind: this.kind,
+            draft: this.source,
+            qtys: this.parts.map((part) => part.qty),
+            name: String(this.draft.name || ''),
+            meal_type: this.draft.meal_type,
+            shouldLog: this.shouldLog,
+            resume: this.opts.resume || { type: 'new' },
+        }, this.opts.keptAt);
+    }
+}
+
+/* When a card was put down: the time for today's, the day for older ones. */
+function keptWhen(at) {
+    const d = new Date(at);
+    return isoOf(d) === todayIso()
+        ? d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+        : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+/* One line a kept card: its name, when, and the two things to do with it. */
+function keptRows(parent, kept, plugin, after) {
+    for (const k of kept) {
+        const row = parent.createDiv({ cls: 'nosh-kept-row' });
+        row.createSpan({ cls: 'nosh-kept-name', text: k.name || 'Draft' });
+        row.createSpan({ cls: 'nosh-kept-when', text: keptWhen(k.at) });
+        const open = row.createEl('button', { cls: 'nosh-kept-open', text: 'Reopen' });
+        open.addEventListener('click', () => {
+            if (after) after('open');
+            plugin.reopenDraft(k.at);
+        });
+        const drop = row.createEl('button', { cls: 'nosh-kept-drop', text: '\u00d7' });
+        drop.setAttr('aria-label', 'Discard this draft');
+        drop.addEventListener('click', () => {
+            plugin.forgetDraft(k.at);
+            if (after) after('drop');
+        });
+    }
+}
+
+class NoshKeptModal extends Modal {
+    constructor(app, plugin) {
+        super(app);
+        this.plugin = plugin;
+    }
+
+    onOpen() {
+        this.setTitle('Unsaved drafts');
+        this.contentEl.addClass('nosh-kept-list');
+        this.draw();
+    }
+
+    draw() {
+        const { contentEl } = this;
+        contentEl.empty();
+        const kept = this.plugin.keptDrafts();
+        if (!kept.length) {
+            this.close();
+            return;
+        }
+        const list = contentEl.createDiv({ cls: 'nosh-kept' });
+        keptRows(list, kept, this.plugin, (did) => {
+            if (did === 'open') this.close();
+            else this.draw();
+        });
+
+        const actions = contentEl.createDiv({ cls: 'nosh-draft-actions' });
+        const all = actions.createEl('button', { text: 'Discard all' });
+        all.addEventListener('click', () => {
+            this.plugin.setKeptDrafts([]);
+            this.close();
+        });
+    }
+
+    onClose() {
         this.contentEl.empty();
     }
 }
@@ -5204,10 +5344,10 @@ class NoshEditModal extends Modal {
         this.close();
         const { plugin, file } = this;
         const kind = this.opts.kind;
-        new NoshDraftModal(this.app, null, kind, draft, {
+        plugin.openDraft(kind, draft, {
+            type: 'edit', path: file.path, kind: kind, was: this.recipe.name,
             title: 'Edit ' + this.recipe.name,
-            save: (d) => plugin.saveEdit(file, kind, d, this.recipe.name),
-        }).open();
+        });
     }
 
     onClose() {
@@ -5337,6 +5477,17 @@ module.exports = class NoshPlugin extends Plugin {
                 const file = this.app.workspace.getActiveFile();
                 if (!editableKind(this.app, file, this.settings)) return false;
                 if (!checking) this.editNote(file);
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'reopen-draft',
+            name: 'Reopen unsaved draft',
+            icon: 'history',
+            checkCallback: (checking) => {
+                if (!this.keptDrafts().length) return false;
+                if (!checking) this.reopenDraft();
                 return true;
             },
         });
@@ -5695,6 +5846,161 @@ module.exports = class NoshPlugin extends Plugin {
         new Notice('Updated ' + saved.basename);
     }
 
+    /* Every draft card opens through here. `resume` says what saving it
+     * does, in a form that can be written down - a path, not a file; words,
+     * not a callback - so a card closed by accident can be rebuilt later
+     * doing exactly what it would have done. `kept` is that later. */
+    async openDraft(kind, draft, resume, view, kept) {
+        const r = resume || { type: 'new' };
+        const opts = { plugin: this, resume: r };
+        if (r.title) opts.title = r.title;
+        if (kept) {
+            opts.restore = kept;
+            opts.keptAt = kept.at;
+            this.keptOpen(kept.at, true);
+        }
+
+        if (r.type === 'edit') {
+            const file = this.app.vault.getAbstractFileByPath(r.path);
+            if (!file) {
+                new Notice('Nosh: the note this draft was editing is gone (' + r.path + ').', 8000);
+                if (kept) {
+                    this.keptOpen(kept.at, false);
+                    this.forgetDraft(kept.at);
+                }
+                return;
+            }
+            opts.save = (d) => this.saveEdit(file, r.kind || kind, d, r.was);
+            new NoshDraftModal(this.app, null, kind, draft, opts).open();
+            return;
+        }
+
+        const pane = view || await this.noshView();
+        if (!pane) {
+            if (kept) this.keptOpen(kept.at, false);
+            new Notice('Nosh: open the Nosh pane, then try again.', 8000);
+            return;
+        }
+        if (r.occasion) opts.occasion = r.occasion;
+        if (r.type === 'log') {
+            opts.onCreated = async (file) => {
+                const source = r.source ? this.app.vault.getAbstractFileByPath(r.source) : null;
+                await this.keepWords(file, r.text, source);
+                if (source) await this.linkWords(source, { start: r.start, text: r.text }, file);
+            };
+        } else if (r.type === 'outing' && r.path) {
+            opts.onCreated = (meal) => {
+                const orders = this.app.vault.getAbstractFileByPath(r.path);
+                return orders ? pane.settleOuting(orders, meal) : undefined;
+            };
+        }
+        new NoshDraftModal(this.app, pane, kind, draft, opts).open();
+    }
+
+    /* Cards closed unsaved, newest first, on this device only: they are a
+     * moment's work rather than a record, and a card reopened on a second
+     * device would log a second time. Past KEPT_DRAFTS_MAX the oldest goes,
+     * being the one least likely to be wanted. */
+    keptDrafts() {
+        if (!this.lostDrafts) {
+            const load = (k) => (typeof this.app.loadLocalStorage === 'function'
+                ? this.app.loadLocalStorage(k) : null);
+            const list = load(KEPT_DRAFTS_LOCAL);
+            this.lostDrafts = (Array.isArray(list) ? list : [])
+                .filter((k) => k && typeof k === 'object' && k.draft && k.at);
+            /* The single card a test build kept, folded into the list. */
+            const one = load(KEPT_DRAFT_LOCAL);
+            if (one && typeof one === 'object' && one.draft && one.at) {
+                if (!this.lostDrafts.some((k) => k.at === one.at)) this.lostDrafts.unshift(one);
+                this.saveKeptDrafts();
+                this.app.saveLocalStorage(KEPT_DRAFT_LOCAL, null);
+            }
+        }
+        return this.lostDrafts;
+    }
+
+    keptDraft(at) {
+        return this.keptDrafts().find((k) => k.at === at) || null;
+    }
+
+    saveKeptDrafts() {
+        if (typeof this.app.saveLocalStorage === 'function') {
+            this.app.saveLocalStorage(KEPT_DRAFTS_LOCAL,
+                this.lostDrafts.length ? this.lostDrafts : null);
+        }
+    }
+
+    setKeptDrafts(list) {
+        this.lostDrafts = list.slice(0, KEPT_DRAFTS_MAX);
+        this.saveKeptDrafts();
+        this.refreshViews();
+    }
+
+    /* `replacing` is the entry a reopened card came from: closed unsaved
+     * again, it takes that entry's place rather than standing beside it. */
+    keepDraft(kept, replacing) {
+        const list = this.keptDrafts().filter((k) => k.at !== replacing);
+        let at = Date.now();
+        while (list.some((k) => k.at === at)) at++;
+        kept.at = at;
+        this.setKeptDrafts([kept].concat(list));
+
+        const name = kept.name || 'The draft';
+        const reopen = () => this.reopenDraft(at);
+        if (typeof createFragment === 'function') {
+            let notice = null;
+            const said = createFragment((f) => {
+                f.appendText(name + ' was closed without saving. ');
+                const a = f.createEl('a', { text: 'Reopen', href: '#' });
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (notice) notice.hide();
+                    reopen();
+                });
+            });
+            notice = new Notice(said, 10000);
+        } else {
+            new Notice(name + ' was closed without saving. Reopen it from the ' +
+                       'command palette: Reopen unsaved draft.', 10000);
+        }
+    }
+
+    /* Only the card that was kept clears its entry: saving some other draft
+     * in the meantime says nothing about this one. */
+    forgetDraft(at) {
+        const list = this.keptDrafts();
+        if (list.some((k) => k.at === at)) this.setKeptDrafts(list.filter((k) => k.at !== at));
+    }
+
+    /* One by its stamp, or the only one there is; with several and none
+     * named, the list to choose from. A draft already open on screen is not
+     * opened a second time, which could only end in it being saved twice. */
+    async reopenDraft(at) {
+        const list = this.keptDrafts();
+        if (at === undefined && list.length > 1) {
+            new NoshKeptModal(this.app, this).open();
+            return;
+        }
+        const kept = at === undefined ? list[0] : this.keptDraft(at);
+        if (!kept) {
+            new Notice('Nosh: there is no unsaved draft to reopen.');
+            return;
+        }
+        if (!this.openKept) this.openKept = new Set();
+        if (this.openKept.has(kept.at)) {
+            new Notice('Nosh: ' + (kept.name || 'that draft') + ' is already open.');
+            return;
+        }
+        await this.openDraft(kept.kind, kept.draft, kept.resume, null, kept);
+    }
+
+    /* Told by a card when it opens and closes, for reopenDraft's sake. */
+    keptOpen(at, open) {
+        if (!this.openKept) this.openKept = new Set();
+        if (open) this.openKept.add(at);
+        else this.openKept.delete(at);
+    }
+
     /* The card logs through the pane - its day, its occasion - so the pane
      * is opened if it is not, and woken if Obsidian deferred it. */
     async noshView() {
@@ -5731,12 +6037,10 @@ module.exports = class NoshPlugin extends Plugin {
             wait.hide();
         }
 
-        new NoshDraftModal(this.app, view, got.kind, got.draft, {
-            onCreated: async (file) => {
-                await this.keepWords(file, span.text, source);
-                if (source) await this.linkWords(source, span, file);
-            },
-        }).open();
+        await this.openDraft(got.kind, got.draft, {
+            type: 'log', source: source ? source.path : '',
+            start: span.start, text: span.text,
+        }, view);
     }
 
     /* The words move into the note they became, so what was written at the
@@ -7158,8 +7462,17 @@ class NoshView extends ItemView {
             go.disabled = true;
             go.setAttr('aria-label', 'No target is set or shown for today');
             /* A day with nothing left to aim at may be one that a dinner out
-             * just filled, and that dinner still wants logging. */
-            this.renderAteOut(el);
+             * just filled, and that dinner still wants logging. Eating out
+             * is not offered here, so neither is its Already eaten, and the
+             * plain button stands in for both. */
+            const pending = this.outingsFor(this.cursor);
+            for (const p of pending) this.renderAteRow(el, p);
+            if (!pending.length) {
+                const ate = el.createEl('button', { cls: 'nosh-suggest-btn' });
+                ate.setText('\u{1F9FE}  Ate out');
+                ate.setAttr('aria-label', 'Log a meal you had at a restaurant');
+                ate.addEventListener('click', () => this.askAteOut(ate, {}));
+            }
             return;
         }
 
@@ -7187,7 +7500,7 @@ class NoshView extends ItemView {
                     this.plugin, 'suggest', this.suggestionPrompt(asked));
                 draft.serves = asked.serves;
                 await this.keepAsk('suggest', null);
-                new NoshDraftModal(this.app, this, 'suggest', draft).open();
+                await this.plugin.openDraft('suggest', draft, { type: 'new' }, this);
             } catch (e) {
                 new Notice('Nosh AI: ' + (e && e.message ? e.message : e) +
                            ' What you typed is kept for the next try.', 8000);
@@ -7198,14 +7511,26 @@ class NoshView extends ItemView {
         });
 
         this.renderEatingOut(el);
-        this.renderAteOut(el);
     }
 
     /* The same question for a night when somebody else is cooking. Asked of
      * the same gaps, so it lives and hides with the button above it. The
      * answer is a few orders rather than one, kept in a note until the meal
-     * is over; renderAteOut is the other half. */
+     * is over - and while they are kept, the button is the other half: Ate
+     * out at the place, to say which one it was. One button for one meal
+     * out, whichever end of it you are at.
+     *
+     * Orders kept for another meal of the day stay on offer beside it, named
+     * with their meal, until they are settled or cleared. */
     renderEatingOut(el) {
+        const pending = this.outingsFor(this.cursor);
+        const here = pending.filter((p) => p.occasion === this.occasion);
+        for (const p of here) this.renderAteRow(el, p);
+        if (!here.length) this.renderEatingOutButton(el);
+        for (const p of pending) if (!here.includes(p)) this.renderAteRow(el, p);
+    }
+
+    renderEatingOutButton(el) {
         const out = el.createEl('button', { cls: 'nosh-suggest-btn' });
         out.setText('🍴  Eating out?');
         out.setAttr('aria-label',
@@ -7214,6 +7539,10 @@ class NoshView extends ItemView {
         out.addEventListener('click', async () => {
             const asked = await this.askRestaurant();
             if (!asked) return;
+            if (asked.eaten) {
+                this.askAteOut(out, { place: asked.place, occasion: this.occasion });
+                return;
+            }
 
             this.plugin.settings.restaurantNear = String(asked.near || '').trim();
             await this.keepAsk('restaurant', asked);
@@ -7260,53 +7589,41 @@ class NoshView extends ItemView {
         });
     }
 
-    /* Eating out's other half, and always on offer, since plenty of meals
-     * out are never planned. Once per restaurant asked about for the day on
-     * screen and not yet settled, naming it, so it appears the moment the
-     * orders are kept and goes once one of them is logged; with none, one
-     * plain button that asks what was had. */
-    renderAteOut(el) {
-        const pending = this.outingsFor(this.cursor);
-        for (const p of pending) {
-            const row = el.createDiv({ cls: 'nosh-ate-row' });
-            const ate = row.createEl('button', { cls: 'nosh-suggest-btn' });
-            ate.setText('\u{1F9FE}  Ate out at ' + p.restaurant +
-                        (p.occasion && p.occasion !== this.occasion
-                            ? ' (' + occasionLabel(p.occasion).toLowerCase() + ')'
-                            : ''));
-            /* Named in full here too, since a long name is cut short on the
-             * button itself. */
-            ate.setAttr('aria-label', 'Pick what you had at ' + p.restaurant +
-                                      ' from the orders Claude offered');
-            ate.addEventListener('click', async () => {
-                const outing = readOuting(await this.app.vault.read(p.file), p.fm);
-                if (!outing) {
-                    new Notice('Nosh could not read the orders in ' +
-                               p.file.basename + '.', 8000);
-                    return;
-                }
-                new NoshOutingModal(this.app, outing, {
-                    picking: true,
-                    onPick: (picked) => this.pickOuting(ate, p.file, outing, picked),
-                }).open();
-            });
+    /* One kept set of orders: Ate out at the place, and a cross for when
+     * the plans changed and it was never gone to. */
+    renderAteRow(el, p) {
+        const row = el.createDiv({ cls: 'nosh-ate-row' });
+        const ate = row.createEl('button', { cls: 'nosh-suggest-btn' });
+        ate.setText('\u{1F9FE}  Ate out at ' + p.restaurant +
+                    (p.occasion && p.occasion !== this.occasion
+                        ? ' (' + occasionLabel(p.occasion).toLowerCase() + ')'
+                        : ''));
+        /* Named in full here too, since a long name is cut short on the
+         * button itself. */
+        ate.setAttr('aria-label', 'Pick what you had at ' + p.restaurant +
+                                  ' from the orders Claude offered');
+        ate.addEventListener('click', async () => {
+            const outing = readOuting(await this.app.vault.read(p.file), p.fm);
+            if (!outing) {
+                new Notice('Nosh could not read the orders in ' +
+                           p.file.basename + '.', 8000);
+                return;
+            }
+            new NoshOutingModal(this.app, outing, {
+                picking: true,
+                onPick: (picked) => this.pickOuting(ate, p.file, outing, picked),
+            }).open();
+        });
 
-            /* Plans change, and a restaurant that was never gone to should
-             * not sit on the day asking to be logged. */
-            const clear = row.createEl('button', { cls: 'nosh-ate-clear' });
-            clear.setAttr('aria-label', 'Clear the orders for ' + p.restaurant);
-            setIcon(clear, 'x');
-            clear.addEventListener('click', () => {
-                this.clearOuting(p.file, p.restaurant).catch((e) => new Notice(
-                    'Nosh: ' + (e && e.message ? e.message : e), 8000));
-            });
-        }
-        if (pending.length) return;
-
-        const ate = el.createEl('button', { cls: 'nosh-suggest-btn' });
-        ate.setText('\u{1F9FE}  Ate out');
-        ate.setAttr('aria-label', 'Log a meal you had at a restaurant');
-        ate.addEventListener('click', () => this.askAteOut(ate, {}));
+        /* Plans change, and a restaurant that was never gone to should not
+         * sit on the day asking to be logged. Cleared, Eating out is back. */
+        const clear = row.createEl('button', { cls: 'nosh-ate-clear' });
+        clear.setAttr('aria-label', 'Clear the orders for ' + p.restaurant);
+        setIcon(clear, 'x');
+        clear.addEventListener('click', () => {
+            this.clearOuting(p.file, p.restaurant).catch((e) => new Notice(
+                'Nosh: ' + (e && e.message ? e.message : e), 8000));
+        });
     }
 
     /* Notes of orders for this day that nothing has been logged from. Read
@@ -7355,10 +7672,8 @@ class NoshView extends ItemView {
             this.askAteOut(button, { place: outing.restaurant, occasion, file });
             return;
         }
-        new NoshDraftModal(this.app, this, 'restaurant', optionDraft(outing, picked), {
-            occasion: occasion,
-            onCreated: (meal) => this.settleOuting(file, meal),
-        }).open();
+        this.plugin.openDraft('restaurant', optionDraft(outing, picked),
+            { type: 'outing', path: file.path, occasion: occasion }, this);
     }
 
     /* A meal out that was not one of the orders offered, or was never asked
@@ -7393,10 +7708,11 @@ class NoshView extends ItemView {
         if (place) draft.restaurant = place;
         const occasion = from.occasion || this.occasion;
         if (MEAL_ORDER.includes(occasion)) draft.meal_type = occasion;
-        new NoshDraftModal(this.app, this, 'meals', draft, {
+        await this.plugin.openDraft('meals', draft, {
+            type: from.file ? 'outing' : 'new',
+            path: from.file ? from.file.path : '',
             occasion: from.occasion,
-            onCreated: from.file ? (meal) => this.settleOuting(from.file, meal) : undefined,
-        }).open();
+        }, this);
     }
 
     /* A meal described after the fact, like any other, with the one thing a
@@ -8018,6 +8334,11 @@ class NoshView extends ItemView {
         this.renderSuggest();
         el.createDiv({ cls: 'nosh-rule' });
 
+        /* One box for both, above the tabs rather than inside them: Claude
+         * says whether it was a meal or an ingredient, so which tab happens
+         * to be open has nothing to add. */
+        this.renderCompose(el);
+
         const switcher = el.createDiv({ cls: 'nosh-source' });
         const logged = this.occasionServings();
 
@@ -8047,10 +8368,7 @@ class NoshView extends ItemView {
         build.setAttr('aria-label', 'Put a meal together out of ingredients');
         build.addEventListener('click', () => this.setSource(BUILD_KEY));
 
-        /* A draft lands in the folder behind the tab you are on, so the box
-         * follows the switcher rather than sitting above it. */
         if (building) this.renderBuild(el);
-        else this.renderCompose(el, source);
 
         const row = el.createDiv({ cls: 'nosh-filter' });
         /* The box holds the field and the cross together, so the cross can sit
@@ -8670,10 +8988,11 @@ class NoshView extends ItemView {
         });
     }
 
-    /* Describe it, and Claude fills in the numbers. Which tab you are on picks
-     * the prompt and the folder. Nothing reaches the vault until the draft has
-     * been read, so a bad guess costs a glance. */
-    renderCompose(parent, source) {
+    /* Describe it, and Claude fills in the numbers - and decides whether it
+     * is a meal or an ingredient, which picks the form and the folder. Nothing
+     * reaches the vault until the draft has been read, so a bad guess costs a
+     * glance. */
+    renderCompose(parent) {
         /* What is in the box outlives the box. The panel is redrawn whenever
          * anything is logged, which used to take a half-typed description
          * with it; and once sent, the words are kept in data.json until an
@@ -8681,10 +9000,28 @@ class NoshView extends ItemView {
          * a phone that puts Obsidian away mid-draft does not lose them. */
         if (!this.composeText) this.composeText = {};
         if (!this.composeBusy) this.composeBusy = {};
-        const key = source.key;
-        const kept = this.unsentAsk('draft-' + key);
+        const key = 'any';
+        /* Words sent from one of the old per-tab boxes and never answered
+         * are still the words to start from. */
+        const kept = this.unsentAsk('draft-' + key) ||
+            this.unsentAsk('draft-meals') || this.unsentAsk('draft-ingredients');
         if (this.composeText[key] === undefined && kept) {
             this.composeText[key] = String(kept.text || '');
+        }
+
+        /* A card closed without saving waits here until it is saved or
+         * cancelled, so a tap outside one never costs the answer. */
+        const waiting = this.plugin.keptDrafts();
+        if (waiting.length) {
+            const list = parent.createDiv({ cls: 'nosh-kept' });
+            keptRows(list, waiting.slice(0, KEPT_SHOWN), this.plugin);
+            if (waiting.length > KEPT_SHOWN) {
+                const more = list.createEl('button', {
+                    cls: 'nosh-kept-open nosh-kept-more',
+                    text: (waiting.length - KEPT_SHOWN) + ' more\u2026',
+                });
+                more.addEventListener('click', () => new NoshKeptModal(this.app, this.plugin).open());
+            }
         }
 
         const box = parent.createDiv({ cls: 'nosh-ai' });
@@ -8693,7 +9030,7 @@ class NoshView extends ItemView {
          * and Enter starts a new line. */
         const input = box.createEl('textarea', { cls: 'nosh-ai-input' });
         input.rows = 2;
-        input.placeholder = 'Describe a ' + source.noun + '\u2026';
+        input.placeholder = 'Describe a meal or an ingredient\u2026';
         input.value = this.composeText[key] || '';
         input.addEventListener('input', () => { this.composeText[key] = input.value; });
         const go = box.createEl('button', { cls: 'nosh-ai-go', text: 'Draft' });
@@ -8732,14 +9069,20 @@ class NoshView extends ItemView {
             try {
                 /* With a picture, the words are about the picture, so it is
                  * said what the picture is before what was said about it. */
-                const draft = await aiDraft(this.plugin, source.key,
-                    photo ? ['This photograph is the ' + source.noun + '.', text]
+                const got = await aiDraftAny(this.plugin,
+                    photo ? ['This photograph is what was eaten.', text]
                                 .filter(Boolean).join(' ')
                           : text,
                     photo);
                 this.composeText[key] = '';
                 await this.keepAsk('draft-' + key, null);
-                new NoshDraftModal(this.app, this, source.key, draft).open();
+                await this.keepAsk('draft-meals', null);
+                await this.keepAsk('draft-ingredients', null);
+                /* The list behind the card turns to the tab the note will
+                 * land in, so it is there to see once it is written. Not
+                 * while a meal is being built, which has a list of its own. */
+                if (this.source !== BUILD_KEY) this.setSource(got.kind);
+                await this.plugin.openDraft(got.kind, got.draft, { type: 'new' }, this);
             } catch (e) {
                 new Notice('Nosh AI: ' + (e && e.message ? e.message : e) +
                            (text ? ' What you typed is kept for the next try.' : ''), 8000);

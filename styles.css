@@ -1291,6 +1291,73 @@
     padding: 0 0 8px;
 }
 
+/* Drafts closed without saving, each one tap from being open again: under
+ * the draft box in the pane, and all of them in the Unsaved drafts list. */
+.nosh-kept {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 0 6px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.nosh-kept-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 22px;
+}
+
+.nosh-kept-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nosh-kept-when {
+    flex: 0 0 auto;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.nosh-kept .nosh-kept-open,
+.nosh-kept .nosh-kept-drop {
+    flex: 0 0 auto;
+    height: auto;
+    padding: 0 2px;
+    color: var(--text-accent);
+    font-size: var(--font-ui-smaller);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.nosh-kept .nosh-kept-drop {
+    color: var(--text-faint);
+}
+
+.nosh-kept .nosh-kept-open:hover {
+    color: var(--text-accent-hover);
+    text-decoration: underline;
+}
+
+.nosh-kept .nosh-kept-drop:hover {
+    color: var(--text-error);
+}
+
+.nosh-kept .nosh-kept-more {
+    align-self: flex-start;
+    padding: 0;
+}
+
+.nosh-kept-list .nosh-kept {
+    font-size: var(--font-ui-small);
+}
+
 .nosh-tracker .nosh-ai-input {
     flex: 1 1 auto;
     min-width: 0;

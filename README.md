@@ -245,10 +245,13 @@ including anything you typed into it.
 
 Off until you add an API key. It adds:
 
-- Drafting. Describe a food, or photograph a label or a plate, and get a note
-  with estimated numbers. You can add a note like *half of it* before sending.
-  The draft lists each ingredient with a portion you can correct, and the
-  nutrients recompute from those.
+- Drafting. In the box above the Ingredients and Meals tabs, describe what you
+  ate, or photograph a label or a plate, and get a note with estimated
+  numbers. Claude decides whether it's an ingredient (one food, one product,
+  a nutrition panel) or a meal (a dish, or a plate of several things), and the
+  list switches to that tab. You can add a note like *half of it* before
+  sending. The draft lists each ingredient with a portion you can correct, and
+  the nutrients recompute from those.
 - What's for… Suggests a meal that fits what's left of your day, with a method.
   It asks how many you're cooking for, how much effort you want, and what needs
   using up.
@@ -259,11 +262,19 @@ Off until you add an API key. It adds:
   to the menu it used. Nothing is logged yet: the orders are kept in a note
   under `Eating out`, so you can decide at the table. Web searches are billed
   on top of the tokens, a few cents a time.
-- Ate out. After the meal, pick the order you had from the ones Eating out
-  offered, adjust any portion (half of it boxed, say), and it's logged to the
-  meal you asked about. The meal note lists the other options too. Had
-  something else, or never asked? Say where you ate and what you had, and
-  Claude estimates it at restaurant portions.
+- Ate out. While orders are kept, the Eating out button becomes *Ate out at*
+  the restaurant. After the meal, pick the order you had, adjust any portion
+  (half of it boxed, say), and it's logged to the meal you asked about. The
+  meal note lists the other options too. Had something else? Say what you
+  had, and Claude estimates it at restaurant portions. The × beside it clears
+  the orders if you never went. Never asked at all? Press Eating out, then
+  *Already eaten*.
+- Unsaved drafts are kept. Close a draft without Create note or Cancel (a tap
+  outside it, Escape) and it waits under the draft box, with your portion and
+  name changes, until you reopen it from there, from the notice, or with
+  *Reopen unsaved draft*. So an answer you paid for isn't lost to a stray tap.
+  Up to ten are kept, newest first, on that device only. The × beside one
+  discards it.
 - Add to log. Select a line in any note, such as *2 eggs scrambled in butter*,
   and choose Add to log from the right-click menu or the command palette. With
   nothing selected it uses the line the cursor is on. Claude decides whether
