@@ -16,9 +16,10 @@ Website: [nosh.health](https://nosh.health/)
 Nosh works offline. The optional Nosh AI features stay off until you add an
 API key. With them on:
 
-- Network use. What you type into a draft, the note you ask about, and any
-  photo you take are sent to the Anthropic API at `api.anthropic.com`, and only
-  when you press the button that sends them. There is no telemetry and no other
+- Network use. What you type into a draft, the line you select for Add to
+  log, the note you ask about or edit, a restaurant you name, and any photo you
+  take are sent to the Anthropic API at `api.anthropic.com`, and only when you
+  press the button that sends them. There is no telemetry and no other
   network use.
 - Account and cost. Nosh AI needs an Anthropic developer platform account, and
   every request is billed to it at API rates. A claude.ai subscription can't be
@@ -245,13 +246,19 @@ including anything you typed into it.
 
 Off until you add an API key. It adds:
 
-- Drafting. In the box above the Ingredients and Meals tabs, describe what you
-  ate, or photograph a label or a plate, and get a note with estimated
-  numbers. Claude decides whether it's an ingredient (one food, one product,
-  a nutrition panel) or a meal (a dish, or a plate of several things), and the
-  list switches to that tab. You can add a note like *half of it* before
-  sending. The draft lists each ingredient with a portion you can correct, and
-  the nutrients recompute from those.
+- Drafting, several ways in. Each ends at the same draft card, and Claude
+  decides whether it's an ingredient (one food, one product, a nutrition panel)
+  or a meal (a dish, or a plate of several things):
+  - *Draft*, above the Ingredients and Meals tabs: describe what you ate.
+  - The camera beside it: photograph a label or a plate. You can add a note
+    like *half of it* before sending.
+  - *Add to log*, from any note: select a line you wrote (below).
+  - *Edit this meal*, from a note's menu: say what changed (below).
+  - *Eating out*, then *Ate out at* the restaurant (below).
+
+  The draft lists each ingredient with a portion you can correct, and the
+  nutrients recompute from those. The list switches to the tab the note will
+  land in.
 - What's for… Suggests a meal that fits what's left of your day, with a method.
   It asks how many you're cooking for, how much effort you want, and what needs
   using up.
@@ -269,12 +276,13 @@ Off until you add an API key. It adds:
   had, and Claude estimates it at restaurant portions. The × beside it clears
   the orders if you never went. Never asked at all? Press Eating out, then
   *Already eaten*.
-- Unsaved drafts are kept. Close a draft without Create note or Cancel (a tap
-  outside it, Escape) and it waits under the draft box, with your portion and
-  name changes, until you reopen it from there, from the notice, or with
-  *Reopen unsaved draft*. So an answer you paid for isn't lost to a stray tap.
-  Up to ten are kept, newest first, on that device only. The × beside one
-  discards it.
+- Drafts are kept. Close a card without Cancel (a tap outside it, Escape) and
+  it waits in the Drafts section under the Draft button until you reopen it.
+  Words you typed and didn't send show there as *not sent*. A draft card that
+  came back from Claude keeps your portion and name changes, and can also be
+  reopened from the notice or with *Reopen unsaved draft*. So an answer you
+  paid for isn't lost to a stray tap. Up to ten are kept, newest first, on
+  that device only. The × beside one discards it.
 - Add to log. Select a line in any note, such as *2 eggs scrambled in butter*,
   and choose Add to log from the right-click menu or the command palette. With
   nothing selected it uses the line the cursor is on. Claude decides whether
@@ -303,8 +311,8 @@ Sonnet's price, and suits plain foods that need little judgement.
 On a phone, switching to another app while Claude is answering cuts the call
 off, because plugins can't run in the background. When you come back to
 Obsidian, Nosh asks again by itself. Whatever you typed into What's for…,
-Eating out, Ate out or the drafting box is kept until it gets an answer, even
-if Obsidian was closed.
+Eating out, Ate out or the Draft card is kept until it gets an answer, even if
+Obsidian was closed.
 
 Each answer shows roughly what it cost, with the model and token counts, under
 the draft card or the recipe answer. For a reading, it shows as a notice, so it

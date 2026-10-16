@@ -588,6 +588,15 @@ button { font: inherit; color: inherit; }
 .s-msg em { display: block; color: var(--screen-text-2); font-style: normal; font-size: 0.9em; margin-top: 0.3em; }
 .s-read { font-size: 0.88em; line-height: 1.4; color: var(--screen-text-2); }
 .s-read b { display: block; color: var(--screen-text); font-family: var(--font-head); font-weight: 600; }
+.ways { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: clamp(40px, 6vw, 64px); list-style: none; padding: 0; }
+.way { display: grid; grid-template-rows: auto auto 1fr; gap: 10px; padding: 20px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--bg); }
+.way-ic { width: 44px; height: 44px; border-radius: 12px; background: var(--primary-soft); color: var(--primary-text); display: grid; place-items: center; }
+.way-ic svg { width: 22px; height: 22px; }
+.way h3 { font-family: var(--font-head); font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.01em; line-height: 1.2; }
+.way h3 small { display: block; margin-top: 3px; font-family: var(--font-body); font-weight: 500; font-size: 0.8125rem; letter-spacing: 0; color: var(--accent-text); }
+.way p { color: var(--text-2); font-size: 0.9375rem; text-wrap: pretty; }
+.ways-note { grid-column: 1 / -1; margin-top: 4px; color: var(--text-2); font-size: 0.9375rem; text-wrap: pretty; }
+.ways-note b { color: var(--text); font-family: var(--font-head); font-weight: 600; }
 .ai-facts { margin-top: clamp(40px, 6vw, 64px); padding-top: 28px; border-top: 1px solid var(--rule); display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(20px, 4vw, 48px); }
 .ai-fact { display: flex; gap: 12px; align-items: flex-start; color: var(--text-2); font-size: 0.9375rem; text-wrap: pretty; }
 .ai-fact svg { flex: none; width: 20px; height: 20px; margin-top: 2px; color: var(--accent-text); }
@@ -610,6 +619,10 @@ button { font: inherit; color: inherit; }
   .ai-media { justify-items: start; }
   .ai-media .phone { --phone-w: 230px; }
   .ai-facts { grid-template-columns: 1fr; }
+  .ways { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 16px 20px; margin-inline: -16px; scrollbar-width: none; scroll-padding-inline: 16px; }
+  .ways::-webkit-scrollbar { display: none; }
+  .way { flex: 0 0 min(78%, 300px); scroll-snap-align: start; }
+  .ways-note { flex: 0 0 min(78%, 300px); align-self: center; scroll-snap-align: start; }
 }
 
 /* ---------- Pricing ---------- */
@@ -1132,9 +1145,38 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
   <div class="wrap">
     <div class="section-head">
       <div class="eyebrow reveal">Nosh AI · optional</div>
-      <h2 id="ai-title" class="reveal" style="--i:1">Four things that need a model. Off until you say so.</h2>
-      <p class="reveal" style="--i:2">Give Nosh an Anthropic API key and four more things switch on. Each sends only what it needs, only when you press the button that asks for it, and only to the Anthropic API.</p>
+      <h2 id="ai-title" class="reveal" style="--i:1">A draft from wherever the food turns up. Off until you say so.</h2>
+      <p class="reveal" style="--i:2">Give Nosh an Anthropic API key and drafting switches on. There is more than one way in, because food turns up in more than one place: a thought, a label, a line in your journal, a menu. Every way ends at the same card. Claude decides whether it was a meal or an ingredient, and nothing reaches your vault until you have read it.</p>
     </div>
+
+    <ul class="ways" aria-label="Ways to make a draft">
+      <li class="way reveal" style="--i:0">
+        <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></span>
+        <h3>Type it<small>Draft</small></h3>
+        <p>Press Draft above your meals and ingredients and say what you ate, how much if you know. "Two eggs scrambled in butter, a slice of sourdough."</p>
+      </li>
+      <li class="way reveal" style="--i:1">
+        <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+        <h3>Photograph it<small>Camera</small></h3>
+        <p>A nutrition label is read rather than guessed at. A plate is estimated from what is on it. Add "half of it" and the portion follows.</p>
+      </li>
+      <li class="way reveal" style="--i:2">
+        <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6M9 13h6M9 17h3"/></svg></span>
+        <h3>Jot it anywhere<small>Add to log</small></h3>
+        <p>Select a line in your journal, or any note, and choose Add to log. It becomes a note, logged, and a link takes the place of the words.</p>
+      </li>
+      <li class="way reveal" style="--i:3">
+        <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></span>
+        <h3>Change it in words<small>Edit this meal</small></h3>
+        <p>"It was brown rice, not white." "Half the cheese." Claude redrafts the note, and you check the portions before it is saved over.</p>
+      </li>
+      <li class="way reveal" style="--i:4">
+        <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v8a2 2 0 0 0 4 0V3M9 11v10M16 21V3c2 1 3 3.5 3 7h-3"/></svg></span>
+        <h3>Order it<small>Eating out</small></h3>
+        <p>Name the restaurant and Claude reads the menu for orders that fit what is left of your day. Afterwards the same button says Ate out there, and logs the one you had.</p>
+      </li>
+      <li class="ways-note reveal" style="--i:5"><b>Nothing is lost to a stray tap.</b> Close a card by accident, or leave words unsent, and it waits under Drafts until you reopen it, so an answer you paid for is still there.</li>
+    </ul>
     <div class="ai-grid">
       <div class="ai-media reveal">
         <div class="phone" aria-hidden="true">
@@ -1197,7 +1239,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
       <div class="ai-list" role="group" aria-label="Nosh AI features. Choose one to show it on the phone.">
         <button class="ai-item reveal" style="--i:0" type="button" aria-pressed="true" data-screen="ai-screen-0">
           <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg></span>
-          <span><span class="ai-h">Draft a note from words or a photo</span><p>Describe a meal in plain words, or photograph a label or a plate. A label is read rather than guessed at. The draft comes back as ingredients with portions you can correct, and the nutrients are recomputed from the parts.</p></span>
+          <span><span class="ai-h">The draft card</span><p>However it started, a draft comes back as ingredients with portions you can correct, and the nutrients are recomputed from the parts. Claude says whether it is a meal or an ingredient, and it is filed there.</p></span>
         </button>
         <button class="ai-item reveal" style="--i:1" type="button" aria-pressed="false" data-screen="ai-screen-1">
           <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18M5 11a7 7 0 0 1 14 0M4 15h16l-1 4H5z"/></svg></span>
@@ -1247,10 +1289,11 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
       <div class="plan featured reveal" style="--i:1">
         <div class="plan-name">Nosh AI</div>
         <div class="plan-price"><b>Your key</b><span>billed by Anthropic at API rates</span></div>
-        <p>The same free plugin, plus four things that need a model. Nothing is sent until you press the button that asks for it.</p>
+        <p>The same free plugin, plus the things that need a model. Nothing is sent until you press the button that asks for it.</p>
         <ul>
-          <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--primary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Draft a note from a description, or from a photo of a label or a plate</li>
+          <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--primary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Drafts from words, a photo, a line in any note, a change in plain words, or a menu</li>
           <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--primary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>What's for dinner: a meal that fits what the day still has room for, with a method</li>
+          <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--primary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Eating out: orders that fit, read from the restaurant's own menu</li>
           <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--primary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Ask about any recipe in your vault, including ones Nosh did not write</li>
           <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--primary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>A reading on any report: what the days show and what to watch</li>
         </ul>
@@ -1281,7 +1324,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
         </div>
         <div class="faq-item reveal" style="--i:2">
           <h3>Does anything leave my vault?</h3>
-          <p>Not unless you turn on Nosh AI and press a button that asks for it. Then what you typed into a draft, the note you are asking about, or the photo you took goes to the Anthropic API and nowhere else. There is no telemetry, no account with the author, and no file is read or written outside the vault.</p>
+          <p>Not unless you turn on Nosh AI and press a button that asks for it. Then what you typed into a draft or selected in a note, the note you are asking about or editing, the photo you took, or the restaurant you named goes to the Anthropic API and nowhere else. There is no telemetry, no account with the author, and no file is read or written outside the vault.</p>
         </div>
         <div class="faq-item reveal" style="--i:3">
           <h3>I am not following DASH. Can I set my own targets?</h3>
