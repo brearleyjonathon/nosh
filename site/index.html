@@ -595,8 +595,6 @@ button { font: inherit; color: inherit; }
 .way h3 { font-family: var(--font-head); font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.01em; line-height: 1.2; }
 .way h3 small { display: block; margin-top: 3px; font-family: var(--font-body); font-weight: 500; font-size: 0.8125rem; letter-spacing: 0; color: var(--accent-text); }
 .way p { color: var(--text-2); font-size: 0.9375rem; text-wrap: pretty; }
-.ways-note { grid-column: 1 / -1; margin-top: 4px; color: var(--text-2); font-size: 0.9375rem; text-wrap: pretty; }
-.ways-note b { color: var(--text); font-family: var(--font-head); font-weight: 600; }
 .ai-facts { margin-top: clamp(40px, 6vw, 64px); padding-top: 28px; border-top: 1px solid var(--rule); display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(20px, 4vw, 48px); }
 .ai-fact { display: flex; gap: 12px; align-items: flex-start; color: var(--text-2); font-size: 0.9375rem; text-wrap: pretty; }
 .ai-fact svg { flex: none; width: 20px; height: 20px; margin-top: 2px; color: var(--accent-text); }
@@ -622,7 +620,6 @@ button { font: inherit; color: inherit; }
   .ways { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 16px 20px; margin-inline: -16px; scrollbar-width: none; scroll-padding-inline: 16px; }
   .ways::-webkit-scrollbar { display: none; }
   .way { flex: 0 0 min(78%, 300px); scroll-snap-align: start; }
-  .ways-note { flex: 0 0 min(78%, 300px); align-self: center; scroll-snap-align: start; }
 }
 
 /* ---------- Pricing ---------- */
@@ -742,7 +739,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
   <div class="wrap">
     <div class="hero-copy">
       <h1 id="hero-title" class="reveal" style="--i:0"><span class="hero-name">nosh</span><span class="hero-verbs">log. see. adjust.</span></h1>
-      <p class="reveal" style="--i:1">Nosh reads the meals and ingredients you keep as notes in Obsidian, adds them up as you eat, and draws them against DASH targets. On your desk and on your phone.</p>
+      <p class="reveal" style="--i:1">Nosh uses notes in Obsidian, defined as meals and ingredients, to track macros, nutrition, and progress. Seamless between your desk and your phone, synced along with your vault.</p>
       <div class="hero-cta reveal" style="--i:2">
         <a class="btn btn-store" href="obsidian://show-plugin?id=nosh">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
@@ -755,7 +752,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
       </div>
       <p class="hero-note reveal" style="--i:3">Free and open source. Runs inside Obsidian on desktop, iOS and Android.</p>
       <div class="stats reveal" style="--i:4">
-        <div class="stat"><b class="num" data-count="9">0</b><span>nutrients DASH is judged on</span></div>
+        <div class="stat"><b class="num" data-count="9">0</b><span>macros and nutrients tracked</span></div>
         <div class="stat"><b class="num" data-count="9">0</b><span>food groups, counted in servings</span></div>
         <div class="stat"><b class="num" data-count="0">0</b><span>accounts, payments or ads</span></div>
       </div>
@@ -810,7 +807,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
       <article class="step reveal" style="--i:0">
         <div class="step-n num">01</div>
         <h3>Log a food</h3>
-        <p>Pick when you are eating, then tick an ingredient or a saved meal from your own notes. Most breakfasts are the same breakfast, so yesterday's is one tap away.</p>
+        <p>Select a meal, then tick an ingredient or a saved meal from your notes.</p>
         <div class="step-art" aria-hidden="true">
           <div class="art-row"><span class="chk on"></span>Rolled oats<span class="qty num">1×</span></div>
           <div class="art-row"><span class="chk on"></span>Banana<span class="qty num">1×</span></div>
@@ -819,7 +816,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
       <article class="step reveal" style="--i:1">
         <div class="step-n num">02</div>
         <h3>See your numbers</h3>
-        <p>Nine nutrients and nine food groups, each against its target. A score out of 100 sits on top, judged on pace, so half the day's calories with half the fibre still reads whole.</p>
+        <p>Visual progress across each macro, colored according to ceiling or floor. A score sits on top, calculated with a custom weighting function.</p>
         <div class="step-art" aria-hidden="true">
           <div class="art-bar"><div class="top"><span>Protein</span><small class="num">67 / 90 g</small></div><div class="track"><i style="--w:74%"></i></div></div>
           <div class="art-bar"><div class="top"><span>Fiber</span><small class="num">22 / 30 g</small></div><div class="track"><i class="neutral" style="--w:73%"></i></div></div>
@@ -828,7 +825,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
       <article class="step reveal" style="--i:2">
         <div class="step-n num">03</div>
         <h3>Adjust tomorrow</h3>
-        <p>The week shows which days went green. A report names the food that brought the sodium, so the change is one ingredient, not a new diet.</p>
+        <p>The week shows a higher-level view of your progress, and what gaps need filling. A report for the day, the week and the month ties it all together in simple tables and optional AI analysis.</p>
         <div class="step-art" aria-hidden="true">
           <div class="art-week"><span class="g">M</span><span class="g">T</span><span class="a">W</span><span class="g">T</span><span class="r">F</span><span class="g">S</span><span>S</span></div>
         </div>
@@ -843,18 +840,18 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
     <div class="section-head">
       <div class="eyebrow reveal">Features</div>
       <h2 id="features-title" class="reveal" style="--i:1">Built from notes you already keep.</h2>
-      <p class="reveal" style="--i:2">A note is a meal or an ingredient because its tags say so. Folders play no part, so a vault with recipes in it needs no rearranging.</p>
+      <p class="reveal" style="--i:2">A tag you choose marks a note for the Nosh sidebar. Folders play no part, so a vault with recipes in it needs no rearranging, only a tag and frontmatter.</p>
     </div>
 
     <!-- Feature 1: ingredient logging -->
     <article class="feature">
       <div class="feature-copy">
         <h3 class="reveal">Log by ingredient, or by the meal you saved</h3>
-        <p class="reveal" style="--i:1">The picker is organised by occasion. Tick ingredients one at a time, tick a saved meal, or build one out of parts and name it for next time. Every number describes one serving, and servings go up and down in halves.</p>
+        <p class="reveal" style="--i:1">The picker is organized by occasion. Tick ingredients one at a time, tick a saved meal, or build one out of parts and name it for next time.</p>
         <ul>
-          <li class="reveal" style="--i:2">Each occasion opens on what it has held lately, most recent first.</li>
-          <li class="reveal" style="--i:3">Copy yesterday's breakfast in one press while today's is still empty.</li>
-          <li class="reveal" style="--i:4">Correct one ingredient note and every meal built on it follows, on every day it was eaten.</li>
+          <li class="reveal" style="--i:2">Each occasion opens with the most recent first, so workday lunches are easy to add.</li>
+          <li class="reveal" style="--i:3">Copy yesterday's breakfast in one press.</li>
+          <li class="reveal" style="--i:4">Notes are live synced across days. If you find a mistake, or want to update a macro, it updates across logged days.</li>
         </ul>
       </div>
       <div class="feature-media reveal">
@@ -890,7 +887,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
     <article class="feature">
       <div class="feature-copy">
         <h3 class="reveal">A score that knows what time it is</h3>
-        <p class="reveal" style="--i:1">Every bar is a floor, a ceiling or a range, and each pays out in proportion to how close it stands. The composite score is their weighted average. While the day's calories are still coming in, floors are measured against the share of the day you have eaten, so the number starts at 100 and moves with each meal.</p>
+        <p class="reveal" style="--i:1">Every bar is a floor, a ceiling or a range, and each pays out in proportion to how close it stands. The composite score is their weighted average. While the day's calories are still coming in, floors are measured against the share of the day you have eaten, so the number starts at 100 and moves with each meal. By default:</p>
         <ul>
           <li class="reveal" style="--i:2">Protein, fibre, potassium and calcium are floors. Sodium, fat and saturated fat are ceilings.</li>
           <li class="reveal" style="--i:3">Carbs are drawn grey and never judged. Calories only count when over.</li>
@@ -933,7 +930,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
     <article class="feature">
       <div class="feature-copy">
         <h3 class="reveal">The week and the month, without blending them</h3>
-        <p class="reveal" style="--i:1">"Am I on track right now" and "did the pattern hold" are different questions, so Day, Week and Month are different tabs. The week is a row a day with its meals and calories. The month is a calendar, a square a day, with the bars drawn as lines too thin to read and coloured so you do not have to.</p>
+        <p class="reveal" style="--i:1">"Am I on track right now" and "did the pattern hold" are different questions, so Day, Week and Month are different tabs. The week is a row a day with its meals and calories. The month is a calendar: a graphical, high-level view.</p>
         <ul>
           <li class="reveal" style="--i:2">Nuts, legumes and sweets are weekly groups in DASH, and are scored against the week.</li>
           <li class="reveal" style="--i:3">A day you did not log is missing, not a zero.</li>
@@ -1146,24 +1143,24 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
     <div class="section-head">
       <div class="eyebrow reveal">Nosh AI · optional</div>
       <h2 id="ai-title" class="reveal" style="--i:1">A draft from wherever the food turns up. Off until you say so.</h2>
-      <p class="reveal" style="--i:2">Give Nosh an Anthropic API key and drafting switches on. There is more than one way in, because food turns up in more than one place: a thought, a label, a line in your journal, a menu. Every way ends at the same card. Claude decides whether it was a meal or an ingredient, and nothing reaches your vault until you have read it.</p>
+      <p class="reveal" style="--i:2">Give Nosh an Anthropic API key and drafting switches on. There is more than one way to add to the log, because food turns up in more than one place: a thought, a label, a line in your journal, a menu. Claude intelligently decides whether to log a meal or an ingredient, and nothing reaches your vault until you review and accept.</p>
     </div>
 
     <ul class="ways" aria-label="Ways to make a draft">
       <li class="way reveal" style="--i:0">
         <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></span>
         <h3>Type it<small>Draft</small></h3>
-        <p>Press Draft above your meals and ingredients and say what you ate, how much if you know. "Two eggs scrambled in butter, a slice of sourdough."</p>
+        <p>Press Draft and say what you ate, how much if you know. "Two eggs scrambled in butter, a slice of sourdough."</p>
       </li>
       <li class="way reveal" style="--i:1">
         <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
         <h3>Photograph it<small>Camera</small></h3>
-        <p>A nutrition label is read rather than guessed at. A plate is estimated from what is on it. Add "half of it" and the portion follows.</p>
+        <p>A nutrition label is read rather than entered by hand. A plate is estimated from what is on it. Add "half of it" and the portion follows.</p>
       </li>
       <li class="way reveal" style="--i:2">
         <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6M9 13h6M9 17h3"/></svg></span>
         <h3>Jot it anywhere<small>Add to log</small></h3>
-        <p>Select a line in your journal, or any note, and choose Add to log. It becomes a note, logged, and a link takes the place of the words.</p>
+        <p>Select a line in your journal, daily note or any note, right-click and choose Add to log, or run it from the command palette. It becomes a note, logged, and a link takes the place of the words.</p>
       </li>
       <li class="way reveal" style="--i:3">
         <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></span>
@@ -1173,9 +1170,8 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
       <li class="way reveal" style="--i:4">
         <span class="way-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v8a2 2 0 0 0 4 0V3M9 11v10M16 21V3c2 1 3 3.5 3 7h-3"/></svg></span>
         <h3>Order it<small>Eating out</small></h3>
-        <p>Name the restaurant and Claude reads the menu for orders that fit what is left of your day. Afterwards the same button says Ate out there, and logs the one you had.</p>
+        <p>Name the restaurant and Claude reads the menu and recommends three orders that fit what is left of your day.</p>
       </li>
-      <li class="ways-note reveal" style="--i:5"><b>Nothing is lost to a stray tap.</b> Close a card by accident, or leave words unsent, and it waits under Drafts until you reopen it, so an answer you paid for is still there.</li>
     </ul>
     <div class="ai-grid">
       <div class="ai-media reveal">
@@ -1239,11 +1235,11 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
       <div class="ai-list" role="group" aria-label="Nosh AI features. Choose one to show it on the phone.">
         <button class="ai-item reveal" style="--i:0" type="button" aria-pressed="true" data-screen="ai-screen-0">
           <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg></span>
-          <span><span class="ai-h">The draft card</span><p>However it started, a draft comes back as ingredients with portions you can correct, and the nutrients are recomputed from the parts. Claude says whether it is a meal or an ingredient, and it is filed there.</p></span>
+          <span><span class="ai-h">The draft card</span><p>However it started, a draft comes back as ingredients with portions you can correct, and the nutrients are recomputed from the parts.</p></span>
         </button>
         <button class="ai-item reveal" style="--i:1" type="button" aria-pressed="false" data-screen="ai-screen-1">
           <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18M5 11a7 7 0 0 1 14 0M4 15h16l-1 4H5z"/></svg></span>
-          <span><span class="ai-h">What's for dinner?</span><p>Takes what the day still has room for and suggests a meal that fits, with a method. It knows which meals are still to come, and it asks how many you are cooking for and what needs using up before it starts.</p></span>
+          <span><span class="ai-h">What's for dinner?</span><p>Takes what you are missing and suggests a meal that fits, with a method. It knows which meals are still to come, and it asks how many you are cooking for and what needs using up before it starts.</p></span>
         </button>
         <button class="ai-item reveal" style="--i:2" type="button" aria-pressed="false" data-screen="ai-screen-2">
           <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/><path d="M9.5 10.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 17h.01"/></svg></span>
