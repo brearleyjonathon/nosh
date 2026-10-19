@@ -3490,6 +3490,9 @@ class NoshDraftModal extends Modal {
             box.step = 'any';
             box.inputMode = 'decimal';
             box.value = String(Math.round(part.qty * 100) / 100);
+            /* A portion is usually typed over rather than edited, so a tap
+             * takes the whole number and the next key replaces it. */
+            box.addEventListener('focus', () => box.select());
             box.addEventListener('input', () => {
                 part.qty = Math.max(0, parseNum(box.value));
                 this.retotal();

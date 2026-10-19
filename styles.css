@@ -1622,13 +1622,31 @@
     color: var(--text-muted);
 }
 
+/* Centred, and without the browser's up and down arrows, which took a
+ * third of a box this narrow and pushed the number into its corner. */
 .nosh-draft .nosh-draft-num {
     flex: 0 0 auto;
     width: 4.5em;
     padding: 2px 6px;
-    text-align: right;
+    text-align: center;
     font-variant-numeric: tabular-nums;
     font-size: var(--font-ui-smaller);
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.nosh-draft .nosh-draft-num::-webkit-inner-spin-button,
+.nosh-draft .nosh-draft-num::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* On a phone, a box a finger can find. 16px also stops iOS zooming the
+ * card in when the box is tapped. */
+.is-mobile .nosh-draft .nosh-draft-num {
+    width: 5.5em;
+    height: 40px;
+    font-size: 16px;
 }
 
 .nosh-draft .nosh-draft-unit {
