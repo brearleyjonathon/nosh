@@ -1680,9 +1680,11 @@
     padding-top: 16px;
 }
 
-/* Something to watch while Claude thinks. The button keeps its width, so the
- * row does not jump when the label swaps out. */
-.nosh-tracker .nosh-ai-spin {
+/* Something to watch while Claude thinks: on a button in the pane, on a
+ * card's button, in a chat's answer and in a notice, so not scoped to the
+ * pane. The button keeps its width, so the row does not jump when the label
+ * swaps out. */
+.nosh-ai-spin {
     display: inline-block;
     animation: nosh-tumble 1.4s linear infinite;
 }
@@ -1692,7 +1694,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .nosh-tracker .nosh-ai-spin { animation: none; }
+    .nosh-ai-spin { animation: none; }
 }
 
 /* A meal rests on its parts, so they read before its numbers do. */

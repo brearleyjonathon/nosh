@@ -5071,6 +5071,26 @@ async function aiAsk(plugin, system, messages) {
     return { text: text, spend: spend };
 }
 
+/* The broccoli that turns while Claude thinks, with the words for what it
+ * is doing beside it, so no wait on an answer looks like a dead button. */
+const SPIN = '\ud83e\udd66';
+
+function spinInto(el, words) {
+    el.empty();
+    el.createSpan({ cls: 'nosh-ai-spin', text: SPIN });
+    if (words) el.createSpan({ text: '  ' + words });
+}
+
+/* The same for a notice, which takes a fragment as readily as a string. */
+function spinNotice(words) {
+    const frag = document.createDocumentFragment();
+    const spin = frag.appendChild(document.createElement('span'));
+    spin.className = 'nosh-ai-spin';
+    spin.textContent = SPIN;
+    frag.appendChild(document.createTextNode('  ' + words));
+    return new Notice(frag, 0);
+}
+
 /* Obsidian has rendered markdown for years, under two names. Take whichever
  * this version has, and fall back on the text itself rather than on nothing. */
 async function renderMarkdownInto(app, markdown, el, path, owner) {
@@ -5222,7 +5242,8 @@ class NoshProbeModal extends Modal {
         }
 
         this.turn('you', question);
-        const answerEl = this.turn('claude', 'Thinking…');
+        const answerEl = this.turn('claude', '');
+        spinInto(answerEl, 'Thinking…');
 
         this.messages.push({
             role: 'user',
@@ -5555,8 +5576,7 @@ class NoshEditModal extends Modal {
         if (!change || this.busy) return;
         this.busy = true;
         this.goEl.disabled = true;
-        this.goEl.empty();
-        this.goEl.createSpan({ cls: 'nosh-ai-spin', text: '🥦' });
+        spinInto(this.goEl);
 
         let draft;
         try {
@@ -6266,7 +6286,7 @@ module.exports = class NoshPlugin extends Plugin {
         }
 
         const shown = span.text.length > 60 ? span.text.slice(0, 57) + '…' : span.text;
-        const wait = new Notice('Nosh is reading “' + shown + '”…', 0);
+        const wait = spinNotice('Nosh is reading “' + shown + '”…');
         let got;
         try {
             got = await aiDraftAny(this, span.text);
@@ -7734,7 +7754,7 @@ class NoshView extends ItemView {
 
             const said = go.textContent;
             go.disabled = true;
-            go.setText('Thinking\u2026');
+            spinInto(go, 'Thinking\u2026');
             try {
                 const draft = await aiDraft(
                     this.plugin, 'suggest', this.suggestionPrompt(asked));
@@ -7789,7 +7809,7 @@ class NoshView extends ItemView {
 
             const said = out.textContent;
             out.disabled = true;
-            out.setText('Reading the menu…');
+            spinInto(out, 'Reading the menu…');
             /* Taken now: the answer is for the day and meal it was asked
              * about, whatever is on screen by the time it arrives. */
             const day = this.cursor;
@@ -7930,7 +7950,7 @@ class NoshView extends ItemView {
 
         const said = button.textContent;
         button.disabled = true;
-        button.setText('Thinking…');
+        spinInto(button, 'Thinking…');
         let draft;
         try {
             draft = await aiDraft(this.plugin, 'meals', this.ateOutPrompt(asked));
@@ -9279,9 +9299,8 @@ class NoshView extends ItemView {
             go.disabled = on;
             shot.disabled = on;
             if (on) {
-                go.empty();
                 /* Something to watch while it thinks, rather than a dead button. */
-                go.createSpan({ cls: 'nosh-ai-spin', text: '\ud83e\udd66' });
+                spinInto(go);
             } else {
                 label();
             }
@@ -9658,7 +9677,9 @@ class NoshView extends ItemView {
         /* An empty month is one line saying so, and there is nothing in one
          * line for anybody to read. */
         if (wants && (r.mode !== 'month' || r.meals)) {
-            new Notice('Reading the log…');
+            /* Up until the answer is in, rather than gone in five seconds
+             * while a reading can take thirty. */
+            const wait = spinNotice('Reading the log…');
             try {
                 const reading = await aiReading(this.plugin, body, r.mode);
                 body += readingMarkdown(reading, aiModelId(settings), r.mode);
@@ -9668,6 +9689,8 @@ class NoshView extends ItemView {
             } catch (e) {
                 new Notice('Report written without a reading: ' +
                            (e && e.message ? e.message : e), 8000);
+            } finally {
+                wait.hide();
             }
         }
 
