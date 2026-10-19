@@ -240,7 +240,8 @@ Reports also give reach (how close the floors got) and excess (the worst
 overshoot of any ceiling).
 
 Each span has one report (`Nosh 2026-09`). Exporting again overwrites it,
-including anything you typed into it.
+including anything you typed into it. Saved chats (below) are the one thing it
+keeps.
 
 ## Nosh AI (optional)
 
@@ -301,6 +302,12 @@ Off until you add an API key. It adds:
   gets progress and suggestions for next month, ranked by what costs the score
   most. Each suggestion names a food from your log. Only the report's tables
   are sent.
+- Let's chat. Talk over a day, week or month with Claude, using the button
+  under the score or the command. Ask what to add, what to cut back on or what
+  to swap, then keep going from there. Claude gets the same tables a report
+  holds, plus the names of your meal and ingredient notes, so a swap can be
+  something you already have. Save to note adds the conversation to that
+  span's report, and exporting the report again keeps it.
 
 Estimating, inventing meals and Eating out each have their own model setting,
 so the frequent job can use a cheaper model and the one you wait on a faster

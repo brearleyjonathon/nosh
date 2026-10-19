@@ -814,6 +814,12 @@
     white-space: nowrap;
 }
 
+/* Let's chat, under the score: the day, week or month talked over. */
+.nosh-tracker .nosh-chat-btn {
+    display: block;
+    margin-top: 8px;
+}
+
 .nosh-tracker .nosh-ate-clear {
     flex: 0 0 auto;
     display: inline-flex;

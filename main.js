@@ -5135,7 +5135,7 @@ class NoshProbeModal extends Modal {
         this.owner.load();
         contentEl.addClass('nosh-draft');
         contentEl.addClass('nosh-probe');
-        this.setTitle('Ask about ' + this.recipe.name);
+        this.setTitle(this.heading());
 
         contentEl.createDiv({ cls: 'nosh-probe-source', text: this.found() });
 
@@ -5143,7 +5143,7 @@ class NoshProbeModal extends Modal {
 
         /* Gone the moment there is a conversation to read instead. */
         this.chipsEl = contentEl.createDiv({ cls: 'nosh-probe-chips' });
-        for (const ask of RECIPE_ASKS) {
+        for (const ask of this.openers()) {
             const chip = this.chipsEl.createEl('button',
                 { cls: 'nosh-probe-chip', text: ask });
             chip.addEventListener('click', () => {
@@ -5154,7 +5154,7 @@ class NoshProbeModal extends Modal {
 
         this.askEl = contentEl.createEl('textarea', { cls: 'nosh-draft-extra' });
         this.askEl.rows = 2;
-        this.askEl.placeholder = 'Ask about this recipe…';
+        this.askEl.placeholder = this.placeholder();
         this.askEl.addEventListener('keydown', (e) => {
             /* Enter sends, because this is a conversation and not a form.
              * Shift keeps the newline for a question worth two lines. */
@@ -5175,6 +5175,15 @@ class NoshProbeModal extends Modal {
 
         this.askEl.focus();
     }
+
+    /* What a chat about a day or a week says differently, gathered here so
+     * NoshChatModal can say it without a second copy of the conversation. */
+    heading() { return 'Ask about ' + this.recipe.name; }
+    openers() { return RECIPE_ASKS; }
+    placeholder() { return 'Ask about this recipe…'; }
+    system() { return AI_PROBE_SYSTEM; }
+    opener() { return probePrompt(this.recipe, this.plugin.settings); }
+    sourcePath() { return this.file.path; }
 
     /* What was found in the note, said plainly, because it is also what will
      * be sent: a recipe read as nothing but a title is worth knowing about
@@ -5219,15 +5228,15 @@ class NoshProbeModal extends Modal {
             role: 'user',
             content: this.messages.length
                 ? question
-                : probePrompt(this.recipe, this.plugin.settings) + '\n\n' + question,
+                : this.opener() + '\n\n' + question,
         });
 
         try {
-            const answer = await aiAsk(this.plugin, AI_PROBE_SYSTEM, this.messages);
+            const answer = await aiAsk(this.plugin, this.system(), this.messages);
             const said = answer.text;
             this.messages.push({ role: 'assistant', content: said });
             this.turns.push({ question, answer: said });
-            await renderMarkdownInto(this.app, said, answerEl, this.file.path, this.owner);
+            await renderMarkdownInto(this.app, said, answerEl, this.sourcePath(), this.owner);
             /* Each answer resends the conversation so far, so a long one
              * costs more per question; the line under each says so. */
             answerEl.parentElement.createDiv({ cls: 'nosh-cost', text: costText(answer.spend) });
@@ -5267,6 +5276,143 @@ class NoshProbeModal extends Modal {
         if (this.unfit) { this.unfit(); this.unfit = null; }
         this.owner.unload();
         this.contentEl.empty();
+    }
+}
+
+/* Let's chat ----------------------------------------------------------
+ *
+ * A reading says what a day or a week shows; this talks it over. What to
+ * add, what to cut back on, what to swap for what, what to do differently
+ * next time - questions that only come up once the first answer is in.
+ * Claude is handed the same tables an exported report holds, so it is
+ * talking about the log and not a guess at it, and the conversation runs
+ * on the recipe chat's window and its rules for asking.
+ */
+
+const AI_CHAT_SYSTEM = [
+    'You talk over a stretch of a DASH diet log with the person who ate it:',
+    'a day, a week or a month. They want ideas. Foods to add or cut back on,',
+    'alternatives to what they ate, and things to change next time.',
+    '',
+    '- The tables you are given are the truth about what was eaten and how it',
+    '  landed against this vault\'s targets. Use their figures rather than',
+    '  working out your own. Where an idea needs a number they do not hold,',
+    '  estimate from standard reference data and say that you have.',
+    '- Ground ideas in the log. Name the food that carried a problem, and the',
+    '  food or the note in their vault that would fix it. A swap says what it',
+    '  replaces, which numbers move and roughly how far.',
+    '- Foods from outside the log are welcome where nothing in it fits. Say',
+    '  so when you reach for one.',
+    '- A limit is a ceiling rather than something to hit: landing well under',
+    '  one is a good outcome. A target marked · is shown for reference only.',
+    '- Days with nothing logged are missing, not days of eating nothing. A day',
+    '  marked "today, so far" is still being eaten.',
+    '- Answer in a few sentences, or a short list where the answer really is a',
+    '  list. No preamble, no cheerleading, no reciting the tables back.',
+].concat(AI_PORTIONS).join('\n');
+
+/* Openers that cover what the chat is for. Typing over them is the point. */
+const CHAT_ASKS = [
+    'What could I add?',
+    'What should I cut back on?',
+    'Any swaps for what I ate?',
+    'What would you change next time?',
+];
+
+/* "today", "this day", "this week", "this month": the span as the button
+ * and the chat call it. */
+function chatSpan(mode, first) {
+    if (mode === 'month') return 'this month';
+    if (mode === 'week') return 'this week';
+    return first === todayIso() ? 'today' : 'this day';
+}
+
+/* The report's tables, then what the vault has to suggest from and what the
+ * person likes, so a swap can be one they already have a note for. */
+function chatPrompt(report, settings, lists) {
+    const lines = ['The log, as its report has it:', '', report];
+    const names = (list) => (list || []).map((r) => r.name).filter(Boolean)
+        .slice(0, CHAT_LIBRARY_MAX);
+    const meals = names(lists && lists.meals);
+    const parts = names(lists && lists.ingredients);
+    if (meals.length || parts.length) {
+        lines.push('');
+        lines.push('Notes already in their vault, which they could log as they are:');
+        if (meals.length) lines.push('- Meals: ' + meals.join('; '));
+        if (parts.length) lines.push('- Ingredients: ' + parts.join('; '));
+    }
+    const taste = String(settings.suggestNote || '').trim();
+    if (taste) {
+        lines.push('');
+        lines.push('What they like:');
+        lines.push(taste);
+    }
+    lines.push('');
+    lines.push('Their first question:');
+    return lines.join('\n');
+}
+
+/* Enough of a library to suggest from, short of a vault of thousands being
+ * sent with every question. */
+const CHAT_LIBRARY_MAX = 200;
+
+/* The heading a saved chat goes under. Exporting the report again keeps
+ * every section under it, since a chat is the reader's record rather than
+ * a table the export can write again. */
+const CHAT_HEAD = "## Let's chat";
+const KEPT_CHAT = /^## Let's chat[ \t]*$/m;
+
+function chatMarkdown(turns, model) {
+    const lines = ['', '', CHAT_HEAD, ''];
+    for (const t of turns) {
+        lines.push('**' + String(t.question).replace(/\s+/g, ' ').trim() + '**');
+        lines.push('');
+        lines.push(String(t.answer).trim());
+        lines.push('');
+    }
+    lines.push('*Talked over with ' + model + ' on ' + humanDay(todayIso()) +
+               ', from the tables above. The numbers are the log; the ideas are not.*');
+    lines.push('');
+    return lines.join('\n');
+}
+
+class NoshChatModal extends NoshProbeModal {
+    constructor(app, plugin, view, r) {
+        super(app, plugin, null, null);
+        this.view = view;
+        this.r = r;
+        this.span = chatSpan(r.mode, r.days[0]);
+        this.report = reportMarkdown(r, plugin.settings);
+    }
+
+    heading() { return "Let's chat about " + this.span; }
+    openers() { return CHAT_ASKS; }
+    placeholder() { return 'Ideas, swaps, things to add or cut…'; }
+    system() { return AI_CHAT_SYSTEM; }
+    opener() { return chatPrompt(this.report, this.plugin.settings, this.view.lists); }
+    sourcePath() { return ''; }
+
+    found() {
+        const n = this.r.meals;
+        return (n ? n + (n === 1 ? ' entry' : ' entries') : 'Nothing logged') +
+               ', ' + this.r.span + '. Sent as its report would show it.';
+    }
+
+    /* Into the span's report, which is written first if there is none yet,
+     * and at the bottom of it, under a heading the next export keeps. */
+    async save() {
+        if (!this.turns.length) return;
+        this.saveEl.disabled = true;
+        try {
+            const file = await this.view.reportFile(this.r);
+            await this.app.vault.append(file, chatMarkdown(
+                this.turns, aiModelId(this.plugin.settings, 'aiSuggestModel')));
+            this.turns = [];
+            new Notice('Added to ' + file.basename + '.');
+        } catch (e) {
+            this.saveEl.disabled = false;
+            new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
+        }
     }
 }
 
@@ -5507,6 +5653,12 @@ module.exports = class NoshPlugin extends Plugin {
                 new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
             }
         };
+
+        this.addCommand({
+            id: 'chat-about-span',
+            name: "Let's chat about the day, week or month on screen",
+            callback: withView(async (view) => view.openChat()),
+        });
 
         this.addCommand({
             id: 'export-nosh-report',
@@ -8154,6 +8306,12 @@ class NoshView extends ItemView {
                       (week ? ' · ' + fmt(totals.calories / 7) + ' kcal/day avg' : ''),
             });
             this.renderScore(this.mode);
+            const chat = this.summaryEl.createEl('button', {
+                cls: 'nosh-suggest-btn nosh-chat-btn',
+                text: "\u{1F4AC}  Let's chat about " + chatSpan(this.mode, days[0]),
+            });
+            chat.setAttr('aria-label', 'Talk over what to add, cut back on or swap');
+            chat.addEventListener('click', () => this.openChat());
         }
 
         /* A month's bars are the grid below, one square a day. Totals for a
@@ -9513,22 +9671,7 @@ class NoshView extends ItemView {
             }
         }
 
-        const vault = this.app.vault;
-        const folder = noshFolder(settings, SUB_REPORTS);
-        await ensureFolder(vault, folder);
-
-        /* One report a day, a week or a month. Exporting the same span again rewrites
-         * the note already there - anything typed into it by hand goes with
-         * it - rather than filing "Nosh 2026-09-15 2" beside it. */
-        const name = safeName(reportTitle(r));
-        const found = vault.getAbstractFileByPath((folder ? folder + '/' : '') + name + '.md');
-        let file;
-        if (found && found.extension === 'md') {
-            await vault.modify(found, body);
-            file = found;
-        } else {
-            file = await vault.create(freePath(vault, folder, name), body);
-        }
+        const file = await this.writeReport(r, body);
 
         /* A report exported again is often still open from the last time,
          * and opening it once more would give it a second tab. */
@@ -9538,6 +9681,44 @@ class NoshView extends ItemView {
         if (open) await workspace.revealLeaf(open);
         else await workspace.getLeaf(false).openFile(file);
         return file;
+    }
+
+    /* One report a day, a week or a month. Exporting the same span again
+     * rewrites the note already there - anything typed into it by hand goes
+     * with it, saved chats aside - rather than filing "Nosh 2026-09-15 2"
+     * beside it. */
+    async writeReport(r, body) {
+        const settings = this.plugin.settings;
+        const vault = this.app.vault;
+        const folder = noshFolder(settings, SUB_REPORTS);
+        await ensureFolder(vault, folder);
+
+        const name = safeName(reportTitle(r));
+        const found = vault.getAbstractFileByPath((folder ? folder + '/' : '') + name + '.md');
+        if (found && found.extension === 'md') {
+            const old = await vault.read(found);
+            const at = old.search(KEPT_CHAT);
+            const kept = at < 0 ? '' : old.slice(at).replace(/\s*$/, '\n');
+            await vault.modify(found, kept ? body.replace(/\s*$/, '\n\n\n') + kept : body);
+            return found;
+        }
+        return vault.create(freePath(vault, folder, name), body);
+    }
+
+    /* The span's report as it stands, or a fresh one without a reading when
+     * there is none yet: somewhere for a chat to be saved to. */
+    async reportFile(r) {
+        const vault = this.app.vault;
+        const folder = noshFolder(this.plugin.settings, SUB_REPORTS);
+        const found = vault.getAbstractFileByPath(
+            (folder ? folder + '/' : '') + safeName(reportTitle(r)) + '.md');
+        if (found && found.extension === 'md') return found;
+        return this.writeReport(r, reportMarkdown(r, this.plugin.settings));
+    }
+
+    /* Talk over whatever is on screen. */
+    openChat() {
+        new NoshChatModal(this.app, this.plugin, this, this.reportData()).open();
     }
 
     /* Until the picker logs into an occasion of its own, servings stay in
