@@ -296,9 +296,11 @@ Off until you add an API key. It adds:
 - Ask about this recipe. Question any recipe note (where the sodium comes from,
   how to stretch it, what to serve with it) from the command palette or the
   right-click menu. Save to note appends the conversation.
-- Readings. An optional section on exported reports: patterns and what to
-  watch for a day or week, progress and ranked improvements for a month. Only
-  the report's tables are sent.
+- Readings. An optional section on exported reports. A day or week gets
+  patterns, what to watch, and suggestions for tomorrow or next week. A month
+  gets progress and suggestions for next month, ranked by what costs the score
+  most. Each suggestion names a food from your log. Only the report's tables
+  are sent.
 
 Estimating, inventing meals and Eating out each have their own model setting,
 so the frequent job can use a cheaper model and the one you wait on a faster

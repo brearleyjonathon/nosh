@@ -4630,10 +4630,18 @@ const AI_REPORT_SYSTEM = [
     '  rather than inventing a trend across one data point.',
     '- If almost nothing is logged, say so in the headline and stop. Do not read',
     '  meaning into two entries.',
+    '- The suggestions look ahead: a plan for the next day after a day, the next',
+    '  week after a week. Turn what is worth watching into things to do (what to',
+    '  eat, what to swap, which meal to put it in), built from foods already in',
+    '  the log. Do not repeat a watch item in other words.',
     '- No preamble, no encouragement, no restating the date range.',
 ].join('\n');
 
-function aiReportTool() {
+/* What a reading looks ahead to, by the span it read. A day read on a later
+ * date still looks to the day after it, which is what tomorrow means here. */
+const READING_NEXT = { day: 'tomorrow', week: 'next week', month: 'next month' };
+
+function aiReportTool(mode) {
     return aiSchema(
         'write_reading',
         'Record a short reading of a DASH log: what the days show, what to watch, ' +
@@ -4660,6 +4668,13 @@ function aiReportTool() {
                 items: { type: 'string' },
                 description: 'One or two things going well that are worth keeping.',
             },
+            next: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Two to four suggestions for ' + READING_NEXT[mode] + ', most ' +
+                             'useful first, each a concrete thing to eat, swap or move, ' +
+                             'naming a food from the log.',
+            },
         });
 }
 
@@ -4685,7 +4700,7 @@ const AI_MONTH_SYSTEM = [
     '- Never restate a figure a table already shows without saying something',
     '  about it. The reader can see that sodium averages 112%; tell them which',
     '  weeks and which foods put it there.',
-    '- Rank improvements by what costs the score most - the "Costing most" line',
+    '- The suggestions are for next month. Rank them by what costs the score most - the "Costing most" line',
     '  already counts the weights this person has set - and keep to the few that',
     '  would move it. Each one names a food from the By food table: what to eat',
     '  more often, what to eat less of, what to swap for what. "The miso soup',
@@ -4700,8 +4715,8 @@ const AI_MONTH_SYSTEM = [
 function aiMonthTool() {
     return aiSchema(
         'write_month_reading',
-        'Record a reading of a month of a DASH log: the progress made, the ways ' +
-        'to improve, and what is worth keeping. Call this once.',
+        'Record a reading of a month of a DASH log: the progress made, what is ' +
+        'worth keeping, and suggestions for next month. Call this once.',
         {
             headline: {
                 type: 'string',
@@ -4716,7 +4731,7 @@ function aiMonthTool() {
             improve: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Two to four ways to improve next month, most valuable first, ' +
+                description: 'Two to four suggestions for next month, most valuable first, ' +
                              'each naming a food from the log and what to do with it.',
             },
             working: {
@@ -4727,17 +4742,21 @@ function aiMonthTool() {
         });
 }
 
-/* Which prompt, which form, and the headings its answers are filed under. */
+/* Which prompt, which form, and the headings its answers are filed under.
+ * The suggestions come last, so the reading ends on what to do next. A month
+ * kept its `improve` key when that list became its suggestions, since it
+ * always was a list of what to do next month. */
 const AI_READINGS = {
     span: {
         system: AI_REPORT_SYSTEM, tool: aiReportTool,
-        sections: [['Across the days', 'patterns'], ['Worth watching', 'watch'],
-                   ['Working', 'working']],
+        sections: (mode) => [['Across the days', 'patterns'], ['Worth watching', 'watch'],
+                             ['Working', 'working'],
+                             ['Suggestions for ' + READING_NEXT[mode], 'next']],
     },
     month: {
         system: AI_MONTH_SYSTEM, tool: aiMonthTool,
-        sections: [['Progress', 'progress'], ['Ways to improve', 'improve'],
-                   ['Worth keeping', 'working']],
+        sections: () => [['Progress', 'progress'], ['Worth keeping', 'working'],
+                         ['Suggestions for next month', 'improve']],
     },
 };
 
@@ -4747,7 +4766,7 @@ function readingKind(mode) {
 
 async function aiReading(plugin, markdown, mode) {
     const kind = readingKind(mode);
-    const tool = kind.tool();
+    const tool = kind.tool(mode);
     const headers = await aiHeaders(plugin);
 
     const model = aiModelId(plugin.settings);
@@ -4776,7 +4795,7 @@ function readingMarkdown(reading, model, mode) {
 
     const lines = ['', '## Reading', ''];
     if (reading.headline) lines.push(String(reading.headline).trim());
-    for (const s of readingKind(mode).sections) {
+    for (const s of readingKind(mode).sections(mode)) {
         lines.push.apply(lines, bullets(s[0], reading[s[1]]));
     }
     lines.push('');
@@ -9816,7 +9835,8 @@ class NoshSettingTab extends PluginSettingTab {
         new Setting(asks)
             .setName('Read the log in reports')
             .setDesc('Adds a Reading section to an exported report — what the days show, '
-                     + 'what to watch; for a month, the progress made and ways to improve — '
+                     + 'what to watch, and suggestions for tomorrow or next week; for a month, '
+                     + 'the progress made and suggestions for next month — '
                      + 'written from the tables in the report itself, which are sent to Claude. '
                      + 'The palette has both commands either way.')
             .addToggle((tg) => tg
