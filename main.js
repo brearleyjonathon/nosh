@@ -370,6 +370,14 @@ const RECENT_DAYS = 30;
 const RECENT_MAX = 8;
 const RECENT_KEY = 'Recent';
 
+/* What is ticked right now gathers above everything else, so a long list
+ * does not have to be scrolled through to see what a meal already holds. */
+const SELECTED_KEY = 'Currently selected';
+
+/* How long a press on a row steers the redraw that follows it. Saving the
+ * tick is quick, but a phone writing data.json can take a moment. */
+const PRESS_HOLD_MS = 3000;
+
 /* A meal can be logged two ways: whole, from a note that already totals it
  * up, or piece by piece from ingredients. Which side of the picker a note
  * lands on is read off its tags. */
@@ -7298,10 +7306,14 @@ class NoshView extends ItemView {
         this.recipes = this.lists.meals.concat(this.lists.ingredients);
         this.byPath = {};
         for (const r of this.recipes) this.byPath[r.path] = r;
-        this.renderTabs();
-        this.renderNav();
-        this.renderTotals();
-        this.renderBody();
+        /* A note saved or a log note written lands here too, so the redraw
+         * holds the view like any other rather than snapping to the top. */
+        this.keepScroll(() => {
+            this.renderTabs();
+            this.renderNav();
+            this.renderTotals();
+            this.renderBody();
+        });
     }
 
     setMode(mode) {
@@ -8578,10 +8590,12 @@ class NoshView extends ItemView {
         return SOURCES.find((s) => s.key === key) || SOURCES[0];
     }
 
+    /* Meals and Ingredients sit side by side under the same strip, so moving
+     * between them is a glance across, not a trip back to the top. */
     setSource(source) {
         if (this.source === source) return;
         this.source = source;
-        this.renderBody();
+        this.keepScroll(() => this.renderBody());
     }
 
     renderPicker() {
@@ -8900,6 +8914,7 @@ class NoshView extends ItemView {
         }
         const keys = names.map((n) => source.key + '/' + n);
         if (this.recentRows(source.key).length) keys.unshift(source.key + '/' + RECENT_KEY);
+        if (this.selectedRows(source.key).length) keys.unshift(source.key + '/' + SELECTED_KEY);
         return keys;
     }
 
@@ -8942,26 +8957,46 @@ class NoshView extends ItemView {
     /* A section like the food groups, folded the same way, with the
      * occasion's recent foods in it. Returns whether it was drawn. */
     renderRecent(el, source, listKey) {
-        const rows = this.recentRows(listKey);
+        return this.renderExtra(el, source, RECENT_KEY, this.recentRows(listKey));
+    }
+
+    /* This tab's notes that are ticked in the occasion on screen, or in the
+     * meal being built, in the list's own order. */
+    selectedRows(listKey) {
+        return ((this.lists && this.lists[listKey]) || [])
+            .filter((r) => this.servingsOf(r.path) > 0);
+    }
+
+    renderSelected(el, source, listKey) {
+        return this.renderExtra(el, source, SELECTED_KEY, this.selectedRows(listKey));
+    }
+
+    /* A section of rows that also appear further down, headed and folded
+     * like a food group. Returns whether it was drawn. */
+    renderExtra(el, source, name, rows) {
         if (!rows.length) return false;
 
-        const key = source.key + '/' + RECENT_KEY;
+        const key = source.key + '/' + name;
         const open = !this.collapsed[key];
         const chosen = rows.filter((r) => this.servingsOf(r.path) > 0).length;
 
         const head = el.createEl('button', { cls: 'nosh-group nosh-group-head' });
+        head.dataset.anchor = key;
         if (chosen) head.addClass('has-selected');
         head.createSpan({ cls: 'nosh-group-caret', text: open ? '\u25be' : '\u25b8' });
         head.addEventListener('click', () => {
             this.collapsed[key] = open;
             this.keepScroll(() => this.renderList());
         });
-        head.createSpan({ cls: 'nosh-group-name', text: RECENT_KEY });
+        head.createSpan({ cls: 'nosh-group-name', text: name });
+        /* Everything in Currently selected is ticked, so "3 of 3" would only
+         * be saying the same number twice. */
         head.createSpan({
             cls: 'nosh-group-count',
-            text: chosen ? chosen + ' of ' + rows.length : String(rows.length),
+            text: chosen && name !== SELECTED_KEY ? chosen + ' of ' + rows.length
+                                                  : String(rows.length),
         });
-        if (open) for (const r of rows) this.renderItem(el, r);
+        if (open) for (const r of rows) this.renderItem(el, r, key);
         return true;
     }
 
@@ -9068,13 +9103,15 @@ class NoshView extends ItemView {
             }
         }
 
-        /* Ahead of the library: the last time this occasion was logged, and
-         * what it has held lately. A filter is a search and a build belongs
-         * to no day, so neither shows there. */
-        let recent = false;
+        /* Ahead of the library: what is ticked now, the last time this
+         * occasion was logged, and what it has held lately. A filter is a
+         * search, so none of them shows there; a build belongs to no day, so
+         * it gets only the first. */
+        let above = false;
+        if (!filtering) above = this.renderSelected(el, source, listKey);
         if (this.source !== BUILD_KEY && !filtering) {
             this.renderCopy(el);
-            recent = this.renderRecent(el, source, listKey);
+            above = this.renderRecent(el, source, listKey) || above;
         }
 
         if (!items.length) {
@@ -9083,14 +9120,17 @@ class NoshView extends ItemView {
         }
 
         /* Meals come through in one alphabetical run with no headings, so there
-         * is nothing to fold and nothing to scan past - unless Recent sits
-         * above them, when the run needs a name to be told apart from it. */
+         * is nothing to fold and nothing to scan past - unless Recent or
+         * Currently selected sits above them, when the run needs a name to be
+         * told apart from it. */
         if (!source.sectioned) {
-            if (recent) {
+            const all = source.key + '/All';
+            if (above) {
                 const head = el.createDiv({ cls: 'nosh-group' });
+                head.dataset.anchor = all;
                 head.createSpan({ cls: 'nosh-group-name', text: 'All ' + source.label.toLowerCase() });
             }
-            for (const r of items) this.renderItem(el, r);
+            for (const r of items) this.renderItem(el, r, all);
             return;
         }
 
@@ -9115,6 +9155,7 @@ class NoshView extends ItemView {
 
             const head = el.createEl(filtering ? 'div' : 'button',
                 { cls: 'nosh-group nosh-group-head' });
+            head.dataset.anchor = key;
             if (chosen) head.addClass('has-selected');
 
             if (!filtering) {
@@ -9130,7 +9171,7 @@ class NoshView extends ItemView {
                 text: chosen ? chosen + ' of ' + sec.items.length : String(sec.items.length),
             });
 
-            if (open) for (const r of sec.items) this.renderItem(el, r);
+            if (open) for (const r of sec.items) this.renderItem(el, r, key);
         }
     }
 
@@ -9183,12 +9224,64 @@ class NoshView extends ItemView {
 
     /* empty() collapses the list to nothing for an instant, and the browser
      * clamps the scroll offset to fit before the rows come back. Hold the
-     * offset across the rebuild, or ticking a box throws you to the top. */
+     * offset across the rebuild, or ticking a box throws you to the top.
+     *
+     * The offset alone is not enough once Currently selected sits at the top:
+     * a tick adds a row up there and everything under it moves down. So the
+     * row that was pressed stays where it was, or failing that, whatever was
+     * at the top of the screen, as long as the list was scrolled into. */
     keepScroll(redraw) {
         const box = this.scrollBox();
-        const top = box ? box.scrollTop : 0;
+        if (!box) {
+            redraw();
+            return;
+        }
+        const top = box.scrollTop;
+        const anchors = this.scrollAnchors(box);
         redraw();
-        if (box) box.scrollTop = top;
+        box.scrollTop = top;
+
+        const list = this.listEl;
+        for (const a of anchors) {
+            const now = list && list.isConnected
+                ? Array.from(list.querySelectorAll('[data-anchor]'))
+                    .find((n) => n.dataset.anchor === a.key)
+                : null;
+            if (!now) continue;
+            box.scrollTop += now.getBoundingClientRect().top - a.y;
+            break;
+        }
+    }
+
+    /* Rows to hold still across a redraw, best first: the one just pressed,
+     * then the ones showing at the top of the scroll box. */
+    scrollAnchors(box) {
+        const out = [];
+        /* A press only counts for the redraw it caused; one left over from
+         * opening a note an hour ago says nothing about where to look now. */
+        const pressed = this.pressed && Date.now() - this.pressed.at < PRESS_HOLD_MS
+            ? this.pressed.key : null;
+        this.pressed = null;
+        const list = this.listEl;
+        if (!list || !list.isConnected) return out;
+
+        const nodes = Array.from(list.querySelectorAll('[data-anchor]'));
+        if (pressed) {
+            const n = nodes.find((x) => x.dataset.anchor === pressed);
+            if (n) out.push({ key: pressed, y: n.getBoundingClientRect().top });
+        }
+
+        /* With the head of the list still on screen there is nothing above it
+         * to lose, and a new Currently selected should be seen arriving. */
+        const edge = box.getBoundingClientRect().top;
+        if (list.getBoundingClientRect().top >= edge) return out;
+        for (const n of nodes) {
+            const r = n.getBoundingClientRect();
+            if (r.bottom <= edge) continue;
+            out.push({ key: n.dataset.anchor, y: r.top });
+            if (out.length >= 8) break;
+        }
+        return out;
     }
 
     /* Where a tick lands: in the meal being built, or in the occasion of the
@@ -9211,12 +9304,21 @@ class NoshView extends ItemView {
         await this.setServings(path, servings, this.occasion);
     }
 
-    renderItem(el, r) {
+    /* `section` is the key of the heading it sits under, since the same note
+     * can be on screen twice: once in Currently selected or Recent, once in
+     * its food group. */
+    renderItem(el, r, section) {
         const servings = this.servingsOf(r.path);
         const isOn = servings > 0;
 
         const item = el.createDiv({ cls: 'nosh-item' });
         if (isOn) item.addClass('is-selected');
+        const anchor = (section || '') + '\n' + r.path;
+        item.dataset.anchor = anchor;
+        /* Whatever in the row was pressed, the row is what to hold still. */
+        const press = () => { this.pressed = { key: anchor, at: Date.now() }; };
+        item.addEventListener('pointerdown', press, true);
+        item.addEventListener('keydown', press, true);
 
         const box = item.createEl('input', { cls: 'nosh-check', type: 'checkbox' });
         box.checked = isOn;

@@ -93,6 +93,11 @@ Each occasion starts with a Recent section: up to eight foods logged there in
 the past month. While an occasion is empty, a button copies the last one
 (*Copy yesterday's breakfast*).
 
+Anything ticked also shows in a Currently selected section at the top of the
+list, so you can see what a meal holds without scrolling. Ticking a box,
+switching between Meals and Ingredients, or changing occasion keeps the list
+where it was instead of jumping back to the top.
+
 Tick meals, tick ingredients, or build a meal from ingredients. A build can be
 logged as a one-off or saved as a meal note:
 
