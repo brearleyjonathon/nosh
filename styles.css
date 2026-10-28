@@ -619,16 +619,19 @@
     aspect-ratio: 1;
 }
 
-/* Rings ---------------------------------------------------------------
+/* A ring --------------------------------------------------------------
  *
- * Each ring is a pair of circles in one colour: a faint track the whole way
- * round, and the arc wound over it. The colour sits on the group, so the
- * track is the arc's own hue dimmed rather than a grey - the way a watch
- * draws an empty ring. The outer ring is the number and is thick; the ones
- * inside are the bars costing most and are not. */
+ * Two circles in one colour: a faint track the whole way round, and the arc
+ * wound over it. The colour sits on the dial, so the track is the arc's own
+ * hue dimmed rather than a grey - the way a watch draws an empty ring - and
+ * the number in the hole takes it too. */
 .nosh-tracker .nosh-rings {
     position: relative;
+    color: var(--interactive-accent);
 }
+
+.nosh-tracker .nosh-rings[data-state="met"]  { color: var(--color-green); }
+.nosh-tracker .nosh-rings[data-state="near"] { color: var(--color-orange); }
 
 .nosh-tracker .nosh-rings svg {
     display: block;
@@ -638,21 +641,11 @@
     transform: rotate(-90deg);
 }
 
-.nosh-tracker .nosh-ring {
-    color: var(--interactive-accent);
-}
-
-.nosh-tracker .nosh-ring[data-state="met"]  { color: var(--color-green); }
-.nosh-tracker .nosh-ring[data-state="near"] { color: var(--color-orange); }
-.nosh-tracker .nosh-ring[data-state="over"] { color: var(--color-red); }
-
-.nosh-tracker .nosh-ring circle {
+.nosh-tracker .nosh-rings circle {
     fill: none;
     stroke: currentColor;
+    stroke-width: 11;
 }
-
-.nosh-tracker .nosh-ring-score circle { stroke-width: 11; }
-.nosh-tracker .nosh-ring-bar circle   { stroke-width: 5; }
 
 .nosh-tracker .nosh-ring-track {
     opacity: 0.18;
@@ -662,24 +655,20 @@
     stroke-linecap: round;
 }
 
-/* The number rides in the hole as ordinary text, small enough for a square
- * of the month and coloured as its ring is. */
+/* The number rides in the hole as ordinary text, as large as three digits
+ * allow in a square of the month. */
 .nosh-tracker .nosh-rings-num {
     position: absolute;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-normal);
-    font-size: 9px;
+    font-size: 12px;
     line-height: 1;
     font-weight: 700;
     letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums;
 }
-
-.nosh-tracker .nosh-rings-num[data-state="met"]  { color: var(--color-green); }
-.nosh-tracker .nosh-rings-num[data-state="near"] { color: var(--color-orange); }
 
 /* Bottom of a target band, e.g. the 4 in "4-5 servings". */
 .nosh-tracker .nosh-bar-min {
