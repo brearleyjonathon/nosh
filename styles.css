@@ -543,8 +543,8 @@
 /* A month ------------------------------------------------------------
  *
  * Seven columns, a row a week, a square a day. Inside each square the
- * nutrient bars as lines a couple of pixels tall, too small to label and
- * not meant to be: the picture is the colour, week by week. */
+ * day's rings, too small to label and not meant to be: the picture is the
+ * colour, week by week. */
 .nosh-tracker .nosh-month {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -603,34 +603,83 @@
     opacity: 0.6;
 }
 
-.nosh-tracker .nosh-cell-lines {
+/* The rings take what is left of the square under the date, as a square of
+ * their own, centred. */
+.nosh-tracker .nosh-cell-rings {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-end;
-    gap: 1px;
+    align-items: center;
+    justify-content: center;
     flex: 1 1 auto;
     min-height: 0;
 }
 
-.nosh-tracker .nosh-cell-line {
-    flex: 0 0 auto;
-    width: 100%;
-    height: 3px;
-    border-radius: 1px;
-    background: var(--background-modifier-border);
-    overflow: hidden;
-}
-
-.nosh-tracker .nosh-cell-fill {
+.nosh-tracker .nosh-cell-rings .nosh-rings {
     height: 100%;
-    background: var(--interactive-accent);
+    max-width: 100%;
+    aspect-ratio: 1;
 }
 
-.nosh-tracker .nosh-cell-line[data-state="met"] .nosh-cell-fill  { background: var(--color-green); }
-.nosh-tracker .nosh-cell-line[data-state="near"] .nosh-cell-fill { background: var(--color-orange); }
-.nosh-tracker .nosh-cell-line[data-state="over"] .nosh-cell-fill { background: var(--color-red); }
-.nosh-tracker .nosh-cell-line[data-state="neutral"] .nosh-cell-fill { background: var(--text-faint); }
+/* Rings ---------------------------------------------------------------
+ *
+ * Each ring is a pair of circles in one colour: a faint track the whole way
+ * round, and the arc wound over it. The colour sits on the group, so the
+ * track is the arc's own hue dimmed rather than a grey - the way a watch
+ * draws an empty ring. The outer ring is the number and is thick; the ones
+ * inside are the bars costing most and are not. */
+.nosh-tracker .nosh-rings {
+    position: relative;
+}
+
+.nosh-tracker .nosh-rings svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* Started at twelve o'clock rather than three. */
+    transform: rotate(-90deg);
+}
+
+.nosh-tracker .nosh-ring {
+    color: var(--interactive-accent);
+}
+
+.nosh-tracker .nosh-ring[data-state="met"]  { color: var(--color-green); }
+.nosh-tracker .nosh-ring[data-state="near"] { color: var(--color-orange); }
+.nosh-tracker .nosh-ring[data-state="over"] { color: var(--color-red); }
+
+.nosh-tracker .nosh-ring circle {
+    fill: none;
+    stroke: currentColor;
+}
+
+.nosh-tracker .nosh-ring-score circle { stroke-width: 11; }
+.nosh-tracker .nosh-ring-bar circle   { stroke-width: 5; }
+
+.nosh-tracker .nosh-ring-track {
+    opacity: 0.18;
+}
+
+.nosh-tracker .nosh-ring-arc {
+    stroke-linecap: round;
+}
+
+/* The number rides in the hole as ordinary text, small enough for a square
+ * of the month and coloured as its ring is. */
+.nosh-tracker .nosh-rings-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-normal);
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+
+.nosh-tracker .nosh-rings-num[data-state="met"]  { color: var(--color-green); }
+.nosh-tracker .nosh-rings-num[data-state="near"] { color: var(--color-orange); }
 
 /* Bottom of a target band, e.g. the 4 in "4-5 servings". */
 .nosh-tracker .nosh-bar-min {

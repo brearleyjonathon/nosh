@@ -4317,6 +4317,58 @@ function scoreOf(bars) {
 function scoreState(score) {
     return score >= 90 ? 'met' : score >= 70 ? 'near' : 'under';
 }
+
+/* A day drawn as rings, the way a watch draws them: the outside one, thick,
+ * is the score - a day at 73 is an arc not quite three-quarters round, wound
+ * from twelve o'clock and coloured as the number is and no finer. Inside it,
+ * thinner, one ring per bar costing most, each wound to what that bar is
+ * paying: a short ring is a bar well short, a red one a ceiling gone over.
+ * Every ring has a faint track of its own colour behind it, so an empty ring
+ * still says there is a ring there, and the number sits in the hole. */
+function drawRings(host, got) {
+    const state = scoreState(got.score);
+    const SVG = 'http://www.w3.org/2000/svg';
+    const dial = host.createDiv({ cls: 'nosh-rings' });
+    const svg = dial.appendChild(document.createElementNS(SVG, 'svg'));
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('aria-hidden', 'true');
+    /* One ring: the full circle dashed, then wound back by what the credit
+     * is short of whole, so a 0 draws nothing at all. */
+    const ring = (cls, r, credit, st, tip) => {
+        const g = svg.appendChild(document.createElementNS(SVG, 'g'));
+        g.setAttribute('class', 'nosh-ring ' + cls);
+        g.setAttribute('data-state', st);
+        const circle = (kind) => {
+            const c = g.appendChild(document.createElementNS(SVG, 'circle'));
+            c.setAttribute('class', 'nosh-ring-' + kind);
+            c.setAttribute('cx', '50');
+            c.setAttribute('cy', '50');
+            c.setAttribute('r', String(r));
+            return c;
+        };
+        circle('track');
+        const round = 2 * Math.PI * r;
+        const arc = circle('arc');
+        arc.setAttribute('stroke-dasharray', round.toFixed(1));
+        arc.setAttribute('stroke-dashoffset',
+                         (round * (1 - Math.max(0, Math.min(1, credit)))).toFixed(1));
+        if (tip) {
+            g.appendChild(document.createElementNS(SVG, 'title')).textContent = tip;
+        }
+    };
+    ring('nosh-ring-score', 44, got.score / 100, state);
+    /* A bar gone over is red as its bar is; one short is the accent, or
+     * amber once it is nearly there, as the number itself goes. */
+    const RADII = [35.5, 29, 22.5];
+    got.worst.slice(0, RADII.length).forEach((b, i) => {
+        const st = b.excess > 0 ? 'over' : scoreState(b.credit * 100);
+        ring('nosh-ring-bar', RADII[i], b.credit, st,
+             b.label + ' ' + Math.round(b.credit * 100) + '%');
+    });
+    dial.createDiv({ cls: 'nosh-rings-num', text: String(got.score) })
+        .setAttr('data-state', state);
+    return dial;
+}
 /* A column of glyphs reads down the page faster than a column of adjectives,
  * and survives being pasted somewhere without the stylesheet. */
 const STATE_MARK = { met: '✓', under: '↓', near: '!', over: '✗', neutral: '·' };
@@ -8525,18 +8577,17 @@ class NoshView extends ItemView {
     }
 
     /* A month at a glance: a row a week, a square a day, and in each square
-     * the nutrient bars drawn as lines too thin to label - which is the
-     * point. You cannot read a number off it, but you can see which weeks
-     * went green and which went red, and which days there is nothing on at
-     * all. Any square opens its day. */
+     * the day's rings - its score round the outside, the bars costing it
+     * most inside, the number in the hole - small enough that the picture
+     * is the colour, week by week: which weeks went green and which went
+     * red, and which days there is nothing on at all. Any square opens its
+     * day. */
     renderMonthGrid() {
         const el = this.bodyEl;
         const settings = this.plugin.settings;
         const inMonth = monthDays(this.cursor);
         const month = dateOf(this.cursor).getMonth();
         const today = todayIso();
-        const hiddenN = settings.hiddenNutrients || [];
-        const lines = NUTRIENTS.filter((n) => !hiddenN.includes(n.key));
 
         /* Whole weeks, so the columns mean the same all the way down. */
         const first = weekDays(inMonth[0], settings.weekStart)[0];
@@ -8559,21 +8610,13 @@ class NoshView extends ItemView {
             cell.setAttr('aria-label', humanDay(iso));
             cell.createDiv({ cls: 'nosh-cell-date', text: String(dateOf(iso).getDate()) });
 
-            const entries = this.entriesFor(iso);
-            const box = cell.createDiv({ cls: 'nosh-cell-lines' });
-            if (!entries.length) {
-                cell.addClass('is-empty');
-            } else {
-                const totals = this.totalsFor([iso]).totals;
-                for (const n of lines) {
-                    const target = parseNum(settings.targets[n.key]);
-                    const pct = target > 0 ? (totals[n.key] / target) * 100 : 0;
-                    const line = box.createDiv({ cls: 'nosh-cell-line' });
-                    line.setAttr('data-state', nutrientState(nutrientShape(n, settings), pct));
-                    line.createDiv({ cls: 'nosh-cell-fill' }).style.width =
-                        Math.max(0, Math.min(100, pct)) + '%';
-                }
-            }
+            /* Judged exactly as the day is: today on pace, any other day
+             * on the whole, so the square agrees with the score its day
+             * shows when opened. */
+            const got = this.entriesFor(iso).length ? this.dayScore(iso) : null;
+            const box = cell.createDiv({ cls: 'nosh-cell-rings' });
+            if (!got) cell.addClass('is-empty');
+            else drawRings(box, got);
 
             cell.addEventListener('click', () => {
                 this.cursor = iso;
