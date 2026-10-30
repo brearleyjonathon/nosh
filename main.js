@@ -167,6 +167,13 @@ const TARGETS_NOTE_NAME = 'Nosh targets';
 const TARGETS_BLOCK_OPEN = '<!-- nosh:targets -->';
 const TARGETS_BLOCK_CLOSE = '<!-- /nosh:targets -->';
 
+/* The last week's totals, in a note a Shortcut on the phone reads at night
+ * and logs to Apple Health. Nothing in an Obsidian plugin can reach
+ * HealthKit, and a scheduled Shortcut runs with Obsidian closed, so the note
+ * is the whole of the handoff. See "Apple Health" below. */
+const HEALTH_NOTE_NAME = 'Nosh health';
+const HEALTH_DAYS = 7;
+
 function noshFolder(settings, sub) {
     /* Typed by a person, so it may carry backslashes, doubled slashes or a
      * leading one. normalizePath settles all of that the way Obsidian does. */
@@ -220,6 +227,9 @@ const DEFAULT_SETTINGS = {
      * default: without it they live only in data.json, which every device
      * overwrites whole. */
     targetNotes: true,
+    /* Off by default: it is a note nobody asked for until they set up the
+     * Shortcut that reads it. See writeHealthNote. */
+    healthNote: false,
     schema: LOG_SCHEMA,
     weekStart: 1,     // 0 = Sunday, 1 = Monday
     hiddenNutrients: [],
@@ -4115,6 +4125,57 @@ function parseTargetsNote(cache) {
     return normalizeTargets(raw);
 }
 
+/* --- the totals for Apple Health -------------------------------------- */
+
+function isHealthNoteName(file) {
+    if (!file) return false;
+    const base = typeof file.basename === 'string' ? file.basename
+        : String(file.path || '').split('/').pop().replace(/\.md$/i, '');
+    return base === HEALTH_NOTE_NAME;
+}
+
+/* The nine nutrients for each of the last HEALTH_DAYS days up to `iso`,
+ * keyed by date, from the notes as they read now. A day with nothing logged
+ * is left out, so the Shortcut finds no entry and logs nothing rather than
+ * a row of zeroes. Food groups are not here: Health has nowhere to put a
+ * serving of vegetables. */
+function healthDays(log, byPath, iso) {
+    const out = {};
+    for (let i = HEALTH_DAYS - 1; i >= 0; i--) {
+        const day = addDays(iso, -i);
+        const rows = logRows(log, day).filter((r) => byPath[r.path]);
+        if (!rows.length) continue;
+        const totals = {};
+        for (const n of NUTRIENTS) totals[n.key] = 0;
+        for (const r of rows) {
+            const values = byPath[r.path].values;
+            for (const n of NUTRIENTS) totals[n.key] += parseNum(values[n.key]) * r.servings;
+        }
+        for (const n of NUTRIENTS) totals[n.key] = Math.round(totals[n.key] * 10) / 10;
+        out[day] = totals;
+    }
+    return out;
+}
+
+/* The JSON goes on one line, so the Shortcut can lift it out with a single
+ * Match Text and nothing else in the note can be mistaken for it. Nothing
+ * here says when it was written: every device writes the same text for the
+ * same log, and Sync then has nothing to reconcile. */
+function healthNoteText(days, settings) {
+    return ['---', 'nosh: health']
+        .concat(tagLines(noteTags(settings, 'health')))
+        .concat(['---',
+                 'Daily totals for the Shortcut that logs them to Apple Health. ' +
+                 'Nosh rewrites this note whenever a day changes, so anything ' +
+                 'typed here is lost.',
+                 '',
+                 '```json',
+                 JSON.stringify(days),
+                 '```',
+                 ''])
+        .join('\n');
+}
+
 /* --- the score -------------------------------------------------------- */
 
 /* How much a bar counts for in the score. 1 unless the settings say so, and
@@ -5859,6 +5920,7 @@ module.exports = class NoshPlugin extends Plugin {
             const read = await this.readLogNotes();
             await this.repairLog();
             if (read || moved) this.refreshViews();
+            this.healthChanged();
         });
 
         /* Keep the list in step with the vault, without redrawing it because
@@ -6001,7 +6063,7 @@ module.exports = class NoshPlugin extends Plugin {
     touches(file) {
         if (!file || typeof file.path !== 'string') return false;
         if (!file.path.toLowerCase().endsWith('.md')) return false;
-        if (logNoteDay(file) || isTargetsNoteName(file)) return false;
+        if (logNoteDay(file) || isTargetsNoteName(file) || isHealthNoteName(file)) return false;
         if (this.knownPaths && this.knownPaths.has(file.path)) return true;
         if (underFolder(file.path, noshFolder(this.settings, ''))) return true;
 
@@ -6024,6 +6086,8 @@ module.exports = class NoshPlugin extends Plugin {
             try {
                 if (mend) await this.repairLog();
                 this.refreshViews();
+                /* An ingredient edited changes every day that used it. */
+                this.healthChanged();
             } catch (e) {
                 new Notice('Nosh: ' + (e && e.message ? e.message : e), 8000);
             }
@@ -6041,6 +6105,11 @@ module.exports = class NoshPlugin extends Plugin {
             clearTimeout(this.targetsTimer);
             this.targetsTimer = null;
             this.flushTargetsNote();
+        }
+        if (this.healthTimer) {
+            clearTimeout(this.healthTimer);
+            this.healthTimer = null;
+            this.flushHealthNote();
         }
     }
 
@@ -6458,8 +6527,9 @@ module.exports = class NoshPlugin extends Plugin {
              * between is several meals of which at most one was eaten. */
             if (underFolder(file.path, reports) || underFolder(file.path, logs) ||
                 underFolder(file.path, outings)) continue;
-            /* The targets note is the plan, not a food. */
-            if (isTargetsNoteName(file)) continue;
+            /* The targets note is the plan, not a food, and the health
+             * note is a copy of the log. */
+            if (isTargetsNoteName(file) || isHealthNoteName(file)) continue;
 
             const cache = this.app.metadataCache.getFileCache(file);
             if (!cache) continue;
@@ -6757,6 +6827,7 @@ module.exports = class NoshPlugin extends Plugin {
      * gathered for a moment, so a stepper tapped five times writes once,
      * and run one after another, so two never race for the same note. */
     logChanged(isos) {
+        this.healthChanged();
         if (!this.settings.logNotes) return;
         if (!this.dirtyLogDays) this.dirtyLogDays = new Set();
         for (const iso of [].concat(isos)) if (iso) this.dirtyLogDays.add(iso);
@@ -7155,6 +7226,61 @@ module.exports = class NoshPlugin extends Plugin {
         delete this.settings.log[iso];
         this.saveSettings();
         this.scheduleRefresh();
+    }
+
+    /* --- the totals for Apple Health ---------------------------------- */
+
+    healthNotePath() {
+        const folder = noshFolder(this.settings, '');
+        return (folder ? folder + '/' : '') + HEALTH_NOTE_NAME + '.md';
+    }
+
+    /* Called wherever a day's totals may have changed: something logged, a
+     * food note edited, a log note arriving from another device. A second
+     * apart is plenty, since the note is only read once a night. */
+    healthChanged() {
+        if (!this.settings.healthNote) return;
+        if (this.healthTimer) clearTimeout(this.healthTimer);
+        this.healthTimer = setTimeout(() => {
+            this.healthTimer = null;
+            this.flushHealthNote();
+        }, 1000);
+    }
+
+    flushHealthNote() {
+        const run = async () => {
+            try {
+                await this.writeHealthNote();
+            } catch (e) {
+                new Notice('Nosh: could not write the health note: ' +
+                           (e && e.message ? e.message : e), 8000);
+            }
+        };
+        this.healthQueue = (this.healthQueue || Promise.resolve()).then(run, run);
+        return this.healthQueue;
+    }
+
+    /* The note is Nosh's alone, so it is written whole. It stays where the
+     * Shortcut was told to look, which is why it is not followed by its tag
+     * the way a log note is. */
+    async writeHealthNote() {
+        if (!this.settings.healthNote) return;
+        const vault = this.app.vault;
+        const notes = this.collectNotes();
+        const byPath = {};
+        for (const r of notes.meal.concat(notes.ingredient)) byPath[r.path] = r;
+        const text = healthNoteText(healthDays(this.settings.log, byPath, todayIso()),
+                                    this.settings);
+
+        const path = this.healthNotePath();
+        const file = vault.getAbstractFileByPath(path);
+        if (!file || file.extension !== 'md') {
+            await ensureFolder(vault, noshFolder(this.settings, ''));
+            await vault.create(path, text);
+            return;
+        }
+        if ((await vault.cachedRead(file)) === text) return;
+        await vault.process(file, () => text);
     }
 };
 
@@ -10033,6 +10159,20 @@ class NoshSettingTab extends PluginSettingTab {
                         this.plugin.refreshViews();
                         this.redraw();
                     }
+                }));
+
+        new Setting(log)
+            .setName('Write totals for Apple Health')
+            .setDesc('Keeps the last week of nutrient totals in "' + HEALTH_NOTE_NAME +
+                     '" in the Nosh folder, for a Shortcut on your iPhone to log ' +
+                     'to Apple Health each night. The README explains how to set ' +
+                     'up the Shortcut.')
+            .addToggle((t) => t
+                .setValue(this.plugin.settings.healthNote === true)
+                .onChange(async (v) => {
+                    this.plugin.settings.healthNote = v;
+                    await this.plugin.saveSettings();
+                    if (v) await this.plugin.flushHealthNote();
                 }));
 
         new Setting(log)

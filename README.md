@@ -32,6 +32,10 @@ API key. With them on:
   on needs it added once. Obsidian older than 1.11.4 has no keychain, so
   there it's stored in plain text in `data.json` in the plugin folder, inside
   your vault. See [Credentials](#credentials).
+- Apple Health. With *Write totals for Apple Health* on, Nosh keeps the last
+  week's nutrient totals in a note in the Nosh folder. A Shortcut you set up
+  reads that note and writes to Health. Nosh itself never opens Health or any
+  other app. See [Apple Health](#apple-health).
 - The notes Nosh looks at. To find your foods, log notes and targets note, Nosh
   goes through the vault's Markdown notes using the tags and frontmatter
   Obsidian already has for each. It only reads a note's text when it's one
@@ -247,6 +251,58 @@ overshoot of any ceiling).
 Each span has one report (`Nosh 2026-09`). Exporting again overwrites it,
 including anything you typed into it. Saved chats (below) are the one thing it
 keeps.
+
+## Apple Health
+
+Nosh can send each day's nutrient totals to Apple Health through a Shortcut on
+your iPhone. Obsidian plugins can't reach Apple Health, so the Shortcut reads
+the totals from a note Nosh writes.
+
+Turn on *Write totals for Apple Health* in settings. Nosh then keeps a note
+called `Nosh health` in the Nosh folder, with the last seven days of totals as
+one line of JSON. It rewrites the note whenever you log something or edit a
+food. Days with nothing logged are left out. Food-group servings stay in Nosh,
+since Health has no type for them.
+
+In the Shortcuts app, make a shortcut called *Nosh to Health* with these
+actions.
+
+1. *Get File*. Set its folder to Obsidian under On My iPhone, and its path to
+   `Your vault/Nosh/Nosh health.md`.
+2. *Match Text* with the pattern `\{.*\}`, in the file.
+3. *Get Dictionary from Input*, on the matches.
+4. *Format Date* on the current date, with the custom format `yyyy-MM-dd`.
+5. *Get Dictionary Value* for the formatted date, in the dictionary.
+6. *If* that value has no value, *Stop This Shortcut*. Nothing was logged today.
+7. For each row of the table below, *Get Dictionary Value* for the key, then
+   *Log Health Sample* with that value.
+
+| Key | Health type | Unit |
+|---|---|---|
+| `calories` | Dietary Energy | kcal |
+| `protein_g` | Protein | g |
+| `carbs_g` | Carbohydrates | g |
+| `fat_g` | Total Fat | g |
+| `sat_fat_g` | Saturated Fat | g |
+| `fiber_g` | Fiber | g |
+| `sodium_mg` | Sodium | mg |
+| `potassium_mg` | Potassium | mg |
+| `calcium_mg` | Calcium | mg |
+
+To run it every night, add an automation in the Automation tab. Choose *Time
+of Day*, set 11:30 PM daily, pick *Run Immediately*, and choose *Nosh to
+Health*. The first run asks permission to write each type to Health.
+
+Health keeps every sample it's given. Running the Shortcut by hand on a day the
+automation already sent counts that day twice. Anything logged after 11:30 PM
+never reaches Health.
+
+Obsidian Sync updates the vault on your iPhone only while Obsidian is open
+there. Food logged on another device reaches the phone's copy of `Nosh health`
+the next time you open Obsidian on the phone. If you log mostly on a computer,
+open Obsidian on the phone sometime before 11:30 PM. You can also start the
+Shortcut with *Open App* (Obsidian) and *Wait* 30 seconds. Test that with the
+phone locked, since iOS can stop an automation from opening an app.
 
 ## Nosh AI (optional)
 
