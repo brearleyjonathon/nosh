@@ -320,7 +320,7 @@ delete that action and drag it in again.
 
 To run it every night, add an automation in the Automation tab. Choose *Time
 of Day*, set a time late in the evening once you're done eating for the day
-(11:30 PM, say), pick *Run Immediately*, and choose *Nosh to Health*. The first
+(11:45 PM, say), pick *Run Immediately*, and choose *Nosh to Health*. The first
 run asks permission to write each type to Health.
 
 <img src="images/shortcut-automation.png" width="300" alt="The Automation tab in Shortcuts, with the time of day highlighted: set it late in the evening, after the day's eating is done.">
