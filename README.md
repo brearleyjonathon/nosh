@@ -267,15 +267,26 @@ since Health has no type for them.
 In the Shortcuts app, make a shortcut called *Nosh to Health* with these
 actions.
 
-1. *Get File*. Set its folder to Obsidian under On My iPhone, and its path to
-   `Your vault/Nosh/Nosh health.md`.
+1. *Get File from Folder*. Pick your vault's Nosh folder, and type the path
+   `Nosh health.md`.
 2. *Match Text* with the pattern `\{.*\}`, in the file.
 3. *Get Dictionary from Input*, on the matches.
-4. *Format Date* on the current date, with the custom format `yyyy-MM-dd`.
-5. *Get Dictionary Value* for the formatted date, in the dictionary.
-6. *If* that value has no value, *Stop This Shortcut*. Nothing was logged today.
-7. For each row of the table below, *Get Dictionary Value* for the key, then
-   *Log Health Sample* with that value.
+4. *Format Date* on Current Date. Expand the action, set Date Format to
+   Custom, and type `yyyy-MM-dd` as the Format String. The date box itself
+   holds only Current Date.
+5. *Get Dictionary Value* for the formatted date, in the dictionary from step 3.
+6. *Set Variable*, named `Today`. Drag it in directly under step 5 and leave
+   its input alone, so it fills in as Dictionary Value.
+7. *If* `Today` has any value. Everything below goes inside the If, so a day
+   with nothing logged sends nothing.
+8. For each row of the table below, *Get Dictionary Value* for the key, in
+   `Today`. Directly under it, drag in a fresh *Log Health Sample*, and its
+   value fills in from the lookup above. Set the type and unit from the table.
+
+Shortcuts names the output of every lookup *Value*, so picking one from a list
+often gets the wrong one. Dragging each new action in directly under the one
+it reads from avoids the list. If a box shows *Name* or *Keys* instead,
+delete that action and drag it in again.
 
 | Key | Health type | Unit |
 |---|---|---|
