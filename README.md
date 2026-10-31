@@ -264,8 +264,13 @@ one line of JSON. It rewrites the note whenever you log something or edit a
 food. Days with nothing logged are left out. Food-group servings stay in Nosh,
 since Health has no type for them.
 
-In the Shortcuts app, make a shortcut called *Nosh to Health* with these
-actions.
+The quickest way is to add the ready-made
+[Nosh to Health](https://www.icloud.com/shortcuts/232ec511534142669b0d0ff44ccd1e48)
+shortcut on your iPhone, then open it and point its first action, *Get File
+from Folder*, at your own vault's Nosh folder.
+
+To build it yourself instead, make a shortcut in the Shortcuts app called
+*Nosh to Health* with these actions.
 
 1. *Get File from Folder*. Pick your vault's Nosh folder, and type the path
    `Nosh health.md`.
