@@ -319,21 +319,21 @@ delete that action and drag it in again.
 | `calcium_mg` | Calcium | mg |
 
 To run it every night, add an automation in the Automation tab. Choose *Time
-of Day*, set 11:30 PM daily, pick *Run Immediately*, and choose *Nosh to
-Health*. The first run asks permission to write each type to Health.
+of Day*, set a time late in the evening once you're done eating for the day
+(11:30 PM, say), pick *Run Immediately*, and choose *Nosh to Health*. The first
+run asks permission to write each type to Health.
 
-<img src="images/shortcut-automation.png" width="300" alt="The Automation tab in Shortcuts, with the time of day highlighted: it should read 11:30 PM, daily.">
+<img src="images/shortcut-automation.png" width="300" alt="The Automation tab in Shortcuts, with the time of day highlighted: set it late in the evening, after the day's eating is done.">
 
-The time has to be before midnight. The Shortcut looks up the current date, so
+Keep the time before midnight. The Shortcut sends the current date's totals, so
 an automation at 3:00 AM looks for a day that has only just started, finds
-nothing logged, and sends nothing.
-
-Anything logged after 11:30 PM never reaches Health.
+nothing logged, and sends nothing. Anything logged after the automation runs
+never reaches Health.
 
 Obsidian Sync updates the vault on your iPhone only while Obsidian is open
 there. Food logged on another device reaches the phone's copy of `Nosh health`
 the next time you open Obsidian on the phone. If you log mostly on a computer,
-open Obsidian on the phone sometime before 11:30 PM. You can also start the
+open Obsidian on the phone sometime before the automation runs. You can also start the
 Shortcut with *Open App* (Obsidian) and *Wait* 30 seconds. Test that with the
 phone locked, since iOS can stop an automation from opening an app.
 
