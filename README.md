@@ -269,7 +269,8 @@ The quickest way is to add the ready-made
 shortcut on your iPhone, then open it and point its first action, *Get File
 from Folder*, at your own vault's Nosh folder. Run it once by hand: it asks to
 read the folder and to write each nutrient to Health, and needs a yes to all of
-them.
+them. That run sends today's totals, so set the nightly automation below to
+start tomorrow, or today will be counted twice.
 
 To build it yourself instead, make a shortcut in the Shortcuts app called
 *Nosh to Health* with these actions.
