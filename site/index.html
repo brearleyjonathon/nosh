@@ -416,6 +416,10 @@ button { font: inherit; color: inherit; }
 .art-row .chk.on { background: var(--primary); border-color: var(--primary); }
 .art-row .chk.on::after { content: ""; width: 5px; height: 9px; border: solid #1c1b1f; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
 .art-row .qty { margin-left: auto; color: var(--text-3); font-size: 0.875rem; }
+.art-tog { margin-left: auto; width: 34px; height: 20px; border-radius: 999px; background: var(--accent); position: relative; flex: none; }
+.art-tog::after { content: ""; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+.step p a, .health-more a { color: var(--text); text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; }
+.health-more { margin-top: 28px; color: var(--text-2); }
 .art-bar { display: grid; gap: 6px; font-size: 0.9375rem; }
 .art-bar .top { display: flex; justify-content: space-between; }
 .art-bar .top small { color: var(--text-2); }
@@ -1260,6 +1264,52 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
   </div>
 </section>
 
+<!-- ============ APPLE HEALTH ============ -->
+<section class="section section-follow" id="health" aria-labelledby="health-title">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow reveal">Apple Health · iPhone</div>
+      <h2 id="health-title" class="reveal" style="--i:1">The day's totals in Apple Health, every night.</h2>
+      <p class="reveal" style="--i:2">An Obsidian plugin can't reach Apple Health, so Nosh writes the last week of nutrient totals to a note in your vault, and a Shortcut on your iPhone reads that note each night and logs the day to Health.</p>
+    </div>
+    <div class="steps">
+      <article class="step reveal" style="--i:0">
+        <div class="step-n num">01</div>
+        <h3>Turn it on</h3>
+        <p>In Nosh's settings, turn on Write totals for Apple Health. A note called Nosh health appears in the Nosh folder and keeps up as you log.</p>
+        <div class="step-art" aria-hidden="true">
+          <div class="art-row">Write totals for Apple Health<span class="art-tog"></span></div>
+        </div>
+      </article>
+      <article class="step reveal" style="--i:1">
+        <div class="step-n num">02</div>
+        <h3>Add the Shortcut</h3>
+        <p>Add the ready-made <a href="https://www.icloud.com/shortcuts/232ec511534142669b0d0ff44ccd1e48">Nosh to Health</a> shortcut, point it at your vault's Nosh folder, and run it once to allow it to write to Health.</p>
+        <div class="step-art" aria-hidden="true">
+          <div class="art-row">Get file from Nosh<span class="qty">Nosh health.md</span></div>
+          <div class="art-row">Log Health Sample<span class="qty num">× 9</span></div>
+        </div>
+      </article>
+      <article class="step reveal" style="--i:2">
+        <div class="step-n num">03</div>
+        <h3>Let it run each night</h3>
+        <p>Add an automation for late in the evening, once you're done eating. Calories, protein, carbs, fat, saturated fat, fiber, sodium, potassium and calcium land in Health.</p>
+        <div class="step-art" aria-hidden="true">
+          <div class="art-row">Dietary Energy<span class="qty num">1,840 kcal</span></div>
+          <div class="art-row">Protein<span class="qty num">92 g</span></div>
+          <div class="art-row">Sodium<span class="qty num">1,720 mg</span></div>
+        </div>
+      </article>
+    </div>
+    <div class="ai-facts">
+      <div class="ai-fact reveal" style="--i:0"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2.5"/></svg><div><b>Once a day</b>Health adds up every sample it's given, so a second run in a day adds that day's food again.</div></div>
+      <div class="ai-fact reveal" style="--i:1"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/></svg><div><b>Nutrients, not food groups</b>Health has nowhere to put servings, so the nine food groups stay in Nosh.</div></div>
+      <div class="ai-fact reveal" style="--i:2"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="8" height="16" rx="2"/><path d="M9.5 15h1"/></svg><div><b>Log anywhere, send from the phone</b>Food logged on a computer reaches the phone when the vault syncs. Open Obsidian there before the automation runs.</div></div>
+    </div>
+    <p class="health-more reveal">The full setup, step by step, is in <a href="https://github.com/brearleyjonathon/nosh#apple-health">the manual</a>.</p>
+  </div>
+</section>
+
 <!-- ============ PRICING ============ -->
 <section class="section pricing" id="pricing" aria-labelledby="pricing-title">
   <div class="wrap">
@@ -1278,6 +1328,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
           <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--accent-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Nine nutrients and nine food groups against DASH targets, every one editable</li>
           <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--accent-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Composite score, week strip and month calendar</li>
           <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--accent-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Reports as markdown notes, a day, a week or a month</li>
+          <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--accent-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Daily totals to Apple Health through a Shortcut</li>
           <li><svg viewBox="0 0 18 18" fill="none" stroke="var(--accent-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5l4 4 8-8"/></svg>Sample notes to start a vault with</li>
         </ul>
         <a class="btn btn-primary" href="obsidian://show-plugin?id=nosh">Install Nosh</a>
@@ -1386,6 +1437,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 40px; }
           <li><a href="#demo">Try the demo</a></li>
           <li><a href="#targets">Targets</a></li>
           <li><a href="#ai">Nosh AI</a></li>
+          <li><a href="#health">Apple Health</a></li>
           <li><a href="#pricing">Pricing</a></li>
           <li><a href="#faq">Questions</a></li>
         </ul>
