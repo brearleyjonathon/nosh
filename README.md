@@ -272,6 +272,16 @@ read the folder and to write each nutrient to Health, and needs a yes to all of
 them. That run sends today's totals, so add the nightly automation below
 tomorrow, or today will be counted twice.
 
+<img src="images/shortcut-actions.png" width="300" alt="The Nosh to Health shortcut in the Shortcuts app. 1: the folder in Get file from, to change to your own Nosh folder. 2: the play button, to run it once by hand.">
+
+1. Tap the folder in *Get file from* and pick the Nosh folder in your own
+   vault. Leave the path as `Nosh health.md`.
+2. Tap ▶ to run it once and allow each permission it asks for.
+
+> [!WARNING]
+> Run the Shortcut only once a day, by hand or by the automation. Health adds
+> up every sample it's given, so a second run adds that day's food again.
+
 To build it yourself instead, make a shortcut in the Shortcuts app called
 *Nosh to Health* with these actions.
 
@@ -312,9 +322,13 @@ To run it every night, add an automation in the Automation tab. Choose *Time
 of Day*, set 11:30 PM daily, pick *Run Immediately*, and choose *Nosh to
 Health*. The first run asks permission to write each type to Health.
 
-Health keeps every sample it's given. Running the Shortcut by hand on a day the
-automation already sent counts that day twice. Anything logged after 11:30 PM
-never reaches Health.
+<img src="images/shortcut-automation.png" width="300" alt="The Automation tab in Shortcuts, with the time of day highlighted: it should read 11:30 PM, daily.">
+
+The time has to be before midnight. The Shortcut looks up the current date, so
+an automation at 3:00 AM looks for a day that has only just started, finds
+nothing logged, and sends nothing.
+
+Anything logged after 11:30 PM never reaches Health.
 
 Obsidian Sync updates the vault on your iPhone only while Obsidian is open
 there. Food logged on another device reaches the phone's copy of `Nosh health`
