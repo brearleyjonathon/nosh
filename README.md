@@ -267,7 +267,9 @@ since Health has no type for them.
 The quickest way is to add the ready-made
 [Nosh to Health](https://www.icloud.com/shortcuts/232ec511534142669b0d0ff44ccd1e48)
 shortcut on your iPhone, then open it and point its first action, *Get File
-from Folder*, at your own vault's Nosh folder.
+from Folder*, at your own vault's Nosh folder. Run it once by hand: it asks to
+read the folder and to write each nutrient to Health, and needs a yes to all of
+them.
 
 To build it yourself instead, make a shortcut in the Shortcuts app called
 *Nosh to Health* with these actions.
