@@ -483,6 +483,64 @@ const flush = async (p) => {
         p.onunload();
     }
 
+    /* Two devices on one vault, the phone still on the default folder. The
+       desk keeps the note under its own folder; the phone, reading its own
+       folder first, has written a second note under "Nosh". The desk deletes
+       that one: the phone adopts the desk's note rather than writing its own
+       again, and takes the desk's figures. */
+    {
+        const desk = 'Health/' + X.TARGETS_NOTE_NAME + '.md';
+        const phone = 'Nosh/' + X.TARGETS_NOTE_NAME + '.md';
+        const filled = Object.assign({}, X.DEFAULT_SETTINGS, { targets: Object.assign({}, X.DEFAULT_TARGETS, { calories: 2500 }) });
+        const p = await plugin(Object.assign({}, filled), {
+            [desk]: X.targetsNoteText(CUSTOM),
+            [phone]: X.targetsNoteText(filled),
+        });
+        await p.readTargetsNote();
+        eq('the phone reads the note in its own folder', p.targetsNoteAt, phone);
+        eq('and keeps its own figures', p.settings.targets.calories, 2500);
+        const gone = p.app.files.get(phone);
+        p.app.files.delete(phone);
+        p.targetsWrote = 0;
+        p.onTargetsNoteDeleted(gone);
+        await flush(p);
+        ok('no note is written back under Nosh', !noteOf(p));
+        eq('the other note is the targets now', p.targetsNoteAt, desk);
+        eq('and its figures are taken', p.settings.targets.calories, 1750);
+        eq('data.json follows', p.app.__data.targets.calories, 1750);
+    }
+
+    /* The same deletion with no other note anywhere: the note is written
+       again from the figures in hand, as before. */
+    {
+        const p = await plugin(Object.assign({}, CUSTOM));
+        await p.readTargetsNote();
+        await flush(p);
+        const gone = noteOf(p);
+        p.app.files.delete(gone.path);
+        p.targetsWrote = 0;
+        p.onTargetsNoteDeleted(gone);
+        await flush(p);
+        ok('a lone note deleted is written again', !!noteOf(p));
+    }
+
+    /* The first read waits for the cache only where Obsidian says it is not
+       up yet, and gives up waiting if it never reports in. */
+    {
+        const p = await plugin({});
+        let settled = false;
+        await p.whenCacheReady().then(() => { settled = true; });
+        ok('a cache without the flag is not waited on', settled);
+        p.app.metadataCache.initialized = false;
+        let fired = 0;
+        let offs = 0;
+        p.app.metadataCache.on = (ev, fn) => { if (ev === 'resolved') setTimeout(fn, 0); fired++; return { ev }; };
+        p.app.metadataCache.offref = () => { offs++; };
+        await p.whenCacheReady();
+        eq('a cache still filling is waited for', fired, 1);
+        eq('and the listener is let go', offs, 1);
+    }
+
     console.log('\n' + pass + ' passed, ' + fail + ' failed');
     process.exit(fail ? 1 : 0);
 })();

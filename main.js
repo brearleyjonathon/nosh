@@ -238,17 +238,17 @@ const DEFAULT_SETTINGS = {
      * Remembered, because a fold is a preference and not a mood. */
     foldedTotals: {},
     aiReading: false,
-    aiModel: 'claude-sonnet-5',   // must be an id in AI_MODELS
+    aiModel: 'claude-sonnet-5-5',   // must be an id in AI_MODELS
     /* Inventing a meal and costing one are different jobs, and not jobs for
      * the same model. This one runs once a day rather than once a mouthful,
      * and is the harder of the two - a dish worth cooking that also threads
      * several shortfalls through what little headroom is left - so it starts
      * on Opus. Cleared, it falls back on aiModel. */
-    aiSuggestModel: 'claude-opus-5',
+    aiSuggestModel: 'claude-opus-5-5',
     /* Eating out is waited on with a coat on, and most of its time goes on
      * reading the menu rather than on thinking about it - which Sonnet does
      * as well as Opus and in a good deal less time. */
-    aiOrderModel: 'claude-sonnet-5',
+    aiOrderModel: 'claude-sonnet-5-5',
     aiKeySecret: '',      // the keychain name an earlier Nosh synced; read, never written
     aiApiKey: '',         // the key itself, only where there is no keychain
     aiEffort: 'medium',
@@ -852,17 +852,17 @@ const AI_ENDPOINT = 'https://api.anthropic.com/v1/messages';
  * to: Sonnet and Opus 5.5 refuse to be made, and Haiku 5.5 allows it but then
  * answers without thinking first. aiFill() takes care of that. The first is
  * the default for the numbers, and the fallback for an id no longer offered,
- * which is why Haiku goes on the end; suggestions start on Opus 5. Keep the
+ * which is why Haiku goes on the end; suggestions start on Opus 5.5. Keep the
  * list in step with DEFAULT_SETTINGS.aiModel, .aiSuggestModel and
  * .aiOrderModel. `input` and `output` are list prices in dollars per million
  * tokens, for the cost on each card; keep them in step with
  * platform.claude.com. Haiku 5.5 is five times dearer on a prompt over 100,000
  * tokens, which no Nosh request comes near, so only the lower rate is here. */
 const AI_MODELS = [
-    { id: 'claude-sonnet-5',   label: 'Sonnet 5',   input: 2, output: 10 },
     { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', input: 2, output: 10, askForForm: true },
-    { id: 'claude-opus-5',     label: 'Opus 5',     input: 5, output: 25 },
+    { id: 'claude-sonnet-5',   label: 'Sonnet 5',   input: 2, output: 10 },
     { id: 'claude-opus-5-5',   label: 'Opus 5.5',   input: 4, output: 20, askForForm: true },
+    { id: 'claude-opus-5',     label: 'Opus 5',     input: 5, output: 25 },
     { id: 'claude-haiku-5-5',  label: 'Haiku 5.5',  input: 0.1, output: 0.5, askForForm: true },
 ];
 
@@ -5912,6 +5912,7 @@ module.exports = class NoshPlugin extends Plugin {
         this.app.workspace.onLayoutReady(async () => {
             let moved = false;
             try {
+                await this.whenCacheReady();
                 moved = await this.readTargetsNote();
             } catch (e) {
                 new Notice('Nosh: could not read the targets note: ' +
@@ -6996,12 +6997,53 @@ module.exports = class NoshPlugin extends Plugin {
     }
 
     /* The note: wherever it was last seen - a targets note is read by its tag
-     * from anywhere in the vault - or else in the Nosh folder. */
+     * from anywhere in the vault - or else in the Nosh folder, or else
+     * wherever one is found. The last of those is what keeps two devices on
+     * one note: a phone whose folder setting was never changed from the
+     * default would otherwise write a second note under "Nosh" at the vault
+     * root, and write it again every time the desk deleted it. */
     targetsNoteFile() {
         const vault = this.app.vault;
         let f = this.targetsNoteAt ? vault.getAbstractFileByPath(this.targetsNoteAt) : null;
         if (!f || f.extension !== 'md') f = vault.getAbstractFileByPath(this.targetsNotePath());
+        if (!f || f.extension !== 'md') f = this.findTargetsNote();
         return f && f.extension === 'md' ? f : null;
+    }
+
+    /* Named like the targets note, and either in the Nosh folder or carrying
+     * the tag. Where there are somehow two, the one in the folder is the
+     * targets. */
+    findTargetsNote() {
+        const app = this.app;
+        const inFolder = (f) => underFolder(f.path, noshFolder(this.settings, ''));
+        return app.vault.getMarkdownFiles()
+            .filter((f) => isTargetsNoteName(f))
+            .sort((a, b) => (inFolder(b) ? 1 : 0) - (inFolder(a) ? 1 : 0))
+            .find((f) => this.isTargetsNote(f, app.metadataCache.getFileCache(f))) || null;
+    }
+
+    /* The tags a note carries are the cache's to report, and on a phone the
+     * cache is still filling when the layout is ready. Read before it has, a
+     * targets note outside the Nosh folder looks like nobody's, and a fresh
+     * one gets written where the folder setting says. So the first read waits
+     * for the cache, where Obsidian says it is not up yet; a stand-in without
+     * the flag, and a cache that never reports in, are not waited on. */
+    whenCacheReady() {
+        const cache = this.app.metadataCache;
+        if (!cache || cache.initialized !== false || typeof cache.on !== 'function') {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+            let done = false;
+            const finish = () => {
+                if (done) return;
+                done = true;
+                if (ref && typeof cache.offref === 'function') cache.offref(ref);
+                resolve();
+            };
+            const ref = cache.on('resolved', finish);
+            setTimeout(finish, 20000);
+        });
     }
 
     /* A file is the targets note by its name and either its place or its tag,
@@ -7144,14 +7186,7 @@ module.exports = class NoshPlugin extends Plugin {
         if (!this.settings.targetNotes) return false;
         const app = this.app;
 
-        /* Named like the targets note, and either in the Nosh folder or
-         * carrying the tag. Where there are somehow two, the one in the
-         * folder is the targets. */
-        const inFolder = (f) => underFolder(f.path, noshFolder(this.settings, ''));
-        const file = app.vault.getMarkdownFiles()
-            .filter((f) => isTargetsNoteName(f))
-            .sort((a, b) => (inFolder(b) ? 1 : 0) - (inFolder(a) ? 1 : 0))
-            .find((f) => this.isTargetsNote(f, app.metadataCache.getFileCache(f)));
+        const file = this.findTargetsNote();
 
         if (!file) {
             this.targetsNoteAt = null;
@@ -7213,6 +7248,15 @@ module.exports = class NoshPlugin extends Plugin {
          * untagged - is theirs to delete without a new one appearing. */
         if (this.targetsNoteAt !== file.path) return;
         this.targetsNoteAt = null;
+        /* Where another targets note is already in the vault - the one the
+         * other device keeps, say - that is the record from here on, and it
+         * is read rather than written over. Otherwise the note is written
+         * again from the figures in hand. */
+        const other = this.findTargetsNote();
+        if (other) {
+            this.targetsNoteAt = other.path;
+            this.onTargetsNoteChanged(other);
+        }
         this.targetsChanged();
     }
 
@@ -10549,3 +10593,5 @@ class NoshSettingTab extends PluginSettingTab {
         }
     }
 }
+
+/* nosourcemap */
